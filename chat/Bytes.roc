@@ -1,6 +1,6 @@
 ## BYTES AS ZIG'S std.mem HANDLES THEM: the searches and splits the chat's
 ## pure modules share (`std.mem.splitScalar`, `splitSequence`, `indexOf`,
-## `startsWith`), on bytes, never Str. Pure.
+## `startsWith`, `lessThan`), on bytes, never Str. Pure.
 
 Bytes := [].{
 	leading : List(U8), U8, U64 -> U64
@@ -63,4 +63,12 @@ Bytes := [].{
 
 	starts_with : List(U8), List(U8) -> Bool
 	starts_with = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
+
+	## std.mem.lessThan of bytes: byte by byte, a prefix first.
+	less : List(U8), List(U8) -> Bool
+	less = |a, b| match (a, b) {
+		([x, .. as ra], [y, .. as rb]) => if x != y x < y else less(ra, rb)
+		([], [_, ..]) => Bool.True
+		_ => Bool.False
+	}
 }
