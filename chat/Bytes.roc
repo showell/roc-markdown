@@ -64,6 +64,19 @@ Bytes := [].{
 	starts_with : List(U8), List(U8) -> Bool
 	starts_with = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
 
+	## std.mem.sort with lessThanStr: equal strings are the same bytes, so the
+	## order among them cannot show.
+	sort : List(List(U8)) -> List(List(U8))
+	sort = |l|
+		List.sort_with(l, |a, b|
+			if less(a, b) {
+				Before
+			} else if less(b, a) {
+				After
+			} else {
+				Same
+			})
+
 	## std.mem.lessThan of bytes: byte by byte, a prefix first.
 	less : List(U8), List(U8) -> Bool
 	less = |a, b| match (a, b) {
