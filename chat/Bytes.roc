@@ -10,7 +10,7 @@ Bytes := [].{
 	}
 
 	join_lines : List(List(U8)) -> List(U8)
-	join_lines = |lines| List.join(List.intersperse(lines, [10]))
+	join_lines = |lines| List.join(List.intersperse(lines, ['\n']))
 
 	## std.mem.splitScalar: every piece, empty ones too, as slices.
 	split_byte : List(U8), U8 -> List(List(U8))
@@ -63,6 +63,11 @@ Bytes := [].{
 
 	starts_with : List(U8), List(U8) -> Bool
 	starts_with = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
+
+	## The bytes after `prefix`, when `l` starts with it: no length is
+	## written beside the literal it belongs to.
+	strip_prefix : List(U8), List(U8) -> Try(List(U8), [NoMatch])
+	strip_prefix = |l, prefix| if starts_with(l, prefix) Ok(List.drop_first(l, List.len(prefix))) else Err(NoMatch)
 
 	## std.mem.sort with lessThanStr: equal strings are the same bytes, so the
 	## order among them cannot show.
