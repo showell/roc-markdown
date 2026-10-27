@@ -61,35 +61,25 @@ Bytes := [].{
 			find(s, needle, i + 1)
 		}
 
-	starts_with : List(U8), List(U8) -> Bool
-	starts_with = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
+	has_prefix : List(U8), List(U8) -> Bool
+	has_prefix = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
 
 	## The bytes after `prefix`, when `l` starts with it: no length is
 	## written beside the literal it belongs to.
 	strip_prefix : List(U8), List(U8) -> Try(List(U8), [NoMatch])
-	strip_prefix = |l, prefix| if starts_with(l, prefix) Ok(List.drop_first(l, List.len(prefix))) else Err(NoMatch)
+	strip_prefix = |l, prefix| if has_prefix(l, prefix) Ok(List.drop_first(l, List.len(prefix))) else Err(NoMatch)
 
 	## std.mem.sort with lessThanStr: equal strings are the same bytes, so the
 	## order among them cannot show.
 	sort : List(List(U8)) -> List(List(U8))
-	sort = |l|
-		List.sort_with(
-			l,
-			|a, b|
-				if less(a, b) {
-					Before
-				} else if less(b, a) {
-					After
-				} else {
-					Same
-				},
-		)
+	sort = |l| List.sort_with(l, compare)
 
-	## std.mem.lessThan of bytes: byte by byte, a prefix first.
-	less : List(U8), List(U8) -> Bool
-	less = |a, b| match (a, b) {
-		([x, .. as ra], [y, .. as rb]) => if x != y x < y else less(ra, rb)
-		([], [_, ..]) => Bool.True
-		_ => Bool.False
+	## std.mem.order of bytes: byte by byte, a prefix first.
+	compare : List(U8), List(U8) -> [Before, Same, After]
+	compare = |a, b| match (a, b) {
+		([x, .. as ra], [y, .. as rb]) => if x < y Before else if x > y After else compare(ra, rb)
+		([], []) => Same
+		([], _) => Before
+		_ => After
 	}
 }
