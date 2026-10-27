@@ -16,33 +16,10 @@ Bytes := [].{
 	split_byte : List(U8), U8 -> List(List(U8))
 	split_byte = |s, b| split_byte_from(s, b, 0, 0, [])
 
-	split_byte_from : List(U8), U8, U64, U64, List(List(U8)) -> List(List(U8))
-	split_byte_from = |s, b, start, i, out| match List.get(s, i) {
-		Err(_) => List.append(out, List.drop_first(s, start))
-		Ok(c) =>
-			if c == b {
-				split_byte_from(s, b, i + 1, i + 1, List.append(out, List.sublist(s, { start, len: i - start })))
-			} else {
-				split_byte_from(s, b, start, i + 1, out)
-			}
-	}
-
 	## std.mem.splitSequence: every piece between non-overlapping matches
 	## of `needle`, found left to right.
 	split_seq : List(U8), List(U8) -> List(List(U8))
 	split_seq = |s, needle| split_seq_from(s, needle, 0, 0, [])
-
-	split_seq_from : List(U8), List(U8), U64, U64, List(List(U8)) -> List(List(U8))
-	split_seq_from = |s, needle, start, i, out| {
-		n = List.len(needle)
-		if i + n > List.len(s) {
-			List.append(out, List.drop_first(s, start))
-		} else if List.get(s, i) == List.first(needle) and List.sublist(s, { start: i, len: n }) == needle {
-			split_seq_from(s, needle, i + n, i + n, List.append(out, List.sublist(s, { start, len: i - start })))
-		} else {
-			split_seq_from(s, needle, start, i + 1, out)
-		}
-	}
 
 	## The bytes before and after the first `needle`.
 	cut_seq : List(U8), List(U8) -> Try((List(U8), List(U8)), [NotFound])
@@ -60,9 +37,6 @@ Bytes := [].{
 		} else {
 			find(s, needle, i + 1)
 		}
-
-	has_prefix : List(U8), List(U8) -> Bool
-	has_prefix = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
 
 	## The bytes after `prefix`, when `l` starts with it: no length is
 	## written beside the literal it belongs to.
@@ -83,3 +57,29 @@ Bytes := [].{
 		_ => After
 	}
 }
+
+split_byte_from : List(U8), U8, U64, U64, List(List(U8)) -> List(List(U8))
+split_byte_from = |s, b, start, i, out| match List.get(s, i) {
+	Err(_) => List.append(out, List.drop_first(s, start))
+	Ok(c) =>
+		if c == b {
+			split_byte_from(s, b, i + 1, i + 1, List.append(out, List.sublist(s, { start, len: i - start })))
+		} else {
+			split_byte_from(s, b, start, i + 1, out)
+		}
+}
+
+split_seq_from : List(U8), List(U8), U64, U64, List(List(U8)) -> List(List(U8))
+split_seq_from = |s, needle, start, i, out| {
+	n = List.len(needle)
+	if i + n > List.len(s) {
+		List.append(out, List.drop_first(s, start))
+	} else if List.get(s, i) == List.first(needle) and List.sublist(s, { start: i, len: n }) == needle {
+		split_seq_from(s, needle, i + n, i + n, List.append(out, List.sublist(s, { start, len: i - start })))
+	} else {
+		split_seq_from(s, needle, start, i + 1, out)
+	}
+}
+
+has_prefix : List(U8), List(U8) -> Bool
+has_prefix = |l, p| List.len(l) >= List.len(p) and List.take_first(l, List.len(p)) == p
