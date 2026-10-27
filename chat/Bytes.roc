@@ -45,16 +45,16 @@ Bytes := [].{
 	}
 
 	## The bytes before and after the first `needle`.
-	cut_seq : List(U8), List(U8) -> Try((List(U8), List(U8)), [None])
-	cut_seq = |s, needle| match find(s, needle, 0) {
-		Ok(i) => Ok((List.take_first(s, i), List.drop_first(s, i + List.len(needle))))
-		Err(None) => Err(None)
+	cut_seq : List(U8), List(U8) -> Try((List(U8), List(U8)), [NotFound])
+	cut_seq = |s, needle| {
+		i = find(s, needle, 0)?
+		Ok((List.take_first(s, i), List.drop_first(s, i + List.len(needle))))
 	}
 
-	find : List(U8), List(U8), U64 -> Try(U64, [None])
+	find : List(U8), List(U8), U64 -> Try(U64, [NotFound])
 	find = |s, needle, i|
 		if i + List.len(needle) > List.len(s) {
-			Err(None)
+			Err(NotFound)
 		} else if List.get(s, i) == List.first(needle) and List.sublist(s, { start: i, len: List.len(needle) }) == needle {
 			Ok(i)
 		} else {
