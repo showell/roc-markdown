@@ -73,14 +73,17 @@ Bytes := [].{
 	## order among them cannot show.
 	sort : List(List(U8)) -> List(List(U8))
 	sort = |l|
-		List.sort_with(l, |a, b|
-			if less(a, b) {
-				Before
-			} else if less(b, a) {
-				After
-			} else {
-				Same
-			})
+		List.sort_with(
+			l,
+			|a, b|
+				if less(a, b) {
+					Before
+				} else if less(b, a) {
+					After
+				} else {
+					Same
+				},
+		)
 
 	## std.mem.lessThan of bytes: byte by byte, a prefix first.
 	less : List(U8), List(U8) -> Bool
