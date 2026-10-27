@@ -43,11 +43,6 @@ Bytes := [].{
 	strip_prefix : List(U8), List(U8) -> Try(List(U8), [NoMatch])
 	strip_prefix = |l, prefix| if has_prefix(l, prefix) Ok(List.drop_first(l, List.len(prefix))) else Err(NoMatch)
 
-	## std.mem.sort with lessThanStr: equal strings are the same bytes, so the
-	## order among them cannot show.
-	sort : List(List(U8)) -> List(List(U8))
-	sort = |l| List.sort_with(l, compare)
-
 	## std.mem.order of bytes: byte by byte, a prefix first.
 	compare : List(U8), List(U8) -> [Before, Same, After]
 	compare = |a, b| match (a, b) {
