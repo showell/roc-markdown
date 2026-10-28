@@ -16,11 +16,7 @@ SafeImg := [].{
 	rebuild = |tag| {
 		s = tag.to_utf8()
 		after = name_end(s)?
-		attrs = scan(
-			s,
-			after,
-			[],
-		)?
+		attrs = scan(s, { at: after, out: [] })?
 		src = last_of(attrs, "src")?
 		if is_local(Bytes.trim(src, Bytes.zig_spaces)) {
 			out = List.concat(Str.to_utf8("<img"), attr("src", src))
@@ -76,84 +72,69 @@ name_end = |s|
 ## markdown_media `TagScan`: each `name=value` from `i` to the tag's `>`,
 ## names lowered, quotes respected, a bare name's value empty. Running off
 ## the end, a name of no name bytes, or `=` with nothing after is `Unsafe`.
-scan : List(U8), U64, List((List(U8), List(U8))) -> Try(List((List(U8), List(U8))), [Unsafe])
-scan = |
-	s,
-	i,
-	out,
-|
+scan : List(U8),
+{
+	at : U64,
+	out : List((List(U8), List(U8))),
+} -> Try(List((List(U8), List(U8))), [Unsafe])
+scan = |s, { at: i, out }|
 	match List.get(s, i) {
 		Err(_) => Err(Unsafe)
-		Ok(c) if is_space(c) or c == '/' => scan(
-			s,
-			i + 1,
-			out,
-		)
+		Ok(c) if is_space(c) or c == '/' => scan(s, { at: i + 1, out })
 		Ok('>') => Ok(out)
 		Ok(_) => {
-			e = Bytes.count_while(
-				s,
-				is_name,
-				i,
-			)
+			e = Bytes.count_while(s, { keep: is_name, at: i })
 			if e == i {
 				Err(Unsafe)
 			} else {
 				name = List.map(List.sublist(s, { start: i, len: e - i }), Ascii.to_lower)
-				j = Bytes.count_while(
-					s,
-					is_space,
-					e,
-				)
+				j = Bytes.count_while(s, { keep: is_space, at: e })
 				match List.get(s, j) {
 					Ok('=') => {
-						k = Bytes.count_while(
-							s,
-							is_space,
-							j + 1,
-						)
+						k = Bytes.count_while(s, { keep: is_space, at: j + 1 })
 						match List.get(s, k) {
 							Err(_) => Err(Unsafe)
 							Ok(q) if q == '"' or q == '\'' => {
 								close = Bytes.find_byte(
 									s,
-									q,
-									k + 1,
+									{ byte: q, at: k + 1 },
 								).map_err(|_| Unsafe)?
 								scan(
 									s,
-									close + 1,
-									List.append(
-										out,
-										(
-											name,
-											List.sublist(s, { start: k + 1, len: close - k - 1 }),
+									{
+										at: close + 1,
+										out: List.append(
+											out,
+											(
+												name,
+												List.sublist(
+													s,
+													{ start: k + 1, len: close - k - 1 },
+												),
+											),
 										),
-									),
+									},
 								)
 							}
 							Ok(_) => {
 								v = Bytes.count_while(
 									s,
-									|b| !is_space(b) and b != '>',
-									k,
+									{ keep: |b| !is_space(b) and b != '>', at: k },
 								)
 								scan(
 									s,
-									v,
-									List.append(
-										out,
-										(name, List.sublist(s, { start: k, len: v - k })),
-									),
+									{
+										at: v,
+										out: List.append(
+											out,
+											(name, List.sublist(s, { start: k, len: v - k })),
+										),
+									},
 								)
 							}
 						}
 					}
-					_ => scan(
-						s,
-						j,
-						List.append(out, (name, [])),
-					)
+					_ => scan(s, { at: j, out: List.append(out, (name, [])) })
 				}
 			}
 		}

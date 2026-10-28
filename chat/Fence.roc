@@ -6,23 +6,28 @@ import Bytes
 
 Fence := [].{
 
-	close_at : List(List(U8)), U8, U64, U64 -> U64
+	close_at : List(List(U8)),
+	{
+		char : U8,
+		count : U64,
+		at : U64,
+	} -> U64
 	close_at = |
 		ls,
-		char,
-		count,
-		j,
+		{
+			char,
+			count,
+			at: j,
+		},
 	| match List.get(ls, j) {
 		Err(_) => j
-		Ok(line) => if is_close(
-			line,
-			char,
-			count,
-		) j else close_at(
+		Ok(line) => if is_close(line, { char, count }) j else close_at(
 			ls,
-			char,
-			count,
-			j + 1,
+			{
+				char,
+				count,
+				at: j + 1,
+			},
 		)
 	}
 
@@ -39,11 +44,7 @@ Fence := [].{
 	)
 	fence_open = |line| {
 		indent = U64.min(
-			Bytes.count_while(
-				line,
-				|x| x == ' ',
-				0,
-			),
+			Bytes.count_while(line, { keep: |x| x == ' ', at: 0 }),
 			4,
 		)
 		match List.get(line, indent) {
@@ -54,8 +55,7 @@ Fence := [].{
 				} else {
 					count = Bytes.count_while(
 						List.drop_first(line, indent),
-						|x| x == f,
-						0,
+						{ keep: |x| x == f, at: 0 },
 					)
 					info = Bytes.trim(
 						List.drop_first(line, indent + count),
@@ -70,11 +70,7 @@ Fence := [].{
 					} else {
 						lang = List.take_first(
 							info,
-							Bytes.count_while(
-								info,
-								|c| c != ' ' and c != '\t',
-								0,
-							),
+							Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 }),
 						)
 						Ok({
 							char: f,
@@ -89,28 +85,16 @@ Fence := [].{
 
 ## markdown_fence `isClose`: up to three spaces, at least `count` of
 ## `char`, then only whitespace.
-is_close : List(U8), U8, U64 -> Bool
-is_close = |
-	line,
-	char,
-	count,
-| {
+is_close : List(U8), { char : U8, count : U64 } -> Bool
+is_close = |line, { char, count }| {
 	indent = U64.min(
-		Bytes.count_while(
-			line,
-			|x| x == ' ',
-			0,
-		),
+		Bytes.count_while(line, { keep: |x| x == ' ', at: 0 }),
 		4,
 	)
 	if indent >= 4 {
 		Bool.False
 	} else {
-		n = Bytes.count_while(
-			List.drop_first(line, indent),
-			|x| x == char,
-			0,
-		)
+		n = Bytes.count_while(List.drop_first(line, indent), { keep: |x| x == char, at: 0 })
 		n >= count and Bytes.trim(
 			List.drop_first(line, indent + n),
 			[
