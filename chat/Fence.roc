@@ -39,9 +39,9 @@ Fence := [].{
 	)
 	fence_open = |line| {
 		indent = U64.min(
-			Bytes.leading(
+			Bytes.count_while(
 				line,
-				' ',
+				|x| x == ' ',
 				0,
 			),
 			4,
@@ -52,12 +52,19 @@ Fence := [].{
 				if indent >= 4 or (f != '`' and f != '~') {
 					Err(NotAFence)
 				} else {
-					count = Bytes.leading(
+					count = Bytes.count_while(
 						List.drop_first(line, indent),
-						f,
+						|x| x == f,
 						0,
 					)
-					info = trim_info(List.drop_first(line, indent + count))
+					info = Bytes.trim(
+						List.drop_first(line, indent + count),
+						[
+							' ',
+							'\t',
+							'\r',
+						],
+					)
 					if count < 3 or count > 10 or (f == '`' and List.contains(info, '`')) {
 						Err(NotAFence)
 					} else {
@@ -89,9 +96,9 @@ is_close = |
 	count,
 | {
 	indent = U64.min(
-		Bytes.leading(
+		Bytes.count_while(
 			line,
-			' ',
+			|x| x == ' ',
 			0,
 		),
 		4,
@@ -99,33 +106,18 @@ is_close = |
 	if indent >= 4 {
 		Bool.False
 	} else {
-		n = Bytes.leading(
+		n = Bytes.count_while(
 			List.drop_first(line, indent),
-			char,
+			|x| x == char,
 			0,
 		)
-		n >= count and trim_info(List.drop_first(line, indent + n)) == []
+		n >= count and Bytes.trim(
+			List.drop_first(line, indent + n),
+			[
+				' ',
+				'\t',
+				'\r',
+			],
+		) == []
 	}
-}
-
-## `std.mem.trim(u8, s, " \t\r")`.
-trim_info : List(U8) -> List(U8)
-trim_info = |s| {
-	ws = |c| c == ' ' or c == '\t' or c == '\r'
-	front = List.drop_first(
-		s,
-		Bytes.Bytes.count_while(
-			s,
-			ws,
-			0,
-		),
-	)
-	List.drop_last(
-		front,
-		Bytes.count_back(
-			front,
-			ws,
-			0,
-		),
-	)
 }

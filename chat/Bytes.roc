@@ -1,21 +1,10 @@
-## BYTES AS ZIG'S std.mem HANDLES THEM: the searches and splits the chat's
-## pure modules share (`std.mem.splitScalar`, `splitSequence`, `indexOf`,
-## `startsWith`, `lessThan`), on bytes, never Str. Pure.
+## BYTES AS ZIG'S std.mem HANDLES THEM: the searches, scans and trims the
+## chat's modules share, each in one place (`std.mem.indexOf`,
+## `indexOfScalar`, `trim`, `trimRight`, `order`), on bytes, never Str; the
+## splits and prefixes are List's own (`split_on`, `split_on_list`,
+## `starts_with`), and a byte's class is Ascii's. Pure.
 
 Bytes := [].{
-	leading : List(U8), U8, U64 -> U64
-	leading = |
-		l,
-		c,
-		n,
-	| match List.get(l, n) {
-		Ok(x) if x == c => leading(
-			l,
-			c,
-			n + 1,
-		)
-		_ => n
-	}
 
 	join_lines : List(List(U8)) -> List(U8)
 	join_lines = |lines| List.join(List.intersperse(lines, ['\n']))
@@ -123,14 +112,6 @@ Bytes := [].{
 		Err(_) => Err(NotFound)
 	}
 
-	lower : List(U8) -> List(U8)
-	lower = |s| List.map(s, |c| if c >= 'A' and c <= 'Z' c - 'A' + 'a' else c)
-
-	## A space, tab, newline, CR, form feed (12) or vertical tab (11): Roc's
-	## character literals have no escape for the last two.
-	is_space : U8 -> Bool
-	is_space = |c| c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == 12 or c == 11
-
 	## How many bytes from `i` on keep `keep`.
 	count_while : List(U8), (U8 -> Bool), U64 -> U64
 	count_while = |
@@ -165,5 +146,48 @@ Bytes := [].{
 				_ => n
 			}
 		}
+
+	## `std.mem.trim(u8, s, set)`: the bytes in `set` off both ends.
+	trim : List(U8), List(U8) -> List(U8)
+	trim = |s, set| {
+		in_set = |c| List.contains(set, c)
+		front = List.drop_first(
+			s,
+			count_while(
+				s,
+				in_set,
+				0,
+			),
+		)
+		List.drop_last(
+			front,
+			count_back(
+				front,
+				in_set,
+				0,
+			),
+		)
+	}
+
+	## `std.mem.trimRight(u8, s, set)`: the bytes in `set` off the end.
+	trim_end : List(U8), List(U8) -> List(U8)
+	trim_end = |s, set| List.drop_last(
+		s,
+		count_back(
+			s,
+			|c| List.contains(set, c),
+			0,
+		),
+	)
+
+	## The four bytes the Zig's sidecar readers trim, `std.mem.trim(u8, s,
+	## " \t\r\n")`: not `Ascii.is_whitespace`, which has VT and FF too.
+	zig_spaces : List(U8)
+	zig_spaces = [
+		' ',
+		'\t',
+		'\r',
+		'\n',
+	]
 
 }

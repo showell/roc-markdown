@@ -7,6 +7,8 @@
 ## dropped, and a tag that does not parse cleanly, or has no such src, is
 ## refused whole. Pure, over bytes; the Images feed rebuilds every stored
 ## tag with it (Feeds.images_event, metal-vmm QUEUE 266).
+import Ascii
+import Bytes
 SafeImg := [].{
 
 	## The tag `tag` (`<img …>`, from its `<`) rebuilt, or `Unsafe`.
@@ -20,7 +22,7 @@ SafeImg := [].{
 			[],
 		)?
 		src = last_of(attrs, "src")?
-		if is_local(trim(src)) {
+		if is_local(Bytes.trim(src, Bytes.zig_spaces)) {
 			out = List.concat(Str.to_utf8("<img"), attr("src", src))
 			with_text = [("alt", last_of(attrs, "alt")), ("title", last_of(attrs, "title"))]
 				|> List.fold(
@@ -54,10 +56,7 @@ is_space = |c| c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == 12
 
 ## markdown_text `isAttrNameChar`.
 is_name : U8 -> Bool
-is_name = |c| (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '-' or c == '_' or c == ':'
-
-lower : U8 -> U8
-lower = |c| if c >= 'A' and c <= 'Z' c - 'A' + 'a' else c
+is_name = |c| Ascii.is_alphanumeric(c) or c == '-' or c == '_' or c == ':'
 
 ## markdown_media `tagNameAt`: `<img` (any case) then a space, `>` or `/`;
 ## the index past the name.
@@ -70,38 +69,9 @@ name_end = |s|
 			m,
 			g,
 			d,
-		] if lower(i) == 'i' and lower(m) == 'm' and lower(g) == 'g' and (is_space(d) or d == '>' or d == '/') => Ok(4)
+		] if Ascii.to_lower(i) == 'i' and Ascii.to_lower(m) == 'm' and Ascii.to_lower(g) == 'g' and (is_space(d) or d == '>' or d == '/') => Ok(4)
 		_ => Err(Unsafe)
 	}
-
-## How far from `i` the bytes keep `keep`.
-skip : List(U8), (U8 -> Bool), U64 -> U64
-skip = |
-	s,
-	keep,
-	i,
-| match List.get(s, i) {
-	Ok(c) if keep(c) => skip(
-		s,
-		keep,
-		i + 1,
-	)
-	_ => i
-}
-
-find : List(U8), U8, U64 -> Try(U64, [Unsafe])
-find = |
-	s,
-	b,
-	i,
-| match List.get(s, i) {
-	Ok(c) => if c == b Ok(i) else find(
-		s,
-		b,
-		i + 1,
-	)
-	Err(_) => Err(Unsafe)
-}
 
 ## markdown_media `TagScan`: each `name=value` from `i` to the tag's `>`,
 ## names lowered, quotes respected, a bare name's value empty. Running off
@@ -121,7 +91,7 @@ scan = |
 		)
 		Ok('>') => Ok(out)
 		Ok(_) => {
-			e = skip(
+			e = Bytes.count_while(
 				s,
 				is_name,
 				i,
@@ -129,15 +99,15 @@ scan = |
 			if e == i {
 				Err(Unsafe)
 			} else {
-				name = List.map(List.sublist(s, { start: i, len: e - i }), lower)
-				j = skip(
+				name = List.map(List.sublist(s, { start: i, len: e - i }), Ascii.to_lower)
+				j = Bytes.count_while(
 					s,
 					is_space,
 					e,
 				)
 				match List.get(s, j) {
 					Ok('=') => {
-						k = skip(
+						k = Bytes.count_while(
 							s,
 							is_space,
 							j + 1,
@@ -145,11 +115,11 @@ scan = |
 						match List.get(s, k) {
 							Err(_) => Err(Unsafe)
 							Ok(q) if q == '"' or q == '\'' => {
-								close = find(
+								close = Bytes.find_byte(
 									s,
 									q,
 									k + 1,
-								)?
+								).map_err(|_| Unsafe)?
 								scan(
 									s,
 									close + 1,
@@ -163,7 +133,7 @@ scan = |
 								)
 							}
 							Ok(_) => {
-								v = skip(
+								v = Bytes.count_while(
 									s,
 									|b| !is_space(b) and b != '>',
 									k,
@@ -200,47 +170,6 @@ last_of = |attrs, name| {
 	)
 }
 
-## `std.mem.trim` of " \t\r\n".
-trim : List(U8) -> List(U8)
-trim = |s| {
-	ws = |c| c == ' ' or c == '\t' or c == '\r' or c == '\n'
-	front = List.drop_first(
-		s,
-		skip(
-			s,
-			ws,
-			0,
-		),
-	)
-	List.take_first(
-		front,
-		List.len(front) - back(
-			front,
-			ws,
-			0,
-		),
-	)
-}
-
-back : List(U8), (U8 -> Bool), U64 -> U64
-back = |
-	s,
-	keep,
-	n,
-|
-	if n >= List.len(s) {
-		n
-	} else {
-		match List.get(s, List.len(s) - 1 - n) {
-			Ok(c) if keep(c) => back(
-				s,
-				keep,
-				n + 1,
-			)
-			_ => n
-		}
-	}
-
 ## markdown_media `isLocalUrl`: `/` then anything but `/` or `\`, and no
 ## control byte or backslash anywhere: a browser strips tabs and newlines
 ## inside a URL and reads `\` as `/`, so `/\t/evil` is `//evil`.
@@ -259,7 +188,7 @@ is_local = |src|
 	}
 
 is_all_digits : List(U8) -> Bool
-is_all_digits = |v| v != [] and List.all(v, |c| c >= '0' and c <= '9')
+is_all_digits = |v| v != [] and List.all(v, Ascii.is_digit)
 
 ## ` name="value"`, the value as markdown_text `escapeInto` escapes it.
 attr : Str, List(U8) -> List(U8)
