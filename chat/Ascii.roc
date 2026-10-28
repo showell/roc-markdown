@@ -12,6 +12,7 @@
 ## Plain functions on `U8`, called on the bytes a parser already holds, with
 ## no wrapper type: Hasnep/roc-ascii instead offers an ASCII-only text type
 ## (`Char :: U8`, `Ascii :: List(Char)`), a different and larger thing.
+## Where its `Char` has the same check, the name here is its name.
 ##
 ## The sets are C's `<ctype.h>` (in the C locale), Zig's `std.ascii` and
 ## Rust's `u8::is_ascii_*`, which agree on all of them but whitespace (see
@@ -32,20 +33,21 @@ Ascii := [].{
 	## `A`-`Z` and `a`-`z` (65-90, 97-122). Zig `isAlphabetic`, Rust
 	## `is_ascii_alphabetic`, C `isalpha`. `Bool.False` for every byte from
 	## 128 to 255, so `é` (bytes 195 169) is no letter here.
-	is_alphabetic : U8 -> Bool
-	is_alphabetic = |c| (c >= 'A' and c <= 'Z') or (c >= 'a' and c <= 'z')
+	is_letter : U8 -> Bool
+	is_letter = |c| (c >= 'A' and c <= 'Z') or (c >= 'a' and c <= 'z')
 
-	## `0`-`9`, `A`-`Z` and `a`-`z`: `is_digit` or `is_alphabetic`. Zig
+	## `0`-`9`, `A`-`Z` and `a`-`z`: `is_digit` or `is_letter`. Zig
 	## `isAlphanumeric`, Rust `is_ascii_alphanumeric`, C `isalnum`.
 	## `Bool.False` for every byte from 128 to 255.
 	is_alphanumeric : U8 -> Bool
-	is_alphanumeric = |c| is_digit(c) or is_alphabetic(c)
+	is_alphanumeric = |c| is_digit(c) or is_letter(c)
 
 	## The six bytes of C's `isspace`, which Zig's `isWhitespace` and Go's
 	## `strings.Fields` share: space (32) and 9-13, which are `\t`, `\n`,
 	## vertical tab (VT, 11), form feed (FF, 12) and `\r`. Rust's
 	## `is_ascii_whitespace` and WHATWG's "ASCII whitespace" (HTML, URLs)
-	## leave VT out, and JSON allows only space, `\t`, `\n` and `\r`: a parser
+	## leave VT out, Hasnep/roc-ascii's is space, `\n` and `\t`, and JSON
+	## allows only space, `\t`, `\n` and `\r`: a parser
 	## for a format with its own set (JSON, HTTP) uses that format's set, not
 	## this. `Bool.False` for every byte from 128 to 255, so a no-break space
 	## (bytes 194 160) is not whitespace here.
@@ -68,40 +70,22 @@ Ascii := [].{
 
 	## `A`-`Z` to `a`-`z`; every other byte, 128 to 255 included, unchanged.
 	## Zig `toLower`, Rust `to_ascii_lowercase`, C `tolower`, and the per-byte
-	## rule of `Str.with_ascii_lowercased`. Branchless, as Zig's is: an
-	## uppercase letter differs from its lowercase only in bit 5 (0x20), so
-	## that bit is ORed in when the byte is `A`-`Z` (`case_bit`).
-	to_lower : U8 -> U8
-	to_lower = |c| c.bitwise_or(case_bit(c.minus_wrap('A')))
+	## rule of `Str.with_ascii_lowercased`: an uppercase letter differs from
+	## its lowercase only in bit 5 (0x20).
+	to_lowercase : U8 -> U8
+	to_lowercase = |c| if c >= 'A' and c <= 'Z' c.bitwise_or(0x20) else c
 
 	## `a`-`z` to `A`-`Z`; every other byte, 128 to 255 included, unchanged.
 	## Zig `toUpper`, Rust `to_ascii_uppercase`, C `toupper`, and the per-byte
-	## rule of `Str.with_ascii_uppercased`. Branchless, as `to_lower`: bit 5
-	## is XORed out when the byte is `a`-`z`.
-	to_upper : U8 -> U8
-	to_upper = |c| c.bitwise_xor(case_bit(c.minus_wrap('a')))
+	## rule of `Str.with_ascii_uppercased`.
+	to_uppercase : U8 -> U8
+	to_uppercase = |c| if c >= 'a' and c <= 'z' c.bitwise_xor(0x20) else c
 }
 
 ## DEL, the one control byte above the printable ones. Roc's character
 ## literals have no escape for it.
 del : U8
 del = 127
-
-## 0x20 when `offset` (a byte minus `A`, or minus `a`, wrapping) is below 26,
-## so the byte is a letter of that case; 0 otherwise. Zig writes this mask as
-## `@intFromBool(isUpper(c)) << 5`, but a Roc `Bool` is a tag with no number
-## in it, so the mask is arithmetic instead, with no comparison and no
-## branch. An offset below 26 has bit 7 clear, and so does the offset plus
-## 102 (128 - 26); an offset from 26 to 127 sets bit 7 of the sum, and one
-## from 128 up sets its own. Bit 7 clear in both, moved down to bit 5, is the
-## mask.
-case_bit : U8 -> U8
-case_bit = |offset|
-	offset
-		.bitwise_or(offset.plus_wrap(128 - 26))
-		.bitwise_not()
-		.bitwise_and(0x80)
-		.shr_wrap(2)
 
 # ── tests ──
 # Each set is written out below as its members, in byte order, not as the
@@ -170,7 +154,7 @@ expect List.len(controls) == 33
 # Each check over all 256 bytes is exactly its set.
 expect List.keep_if(all_bytes, Ascii.is_digit) == digits
 expect List.keep_if(all_bytes, Ascii.is_hex_digit) == Str.to_utf8("0123456789ABCDEFabcdef")
-expect List.keep_if(all_bytes, Ascii.is_alphabetic) == letters
+expect List.keep_if(all_bytes, Ascii.is_letter) == letters
 expect List.keep_if(all_bytes, Ascii.is_alphanumeric) == List.concat(digits, letters)
 expect List.keep_if(all_bytes, Ascii.is_whitespace) == whitespace
 expect List.keep_if(all_bytes, Ascii.is_punctuation) == punctuation
@@ -181,7 +165,7 @@ expect List.all(
 	[
 		Ascii.is_digit,
 		Ascii.is_hex_digit,
-		Ascii.is_alphabetic,
+		Ascii.is_letter,
 		Ascii.is_alphanumeric,
 		Ascii.is_whitespace,
 		Ascii.is_punctuation,
@@ -189,13 +173,13 @@ expect List.all(
 	],
 	|check| !List.any(beyond_ascii, check),
 )
-expect List.map(beyond_ascii, Ascii.to_lower) == beyond_ascii
-expect List.map(beyond_ascii, Ascii.to_upper) == beyond_ascii
+expect List.map(beyond_ascii, Ascii.to_lowercase) == beyond_ascii
+expect List.map(beyond_ascii, Ascii.to_uppercase) == beyond_ascii
 
 # The bytes on each side of every range: of each probe, the members.
 expect List.keep_if(Str.to_utf8("/09:"), Ascii.is_digit) == Str.to_utf8("09")
 expect List.keep_if(Str.to_utf8("/09:@AFG`afg"), Ascii.is_hex_digit) == Str.to_utf8("09AFaf")
-expect List.keep_if(Str.to_utf8("@AZ[`az{"), Ascii.is_alphabetic) == Str.to_utf8("AZaz")
+expect List.keep_if(Str.to_utf8("@AZ[`az{"), Ascii.is_letter) == Str.to_utf8("AZaz")
 expect List.keep_if(Str.to_utf8("/09:@AZ[`az{"), Ascii.is_alphanumeric) == Str.to_utf8("09AZaz")
 expect List.keep_if(
 	[
@@ -225,19 +209,19 @@ expect List.keep_if(
 	31,
 	127,
 ]
-expect List.map(Str.to_utf8("@AZ[`az{"), Ascii.to_lower) == Str.to_utf8("@az[`az{")
-expect List.map(Str.to_utf8("@AZ[`az{"), Ascii.to_upper) == Str.to_utf8("@AZ[`AZ{")
+expect List.map(Str.to_utf8("@AZ[`az{"), Ascii.to_lowercase) == Str.to_utf8("@az[`az{")
+expect List.map(Str.to_utf8("@AZ[`az{"), Ascii.to_uppercase) == Str.to_utf8("@AZ[`AZ{")
 
 # The case maps: each letter to its pair, each letter already in the case
 # kept, every other byte (204 of them) unchanged.
-expect List.map(uppers, Ascii.to_lower) == lowers
-expect List.map(lowers, Ascii.to_lower) == lowers
-expect List.map(lowers, Ascii.to_upper) == uppers
-expect List.map(uppers, Ascii.to_upper) == uppers
+expect List.map(uppers, Ascii.to_lowercase) == lowers
+expect List.map(lowers, Ascii.to_lowercase) == lowers
+expect List.map(lowers, Ascii.to_uppercase) == uppers
+expect List.map(uppers, Ascii.to_uppercase) == uppers
 expect List.len(non_letters) == 204
-expect List.map(non_letters, Ascii.to_lower) == non_letters
-expect List.map(non_letters, Ascii.to_upper) == non_letters
+expect List.map(non_letters, Ascii.to_lowercase) == non_letters
+expect List.map(non_letters, Ascii.to_uppercase) == non_letters
 
 # Every letter round-trips through the other case.
-expect List.map(lowers, |b| Ascii.to_lower(Ascii.to_upper(b))) == lowers
-expect List.map(uppers, |b| Ascii.to_upper(Ascii.to_lower(b))) == uppers
+expect List.map(lowers, |b| Ascii.to_lowercase(Ascii.to_uppercase(b))) == lowers
+expect List.map(uppers, |b| Ascii.to_uppercase(Ascii.to_lowercase(b))) == uppers
