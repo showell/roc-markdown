@@ -65,7 +65,7 @@ name_end = |s|
 			m,
 			g,
 			d,
-		] if Ascii.to_lower(i) == 'i' and Ascii.to_lower(m) == 'm' and Ascii.to_lower(g) == 'g' and (is_space(d) or d == '>' or d == '/') => Ok(4)
+		] if Ascii.to_lowercase(i) == 'i' and Ascii.to_lowercase(m) == 'm' and Ascii.to_lowercase(g) == 'g' and (is_space(d) or d == '>' or d == '/') => Ok(4)
 		_ => Err(Unsafe)
 	}
 
@@ -87,7 +87,7 @@ scan = |s, { at: i, out }|
 			if e == i {
 				Err(Unsafe)
 			} else {
-				name = List.map(List.sublist(s, { start: i, len: e - i }), Ascii.to_lower)
+				name = List.map(List.sublist(s, { start: i, len: e - i }), Ascii.to_lowercase)
 				j = Bytes.count_while(s, { keep: is_space, at: e })
 				match List.get(s, j) {
 					Ok('=') => {
