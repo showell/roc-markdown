@@ -14,7 +14,11 @@ SafeImg := [].{
 	rebuild = |tag| {
 		s = tag.to_utf8()
 		after = name_end(s)?
-		attrs = scan(s, after, [])?
+		attrs = scan(
+			s,
+			after,
+			[],
+		)?
 		src = last_of(attrs, "src")?
 		if is_local(trim(src)) {
 			out = List.concat(Str.to_utf8("<img"), attr("src", src))
@@ -60,20 +64,42 @@ lower = |c| if c >= 'A' and c <= 'Z' c - 'A' + 'a' else c
 name_end : List(U8) -> Try(U64, [Unsafe])
 name_end = |s|
 	match List.take_first(s, 5) {
-		['<', i, m, g, d] if lower(i) == 'i' and lower(m) == 'm' and lower(g) == 'g' and (is_space(d) or d == '>' or d == '/') => Ok(4)
+		[
+			'<',
+			i,
+			m,
+			g,
+			d,
+		] if lower(i) == 'i' and lower(m) == 'm' and lower(g) == 'g' and (is_space(d) or d == '>' or d == '/') => Ok(4)
 		_ => Err(Unsafe)
 	}
 
 ## How far from `i` the bytes keep `keep`.
 skip : List(U8), (U8 -> Bool), U64 -> U64
-skip = |s, keep, i| match List.get(s, i) {
-	Ok(c) if keep(c) => skip(s, keep, i + 1)
+skip = |
+	s,
+	keep,
+	i,
+| match List.get(s, i) {
+	Ok(c) if keep(c) => skip(
+		s,
+		keep,
+		i + 1,
+	)
 	_ => i
 }
 
 find : List(U8), U8, U64 -> Try(U64, [Unsafe])
-find = |s, b, i| match List.get(s, i) {
-	Ok(c) => if c == b Ok(i) else find(s, b, i + 1)
+find = |
+	s,
+	b,
+	i,
+| match List.get(s, i) {
+	Ok(c) => if c == b Ok(i) else find(
+		s,
+		b,
+		i + 1,
+	)
 	Err(_) => Err(Unsafe)
 }
 
@@ -81,34 +107,83 @@ find = |s, b, i| match List.get(s, i) {
 ## names lowered, quotes respected, a bare name's value empty. Running off
 ## the end, a name of no name bytes, or `=` with nothing after is `Unsafe`.
 scan : List(U8), U64, List((List(U8), List(U8))) -> Try(List((List(U8), List(U8))), [Unsafe])
-scan = |s, i, out|
+scan = |
+	s,
+	i,
+	out,
+|
 	match List.get(s, i) {
 		Err(_) => Err(Unsafe)
-		Ok(c) if is_space(c) or c == '/' => scan(s, i + 1, out)
+		Ok(c) if is_space(c) or c == '/' => scan(
+			s,
+			i + 1,
+			out,
+		)
 		Ok('>') => Ok(out)
 		Ok(_) => {
-			e = skip(s, is_name, i)
+			e = skip(
+				s,
+				is_name,
+				i,
+			)
 			if e == i {
 				Err(Unsafe)
 			} else {
 				name = List.map(List.sublist(s, { start: i, len: e - i }), lower)
-				j = skip(s, is_space, e)
+				j = skip(
+					s,
+					is_space,
+					e,
+				)
 				match List.get(s, j) {
 					Ok('=') => {
-						k = skip(s, is_space, j + 1)
+						k = skip(
+							s,
+							is_space,
+							j + 1,
+						)
 						match List.get(s, k) {
 							Err(_) => Err(Unsafe)
 							Ok(q) if q == '"' or q == '\'' => {
-								close = find(s, q, k + 1)?
-								scan(s, close + 1, List.append(out, (name, List.sublist(s, { start: k + 1, len: close - k - 1 }))))
+								close = find(
+									s,
+									q,
+									k + 1,
+								)?
+								scan(
+									s,
+									close + 1,
+									List.append(
+										out,
+										(
+											name,
+											List.sublist(s, { start: k + 1, len: close - k - 1 }),
+										),
+									),
+								)
 							}
 							Ok(_) => {
-								v = skip(s, |b| !is_space(b) and b != '>', k)
-								scan(s, v, List.append(out, (name, List.sublist(s, { start: k, len: v - k }))))
+								v = skip(
+									s,
+									|b| !is_space(b) and b != '>',
+									k,
+								)
+								scan(
+									s,
+									v,
+									List.append(
+										out,
+										(name, List.sublist(s, { start: k, len: v - k })),
+									),
+								)
 							}
 						}
 					}
-					_ => scan(s, j, List.append(out, (name, [])))
+					_ => scan(
+						s,
+						j,
+						List.append(out, (name, [])),
+					)
 				}
 			}
 		}
@@ -118,24 +193,50 @@ scan = |s, i, out|
 last_of : List((List(U8), List(U8))), Str -> Try(List(U8), [Unsafe])
 last_of = |attrs, name| {
 	want = name.to_utf8()
-	List.fold(attrs, Err(Unsafe), |got, (n, v)| if n == want Ok(v) else got)
+	List.fold(
+		attrs,
+		Err(Unsafe),
+		|got, (n, v)| if n == want Ok(v) else got,
+	)
 }
 
 ## `std.mem.trim` of " \t\r\n".
 trim : List(U8) -> List(U8)
 trim = |s| {
 	ws = |c| c == ' ' or c == '\t' or c == '\r' or c == '\n'
-	front = List.drop_first(s, skip(s, ws, 0))
-	List.take_first(front, List.len(front) - back(front, ws, 0))
+	front = List.drop_first(
+		s,
+		skip(
+			s,
+			ws,
+			0,
+		),
+	)
+	List.take_first(
+		front,
+		List.len(front) - back(
+			front,
+			ws,
+			0,
+		),
+	)
 }
 
 back : List(U8), (U8 -> Bool), U64 -> U64
-back = |s, keep, n|
+back = |
+	s,
+	keep,
+	n,
+|
 	if n >= List.len(s) {
 		n
 	} else {
 		match List.get(s, List.len(s) - 1 - n) {
-			Ok(c) if keep(c) => back(s, keep, n + 1)
+			Ok(c) if keep(c) => back(
+				s,
+				keep,
+				n + 1,
+			)
 			_ => n
 		}
 	}
@@ -146,7 +247,14 @@ back = |s, keep, n|
 is_local : List(U8) -> Bool
 is_local = |src|
 	match src {
-		['/', second, ..] if second != '/' and second != '\\' => List.all(src, |c| c >= 0x20 and c != 0x7f and c != '\\')
+		[
+			'/',
+			second,
+			..,
+		] if second != '/' and second != '\\' => List.all(
+			src,
+			|c| c >= 0x20 and c != 0x7f and c != '\\',
+		)
 		_ => Bool.False
 	}
 
