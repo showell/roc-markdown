@@ -30,7 +30,7 @@ SafeImg := [].{
 				|> List.fold(
 					with_text,
 					|acc, (name, v)| match v {
-						Ok(val) if all_digits(val) => List.concat(acc, attr(name, val))
+						Ok(val) if is_all_digits(val) => List.concat(acc, attr(name, val))
 						_ => acc
 					},
 				)
@@ -150,8 +150,8 @@ is_local = |src|
 		_ => Bool.False
 	}
 
-all_digits : List(U8) -> Bool
-all_digits = |v| v != [] and List.all(v, |c| c >= '0' and c <= '9')
+is_all_digits : List(U8) -> Bool
+is_all_digits = |v| v != [] and List.all(v, |c| c >= '0' and c <= '9')
 
 ## ` name="value"`, the value as markdown_text `escapeInto` escapes it.
 attr : Str, List(U8) -> List(U8)
