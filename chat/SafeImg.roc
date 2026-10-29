@@ -144,11 +144,10 @@ scan = |s, { at: i, out }|
 last_of : List((List(U8), List(U8))), Str -> Try(List(U8), [Unsafe])
 last_of = |attrs, name| {
 	want = name.to_utf8()
-	List.fold(
-		attrs,
-		Err(Unsafe),
-		|got, (n, v)| if n == want Ok(v) else got,
-	)
+	match List.find_last(attrs, |(n, _)| n == want) {
+		Ok((_, v)) => Ok(v)
+		Err(NotFound) => Err(Unsafe)
+	}
 }
 
 ## markdown_media `isLocalUrl`: `/` then anything but `/` or `\`, and no
