@@ -15,10 +15,10 @@
 //!       its answers: a case with none, a case whose text is not the text
 //!       frozen, and an answer whose case is gone each fail too. Each
 //!       corpus's pass count is also held to judge/data/ratchet.txt, which
-//!       may only rise, so a corpus that loses cases is caught. The spec
-//!       corpus (spec_agree, CommonMark's and GFM's examples) is held to the
-//!       spec's html too, less the divergences judge/data/spec_diverge.txt
-//!       lists (specCheck).
+//!       may only rise, so a corpus that loses cases is caught. The spec's
+//!       corpora (spec_agree, CommonMark's and GFM's examples, and
+//!       spec_tables, GFM's tables) are held to the spec's html too, less
+//!       the divergences judge/data/spec_diverge.txt lists (specCheck).
 //!   zig build judge -- --also PATH       one more corpus, not ratcheted
 //!   zig build judge -- --refreeze LABEL  that corpus's answers recorded
 //!                             again (LABEL: its file's name less `.jsonl`,
@@ -58,7 +58,9 @@ const data_path = @import("judge_paths").data;
 const corpora_list = "corpora.txt";
 const ratchet_path = "ratchet.txt";
 const hostile_answers_path = "hostile.answers.jsonl";
-const spec_label = "spec_agree";
+/// The spec's corpora: CommonMark's and GFM's examples, and GFM's table
+/// examples (QUEUE 311), checked as one against spec_diverge.txt.
+const spec_labels = [_][]const u8{ "spec_agree", "spec_tables" };
 const spec_diverge_path = "spec_diverge.txt";
 
 /// The five answers, in judge/answers.roc's order.
@@ -534,6 +536,16 @@ const deep_shapes = [_]Shape{
     .{ .name = "rm-unbalanced-close-parens", .head = "[a](b", .unit = ")" },
     .{ .name = "rm-paren-bait", .unit = "[a]((" },
     .{ .name = "rm-paren-links", .unit = "[a](b(c)) " },
+    // GFM's tables (QUEUE 311): a header row n cells wide, its delimiter as
+    // wide, and a one-cell row padded to n; n body rows; a delimiter row
+    // alone, again and again (the first two lines are a table, the rest its
+    // rows); pipes in code spans, which split a cell all the same, a row's
+    // worth and a header's width.
+    .{ .name = "tbl-wide", .unit = "| a ", .middle = "|\n", .after = "| - ", .tail = "|\n| x |\n" },
+    .{ .name = "tbl-many-rows", .head = "| a | b |\n| - | - |\n", .unit = "| x | *y* |\n" },
+    .{ .name = "tbl-delimiter-alone", .unit = "|---|\n" },
+    .{ .name = "tbl-code-pipes", .head = "| a | b |\n| - | - |\n", .unit = "| `|` | `\\|` |\n" },
+    .{ .name = "tbl-code-pipes-wide", .unit = "`a|b` ", .middle = "\n", .after = "-|", .tail = "-\n`a|b`\n" },
     .{ .name = "lb-unclosed-processing-instructions", .unit = "<?" },
     .{ .name = "lb-unclosed-declarations", .unit = "<!A" },
     .{ .name = "lb-unclosed-open-tags", .unit = "<a b='" },
@@ -574,6 +586,15 @@ fn hostileCases(a: std.mem.Allocator) ![]Case {
         try cases.append(a, .{ .id = try std.fmt.allocPrint(a, "hostile/list-stair/{d}", .{n}), .md = stair.items });
         try cases.append(a, .{ .id = try std.fmt.allocPrint(a, "hostile/backtick-stair/{d}", .{n}), .md = ticks.items });
         try cases.append(a, .{ .id = try std.fmt.allocPrint(a, "hostile/quote-stair/{d}", .{n}), .md = quotes.items });
+        // A table n wide and n rows of one cell: n² cells out of 4n bytes,
+        // the padding its source never paid for, so the budget's to stop.
+        var ragged: std.ArrayList(u8) = .empty;
+        for (0..n) |_| try ragged.appendSlice(a, "|a");
+        try ragged.appendSlice(a, "|\n");
+        for (0..n) |_| try ragged.appendSlice(a, "|-");
+        try ragged.appendSlice(a, "|\n");
+        for (0..n) |_| try ragged.appendSlice(a, "x\n");
+        try cases.append(a, .{ .id = try std.fmt.allocPrint(a, "hostile/tbl-ragged/{d}", .{n}), .md = ragged.items });
     }
     // **ACROSS THE BUDGET'S EDGE**: a run of backtick runs each one longer
     // is quadratic (each unmatched run scans to the line's end), so as n
@@ -669,7 +690,7 @@ fn specCheck(io: Io, dir: Io.Dir, arena: *std.heap.ArenaAllocator, sa: std.mem.A
     while (it.next()) |id| {
         if (seen.contains(id.*)) continue;
         fails += 1;
-        std.debug.print("SPECSTALE\t{s}\tlisted in {s}, and no case of {s}\n", .{ id.*, spec_diverge_path, spec_label });
+        std.debug.print("SPECSTALE\t{s}\tlisted in {s}, and no spec corpus's case\n", .{ id.*, spec_diverge_path });
     }
     std.debug.print("== spec: {d}/{d} match CommonMark, {d} listed as diverging ({d} fail)\n", .{ agree, cases.len, listed.count(), fails });
     return fails;
@@ -826,17 +847,19 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("\n", .{});
         if (timed) try timeCorpus(&arena, c.cases);
     }
-    var spec_fails: usize = 0;
-    var spec_checked = false;
+    var spec_cases: std.ArrayList(Case) = .empty;
+    var spec_found: usize = 0;
     for (corpora.items) |c| {
-        if (!std.mem.eql(u8, c.label, spec_label)) continue;
-        spec_fails = try specCheck(io, data, &arena, sa, c.cases);
-        spec_checked = true;
+        if (!contains(&spec_labels, c.label)) continue;
+        try spec_cases.appendSlice(sa, c.cases);
+        spec_found += 1;
     }
+    const spec_checked = spec_found == spec_labels.len;
+    const spec_fails = try specCheck(io, data, &arena, sa, spec_cases.items);
     std.debug.print("==> {d}/{d} hold to their answers ({d} fail; {d} hostile)\n", .{ total.pass, total.pass + total.fail, total.fail, total.hostile });
     if (fell) std.debug.print("a corpus fell below its ratchet ({s})\n", .{ratchet_path});
     if (unrecorded) std.debug.print("a corpus has no answers\n", .{});
-    if (!spec_checked) std.debug.print("no corpus is labelled {s}: the spec check judged nothing\n", .{spec_label});
+    if (!spec_checked) std.debug.print("the spec check wants corpora labelled {s} and {s}: {d} of them are here\n", .{ spec_labels[0], spec_labels[1], spec_found });
     if (spec_fails > 0) std.debug.print("the spec check failed: {s} is not what the package does today\n", .{spec_diverge_path});
     if (fell or unrecorded or total.fail > 0 or !spec_checked or spec_fails > 0) std.process.exit(1);
     if (raise) {

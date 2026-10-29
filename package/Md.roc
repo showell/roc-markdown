@@ -1,9 +1,10 @@
 ## **THE CHAT'S MARKDOWN** (ported from chat-markdown markdown.zig, metal-vmm
 ## QUEUE 305; this is the dialect's definition now): a member's message to
 ## HTML. GFM-style paragraphs with hard wraps, ATX headings, fenced code
-## (with the `quote` fence of a reply), lists, blockquotes, and the raw
-## HTML block, which is escaped but for a same-origin `<img>` or `<video>`
-## (MdMedia); each line's inline content is MdInline's. Pure.
+## (with the `quote` fence of a reply), lists, blockquotes, GFM's pipe
+## tables (MdTable), and the raw HTML block, which is escaped but for a
+## same-origin `<img>` or `<video>` (MdMedia); each line's inline content
+## is MdInline's. Pure.
 ##
 ## **THE PARSER IS THE JUDGE OF HOSTILITY**: a render charges its work to a
 ## budget (MdText), checked at each block line and each inline step, and a
@@ -20,6 +21,7 @@ import MdText
 import MdFence
 import MdInline
 import MdMedia
+import MdTable
 
 Md := [].{
 
@@ -252,6 +254,14 @@ blocks_onto = |
 											$out = raw.out
 											$budget = raw.budget
 											$pos = $p
+										} else if is_table_at(md, $pos) {
+											tabled = table_onto(
+												tight_sep($out, spacing),
+												{ md, pos: $pos, budget: $budget },
+											)?
+											$out = tabled.out
+											$budget = tabled.budget
+											$pos = tabled.after
 										} else {
 											para = paragraph_onto(
 												tight_sep($out, spacing),
@@ -319,7 +329,7 @@ paragraph_onto = |
 		).is_ok() or atx_heading(line).is_ok() or is_list_interrupting(
 			md,
 			$p,
-		) or is_quote_line(line) {
+		) or is_quote_line(line) or ($p > pos and is_table_at(md, $p)) {
 			break
 		} else {
 			{}
@@ -700,8 +710,8 @@ list_onto = |
 }
 
 ## markdown `firstItemChildIsBlock`: a tight item starts on a line of its
-## own when its first child is a list, a quote, a fence or a heading, not a
-## paragraph.
+## own when its first child is a list, a quote, a fence, a heading or a
+## table, not a paragraph.
 is_first_child_block : List(U8) -> Bool
 is_first_child_block = |item| {
 	len = List.len(item)
@@ -716,7 +726,7 @@ is_first_child_block = |item| {
 			).is_ok() or is_quote_line(line) or fence_open_at(
 				item,
 				$pos,
-			).is_ok() or atx_heading(line).is_ok()
+			).is_ok() or atx_heading(line).is_ok() or is_table_at(item, $pos)
 		} else {
 			$pos = MdText.next_line(item, eol)
 		}
@@ -734,6 +744,134 @@ is_block_start = |md, pos| {
 		md,
 		pos,
 	).is_ok() or is_quote_line(line) or fence_open_at(md, pos).is_ok() or atx_heading(line).is_ok()
+}
+
+# ── tables ──
+
+## GFM's table at the line at `pos`: that line is its header row and the
+## next a delimiter row (MdTable) of as many cells. Its header's cells, each
+## column's alignment, and where its body starts.
+Table : {
+	header : List(List(U8)),
+	aligns : List(MdTable.Align),
+	body : U64,
+}
+
+table_at : List(U8), U64 -> Try(Table, [NotATable])
+table_at = |md, pos| {
+	eol = MdText.line_end(md, pos)
+	if eol >= List.len(md) {
+		Err(NotATable)
+	} else {
+		delim_end = MdText.line_end(md, eol + 1)
+		match MdTable.delimiter_row(MdText.cut(md, { start: eol + 1, end: delim_end })) {
+			Err(NotADelimiter) => Err(NotATable)
+			Ok(aligns) => {
+				header = MdTable.cells(MdText.cut(md, { start: pos, end: eol }))
+				if List.len(header) == List.len(aligns) {
+					Ok({ header, aligns, body: MdText.next_line(md, delim_end) })
+				} else {
+					Err(NotATable)
+				}
+			}
+		}
+	}
+}
+
+is_table_at : List(U8), U64 -> Bool
+is_table_at = |md, pos| table_at(md, pos).is_ok()
+
+## GFM's table from `pos`: its header row in `<thead>`, then a body row a
+## line, up to a blank line or one that starts a block (is_block_start),
+## each cut or padded to the header's width with empty cells. No body, no
+## `<tbody>`. A unit a row and a unit a cell, checked a cell: a short row's
+## padding is output its source never paid for.
+table_onto : List(U8),
+{
+	md : List(U8),
+	pos : U64,
+	budget : MdText.Budget,
+} -> Try(Block, [Hostile])
+table_onto = |out, { md, pos, budget }| match table_at(md, pos) {
+	Err(NotATable) => crash "Md.table_onto: no table where the dispatcher found one"
+	Ok(table) => {
+		len = List.len(md)
+		head = row_onto(
+			List.concat(out, Str.to_utf8("<table>\n<thead>\n")),
+			{ cells: table.header, aligns: table.aligns, tag: Th, budget },
+		)?
+		var $out = List.concat(head.out, Str.to_utf8("</thead>\n"))
+		var $budget = head.budget
+		var $rows = 0
+		var $p = table.body
+		while $p < len and !is_block_start(md, $p) {
+			eol = MdText.line_end(md, $p)
+			row = row_onto(
+				if $rows == 0 List.concat($out, Str.to_utf8("<tbody>\n")) else $out,
+				{
+					cells: MdTable.cells(MdText.cut(md, { start: $p, end: eol })),
+					aligns: table.aligns,
+					tag: Td,
+					budget: $budget,
+				},
+			)?
+			$out = row.out
+			$budget = row.budget
+			$rows = $rows + 1
+			$p = MdText.next_line(md, eol)
+		}
+		Ok({
+			out: List.concat($out, Str.to_utf8(if $rows == 0 "</table>\n" else "</tbody>\n</table>\n")),
+			budget: $budget,
+			after: $p,
+		})
+	}
+}
+
+## One `<tr>`: a cell a column, the row's own or an empty one, past the
+## columns' count none.
+row_onto : List(U8),
+{
+	cells : List(List(U8)),
+	aligns : List(MdTable.Align),
+	tag : [Th, Td],
+	budget : MdText.Budget,
+} -> Try(MdText.Rendered, [Hostile])
+row_onto = |out, { cells, aligns, tag, budget }| {
+	var $out = List.concat(out, Str.to_utf8("<tr>\n"))
+	var $budget = MdText.charge(budget, 1)
+	var $k = 0
+	for align in aligns {
+		$budget = MdText.charge($budget, 1)
+		if MdText.is_blown($budget) {
+			return Err(Hostile)
+		} else {
+			{}
+		}
+		cell = MdInline.render_onto({
+			out: List.concat($out, cell_open(tag, align)),
+			text: List.get(cells, $k) ?? [],
+			refs: Linked,
+			budget: $budget,
+		})?
+		$out = List.concat(cell.out, Str.to_utf8(if tag == Th "</th>\n" else "</td>\n"))
+		$budget = cell.budget
+		$k = $k + 1
+	}
+	Ok({ out: List.concat($out, Str.to_utf8("</tr>\n")), budget: $budget })
+}
+
+## `<th>` or `<td>`, with GFM's `align` when the column has one.
+cell_open : [Th, Td], MdTable.Align -> List(U8)
+cell_open = |tag, align| {
+	name = if tag == Th "<th" else "<td"
+	attr = match align {
+		Plain => ""
+		Left => " align=\"left\""
+		Center => " align=\"center\""
+		Right => " align=\"right\""
+	}
+	List.append(List.concat(Str.to_utf8(name), Str.to_utf8(attr)), '>')
 }
 
 # ── blockquotes ──
@@ -779,6 +917,10 @@ quote_onto = |
 	len = List.len(md)
 	var $inner = []
 	var $last_was_text = Bool.False
+	# A table's rows are no paragraph's, so no line is lazy after them:
+	# the table is open from its delimiter row to a blank line or a block.
+	var $in_table = Bool.False
+	var $prev_start = 0
 	var $p = pos
 	while $p < len {
 		eol = MdText.line_end(md, $p)
@@ -791,11 +933,16 @@ quote_onto = |
 		match quote_marker_len(line) {
 			Ok(strip) => {
 				stripped = List.drop_first(line, strip)
+				start = List.len($inner)
 				$inner = List.append(List.concat($inner, stripped), '\n')
-				$last_was_text = !MdText.is_blank(stripped) and !is_block_start(md, $p + strip)
+				ends_text = MdText.is_blank(stripped) or is_block_start(md, $p + strip)
+				$in_table = !ends_text and ($in_table or ($last_was_text and is_table_at($inner, $prev_start)))
+				$last_was_text = !ends_text and !$in_table
+				$prev_start = start
 			}
 			Err(NotAQuote) =>
 				if $last_was_text and !is_block_start(md, $p) {
+					$prev_start = List.len($inner)
 					$inner = List.append(List.concat($inner, line), '\n')
 				} else {
 					break
@@ -923,3 +1070,13 @@ expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
 expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("A **bold phrase that\nspans two lines** here."))) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
 expect Md.hostility(Str.to_utf8("some **bold** text and a [link](http://x.com)")) == Renderable
+# GFM's tables.
+expect md("| a | b |\n| :- | -: |\n| c |\n| d | e | f |") == "<table>\n<thead>\n<tr>\n<th align=\"left\">a</th>\n<th align=\"right\">b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align=\"left\">c</td>\n<td align=\"right\"></td>\n</tr>\n<tr>\n<td align=\"left\">d</td>\n<td align=\"right\">e</td>\n</tr>\n</tbody>\n</table>\n"
+expect md("see:\n| a |\n| - |\n\nafter") == "<p>see:</p>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n</table>\n<p>after</p>\n"
+expect md("| a | b |\n| - |") == "<p>| a | b |<br>\n| - |</p>\n"
+# A pipe in a code span splits its cell all the same: GFM splits first.
+expect md("| a | b |\n| - | - |\n| `x|y` |") == "<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>`x</td>\n<td>y`</td>\n</tr>\n</tbody>\n</table>\n"
+# A tight item whose first child is a table starts it on a line of its own.
+expect md("- | a |\n  | - |\n  | b |\n- next") == "<ul>\n<li>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>b</td>\n</tr>\n</tbody>\n</table>\n</li>\n<li>next</li>\n</ul>\n"
+# No line is lazy after a quoted table: its rows are no paragraph.
+expect md("> | a |\n> | - |\n> | MSG_x_1 |\nlazy") == "<blockquote>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><a href=\"#msg-x_1\" class=\"msg-ref\">MSG_x_1</a></td>\n</tr>\n</tbody>\n</table>\n</blockquote>\n<p>lazy</p>\n"

@@ -590,6 +590,31 @@
 {"id":"hostile/rm-paren-links/100","md_hash":"839cea3e04e86d56","html_hash":"aedb8d7ec73cf896","work_units":2489,"hostile":"","trusted_hash":"aedb8d7ec73cf896","trusted_reflow_hash":"aedb8d7ec73cf896"}
 {"id":"hostile/rm-paren-links/1000","md_hash":"cbce65a244a01249","html_hash":"3f3f0e77a047d72c","work_units":24989,"hostile":"","trusted_hash":"3f3f0e77a047d72c","trusted_reflow_hash":"3f3f0e77a047d72c"}
 {"id":"hostile/rm-paren-links/8191","md_hash":"ce950765a722a2bb","html_hash":"24d513ff8eb09ee1","work_units":204764,"hostile":"","trusted_hash":"24d513ff8eb09ee1","trusted_reflow_hash":"24d513ff8eb09ee1"}
+{"id":"hostile/tbl-wide/1","md_hash":"6b0dabf20d1d011e","html_hash":"0d3516b7a4f04848","work_units":11,"hostile":"","trusted_hash":"0d3516b7a4f04848","trusted_reflow_hash":"0d3516b7a4f04848"}
+{"id":"hostile/tbl-wide/10","md_hash":"346c62a12a9d88cf","html_hash":"324bb095647157b3","work_units":56,"hostile":"","trusted_hash":"324bb095647157b3","trusted_reflow_hash":"324bb095647157b3"}
+{"id":"hostile/tbl-wide/100","md_hash":"748f651635209d51","html_hash":"c17ddc25dbeff85a","work_units":506,"hostile":"","trusted_hash":"c17ddc25dbeff85a","trusted_reflow_hash":"c17ddc25dbeff85a"}
+{"id":"hostile/tbl-wide/1000","md_hash":"97dc5cee63fce7be","html_hash":"41b83be7fcb9d9a6","work_units":5006,"hostile":"","trusted_hash":"41b83be7fcb9d9a6","trusted_reflow_hash":"41b83be7fcb9d9a6"}
+{"id":"hostile/tbl-wide/8191","md_hash":"56fadd418eddd9ab","html_hash":"c45771bf4fb02d6e","work_units":40961,"hostile":"","trusted_hash":"c45771bf4fb02d6e","trusted_reflow_hash":"c45771bf4fb02d6e"}
+{"id":"hostile/tbl-many-rows/1","md_hash":"cd8538ea07fb7efa","html_hash":"fca52b62ea6e34bd","work_units":26,"hostile":"","trusted_hash":"fca52b62ea6e34bd","trusted_reflow_hash":"fca52b62ea6e34bd"}
+{"id":"hostile/tbl-many-rows/10","md_hash":"725cbca46d1849d6","html_hash":"13a75978e28f213f","work_units":170,"hostile":"","trusted_hash":"13a75978e28f213f","trusted_reflow_hash":"13a75978e28f213f"}
+{"id":"hostile/tbl-many-rows/100","md_hash":"30bccbc5f34a5f3b","html_hash":"f78f74ecaeaccf49","work_units":1610,"hostile":"","trusted_hash":"f78f74ecaeaccf49","trusted_reflow_hash":"f78f74ecaeaccf49"}
+{"id":"hostile/tbl-many-rows/1000","md_hash":"7cc24fa846dae623","html_hash":"e9a50da94367a479","work_units":16010,"hostile":"","trusted_hash":"e9a50da94367a479","trusted_reflow_hash":"e9a50da94367a479"}
+{"id":"hostile/tbl-many-rows/8191","md_hash":"5021ff0e74c031f2","html_hash":"f4ed021685a657c0","work_units":131066,"hostile":"","trusted_hash":"f4ed021685a657c0","trusted_reflow_hash":"f4ed021685a657c0"}
+{"id":"hostile/tbl-delimiter-alone/1","md_hash":"1b04a4bbec572765","html_hash":"611cff126ae67173","work_units":6,"hostile":"","trusted_hash":"611cff126ae67173","trusted_reflow_hash":"611cff126ae67173"}
+{"id":"hostile/tbl-delimiter-alone/10","md_hash":"3632086de3acea45","html_hash":"1fa9c672b2d07252","work_units":100,"hostile":"","trusted_hash":"1fa9c672b2d07252","trusted_reflow_hash":"1fa9c672b2d07252"}
+{"id":"hostile/tbl-delimiter-alone/100","md_hash":"56875c02d2bbf2ff","html_hash":"396be711dd7332aa","work_units":1090,"hostile":"","trusted_hash":"396be711dd7332aa","trusted_reflow_hash":"396be711dd7332aa"}
+{"id":"hostile/tbl-delimiter-alone/1000","md_hash":"2a90399f44674f4c","html_hash":"e8895977b88da73a","work_units":10990,"hostile":"","trusted_hash":"e8895977b88da73a","trusted_reflow_hash":"e8895977b88da73a"}
+{"id":"hostile/tbl-delimiter-alone/8191","md_hash":"a5685c6edfd0fa0a","html_hash":"7038384525a02e24","work_units":90091,"hostile":"","trusted_hash":"7038384525a02e24","trusted_reflow_hash":"7038384525a02e24"}
+{"id":"hostile/tbl-code-pipes/1","md_hash":"80b3edf0eae080c8","html_hash":"510a27de3dc7054e","work_units":19,"hostile":"","trusted_hash":"510a27de3dc7054e","trusted_reflow_hash":"510a27de3dc7054e"}
+{"id":"hostile/tbl-code-pipes/10","md_hash":"ca7f3aef36aeffc5","html_hash":"6e12097bbbd18a6e","work_units":100,"hostile":"","trusted_hash":"6e12097bbbd18a6e","trusted_reflow_hash":"6e12097bbbd18a6e"}
+{"id":"hostile/tbl-code-pipes/100","md_hash":"cb910ac6a22210f8","html_hash":"bfad5d2427ca3406","work_units":910,"hostile":"","trusted_hash":"bfad5d2427ca3406","trusted_reflow_hash":"bfad5d2427ca3406"}
+{"id":"hostile/tbl-code-pipes/1000","md_hash":"3130e173dcd8d8b3","html_hash":"717f18290a515efd","work_units":9010,"hostile":"","trusted_hash":"717f18290a515efd","trusted_reflow_hash":"717f18290a515efd"}
+{"id":"hostile/tbl-code-pipes/8191","md_hash":"6dbcea6ab42197cc","html_hash":"f75fe2dc19675295","work_units":73729,"hostile":"","trusted_hash":"f75fe2dc19675295","trusted_reflow_hash":"f75fe2dc19675295"}
+{"id":"hostile/tbl-code-pipes-wide/1","md_hash":"ad27a78acf40103f","html_hash":"86085dc4f014cf08","work_units":29,"hostile":"","trusted_hash":"86085dc4f014cf08","trusted_reflow_hash":"86085dc4f014cf08"}
+{"id":"hostile/tbl-code-pipes-wide/10","md_hash":"1a0d49aa89427469","html_hash":"8d8b02f4e3bcdf31","work_units":128,"hostile":"","trusted_hash":"8d8b02f4e3bcdf31","trusted_reflow_hash":"8d8b02f4e3bcdf31"}
+{"id":"hostile/tbl-code-pipes-wide/100","md_hash":"cc374807145af5fa","html_hash":"9baedbf59e66a95b","work_units":1118,"hostile":"","trusted_hash":"9baedbf59e66a95b","trusted_reflow_hash":"9baedbf59e66a95b"}
+{"id":"hostile/tbl-code-pipes-wide/1000","md_hash":"3fe4a491cb2e0f40","html_hash":"68e042afdefb0c67","work_units":11018,"hostile":"","trusted_hash":"68e042afdefb0c67","trusted_reflow_hash":"68e042afdefb0c67"}
+{"id":"hostile/tbl-code-pipes-wide/8191","md_hash":"2387b8644fcc439a","html_hash":"42d7a8edea78b9c9","work_units":90119,"hostile":"","trusted_hash":"42d7a8edea78b9c9","trusted_reflow_hash":"42d7a8edea78b9c9"}
 {"id":"hostile/lb-unclosed-processing-instructions/1","md_hash":"eafd1e6b444b2f81","html_hash":"72b0180674478e6c","work_units":3,"hostile":"","trusted_hash":"72b0180674478e6c","trusted_reflow_hash":"72b0180674478e6c"}
 {"id":"hostile/lb-unclosed-processing-instructions/10","md_hash":"5074ec885af942ad","html_hash":"28252537e28f7fa2","work_units":21,"hostile":"","trusted_hash":"28252537e28f7fa2","trusted_reflow_hash":"28252537e28f7fa2"}
 {"id":"hostile/lb-unclosed-processing-instructions/100","md_hash":"ededd209c1d76a96","html_hash":"921fef3ca50dc783","work_units":201,"hostile":"","trusted_hash":"921fef3ca50dc783","trusted_reflow_hash":"921fef3ca50dc783"}
@@ -623,15 +648,19 @@
 {"id":"hostile/list-stair/2","md_hash":"1642b4c718b60d59","html_hash":"e764b82b03af2419","work_units":10,"hostile":"","trusted_hash":"e764b82b03af2419","trusted_reflow_hash":"e764b82b03af2419"}
 {"id":"hostile/backtick-stair/2","md_hash":"0f2c36b29ef85f61","html_hash":"9c05237e2f517536","work_units":17,"hostile":"","trusted_hash":"9c05237e2f517536","trusted_reflow_hash":"9c05237e2f517536"}
 {"id":"hostile/quote-stair/2","md_hash":"bdf56bcff9771b81","html_hash":"1cd465b01a70d3d7","work_units":10,"hostile":"","trusted_hash":"1cd465b01a70d3d7","trusted_reflow_hash":"1cd465b01a70d3d7"}
+{"id":"hostile/tbl-ragged/2","md_hash":"bc19f9c5ac9414f2","html_hash":"757272517f03f15f","work_units":22,"hostile":"","trusted_hash":"757272517f03f15f","trusted_reflow_hash":"757272517f03f15f"}
 {"id":"hostile/list-stair/17","md_hash":"80ef06dc3f11e95c","html_hash":"83c55666d3f9b9ba","work_units":85,"hostile":"","trusted_hash":"83c55666d3f9b9ba","trusted_reflow_hash":"83c55666d3f9b9ba"}
 {"id":"hostile/backtick-stair/17","md_hash":"9e242e167e08af53","html_hash":"eaf1e9e6d11bc4e9","work_units":2247,"hostile":"","trusted_hash":"eaf1e9e6d11bc4e9","trusted_reflow_hash":"eaf1e9e6d11bc4e9"}
 {"id":"hostile/quote-stair/17","md_hash":"6a09a271a55a9336","html_hash":"c5138f8b469d1908","work_units":85,"hostile":"","trusted_hash":"c5138f8b469d1908","trusted_reflow_hash":"c5138f8b469d1908"}
+{"id":"hostile/tbl-ragged/17","md_hash":"c946d7759b37b82b","html_hash":"71bd49e4debfc5aa","work_units":427,"hostile":"","trusted_hash":"71bd49e4debfc5aa","trusted_reflow_hash":"71bd49e4debfc5aa"}
 {"id":"hostile/list-stair/40","md_hash":"c6e433562710005f","html_hash":"08c9344aae3989f8","work_units":775,"hostile":"","trusted_hash":"08c9344aae3989f8","trusted_reflow_hash":"08c9344aae3989f8"}
 {"id":"hostile/backtick-stair/40","md_hash":"9847198ab4d44ffd","html_hash":"fd2fe34c84ed2404","work_units":24603,"hostile":"too much markdown formatting","trusted_hash":"180db4404468add4","trusted_reflow_hash":"180db4404468add4"}
 {"id":"hostile/quote-stair/40","md_hash":"77beed3d8d5ee4e1","html_hash":"632e73932804af29","work_units":476,"hostile":"","trusted_hash":"632e73932804af29","trusted_reflow_hash":"632e73932804af29"}
+{"id":"hostile/tbl-ragged/40","md_hash":"881bbaf00a954723","html_hash":"81a4488e2d21c9f7","work_units":1922,"hostile":"","trusted_hash":"81a4488e2d21c9f7","trusted_reflow_hash":"81a4488e2d21c9f7"}
 {"id":"hostile/list-stair/200","md_hash":"d0eb3499152c5c21","html_hash":"b173a0fc09104352","work_units":34855,"hostile":"","trusted_hash":"b173a0fc09104352","trusted_reflow_hash":"b173a0fc09104352"}
 {"id":"hostile/backtick-stair/200","md_hash":"a7bda23bad304095","html_hash":"fd2fe34c84ed2404","work_units":2747003,"hostile":"too much markdown formatting","trusted_hash":"ba9c81d6bcf46e0c","trusted_reflow_hash":"ba9c81d6bcf46e0c"}
 {"id":"hostile/quote-stair/200","md_hash":"8ee9f7821182c7b8","html_hash":"26d623347e305691","work_units":17836,"hostile":"","trusted_hash":"26d623347e305691","trusted_reflow_hash":"26d623347e305691"}
+{"id":"hostile/tbl-ragged/200","md_hash":"76d696eea684a132","html_hash":"fd2fe34c84ed2404","work_units":41602,"hostile":"too much markdown formatting","trusted_hash":"9922947a1b07d449","trusted_reflow_hash":"9922947a1b07d449"}
 {"id":"hostile/edge/0/20","md_hash":"d21ed61bf322b255","html_hash":"f804a3d712cbd6fa","work_units":3521,"hostile":"","trusted_hash":"f804a3d712cbd6fa","trusted_reflow_hash":"f804a3d712cbd6fa"}
 {"id":"hostile/edge/0/23","md_hash":"196c4af16af7389c","html_hash":"fd2fe34c84ed2404","work_units":5176,"hostile":"too much markdown formatting","trusted_hash":"99fcaeb234450521","trusted_reflow_hash":"99fcaeb234450521"}
 {"id":"hostile/edge/0/26","md_hash":"ee0e0a3d8ca68f15","html_hash":"fd2fe34c84ed2404","work_units":7281,"hostile":"too much markdown formatting","trusted_hash":"ac0b1b02865d0e9e","trusted_reflow_hash":"ac0b1b02865d0e9e"}

@@ -12,6 +12,12 @@ Zig is no longer its judge. Its judge is a set of frozen answers (below).
 
 - Paragraphs, ATX headings, lists, blockquotes and fenced code; a list or a
   quote nested past 16 levels renders as one flat paragraph.
+- **GFM's pipe tables**, as the GFM spec writes them: a header row, a
+  delimiter row (`:` for `align`), body rows cut or padded to the header's
+  width, `\|` for a pipe in a cell (in a code span too). A table may
+  follow a paragraph's line directly. Its HTML is the spec's own: `table`,
+  `thead`, `tbody`, `tr`, `th`, `td` and `align="left|center|right"`, no
+  class.
 - **Inline markup is per line**: `**`, `*`, `_`, backticks and `[...](...)`
   never pair across a line break.
 - **A newline is a `<br>`** (`render`, `render_trusted`), or a space for
@@ -65,7 +71,8 @@ the divergences `judge/data/spec_diverge.txt` lists.
 
 - **The corpora:** adversarial and dialect shapes; `unit_cases`, every input
   of chat-markdown's Zig unit tests (where the dialect came from); CommonMark's
-  and GFM's examples (`spec_agree`, CC BY-SA 4.0: `judge/data/SPEC-LICENSE`);
+  and GFM's examples (`spec_agree`), and GFM's table examples
+  (`spec_tables`; both CC BY-SA 4.0: `judge/data/SPEC-LICENSE`);
   pinned departures from CommonMark; and the hostile shapes the judge
   generates itself.
 - **It prints counts and failing case ids, never a case's text**, so it can

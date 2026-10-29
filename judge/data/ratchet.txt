@@ -3,5 +3,6 @@ adversarial 29
 dialect 3
 unit_cases 69
 spec_agree 269
+spec_tables 8
 pinned 3
-hostile 1003
+hostile 1032

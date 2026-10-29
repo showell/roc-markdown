@@ -14,8 +14,11 @@
 --   - `zig build test`: the package's expects, then the judge, whose count
 --     a corpus must be exactly what `want` says: a different number is a
 --     FAIL, never a pass;
---   - three planted faults, each red: one byte of a frozen answer, one
---     hostile hash, and a spec_diverge.txt id that now matches;
+--   - the paren and table shapes linear in their work units, and a ragged
+--     table's quadratic padding refused by the budget (QUEUE 311);
+--   - five planted faults, each red: one byte of a frozen answer
+--     (adversarial's, and a table's), one hostile hash, and a
+--     spec_diverge.txt id that now matches (CommonMark's, and a table's);
 --   - `zig fmt --check` and `roc fmt --check` clean;
 --   - roc-chat's `roc test` against this package (roc-chat main, cloned
 --     beside a copy of package/);
@@ -28,9 +31,9 @@
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
 -- Each corpus's case count, exactly.
-const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, pinned = 3, hostile = 1003}
-const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "pinned", "hostile"}
-const want_total = 1376
+const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, spec_tables = 8, pinned = 3, hostile = 1032}
+const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "spec_tables", "pinned", "hostile"}
+const want_total = 1413
 const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
 const scratch_data = ".zig-cache/verify/data"
@@ -89,10 +92,10 @@ for label in want_order do
 end
 say(total == want_total, "cases in all: " .. total .. " (want " .. want_total .. ")")
 
--- ── the paren shapes stay linear (QUEUE 311) ──
+-- ── the paren and table shapes stay linear (QUEUE 311) ──
 -- Each shape's work units at 8,191 against its units at 1,000: linear is
 -- 8.19 times, and past 9 times is a re-scan creeping in.
-const linear_shapes = {"lb-nested-parens-in-dest", "rm-unbalanced-open-parens", "rm-unbalanced-close-parens", "rm-paren-bait", "rm-paren-links"}
+const linear_shapes = {"lb-nested-parens-in-dest", "rm-unbalanced-open-parens", "rm-unbalanced-close-parens", "rm-paren-bait", "rm-paren-links", "tbl-wide", "tbl-many-rows", "tbl-delimiter-alone", "tbl-code-pipes", "tbl-code-pipes-wide"}
 function units_of(answers, id)
   local key = "{\"id\":\"" .. id .. "\""
   local at = find(answers, key)
@@ -107,6 +110,11 @@ for shape in linear_shapes do
   local big = units_of(hostile_answers, "hostile/" .. shape .. "/8191")
   say(small > 0 and big > 0 and big * 10 <= small * 90, "linear: " .. shape .. " " .. small .. " units at 1,000, " .. big .. " at 8,191")
 end
+-- A table 200 wide and 200 rows of one cell: 40,000 cells out of 1,206
+-- bytes, padding its source never paid for, which the budget refuses.
+local ragged_at = find(hostile_answers, "{\"id\":\"hostile/tbl-ragged/200\"")
+local ragged = ragged_at ~= nil and re_find(sub(hostile_answers, ragged_at, ragged_at + 400), "\"hostile\":\"too much") ~= nil
+say(ragged, "budget: hostile/tbl-ragged/200 (40,000 padded cells) is refused")
 
 -- ── the planted faults, each in a copy of judge/data ──
 if exists(scratch_dir) then remove_tree(scratch_dir) end
@@ -115,9 +123,10 @@ for name in ls("judge/data") do
   replace(scratch_data .. "/" .. name, read("judge/data/" .. name))
 end
 
--- One byte of a frozen answer: the first `<p>` of adversarial's answers.
-function one_byte(s)
-  local at = find(s, "<p>")
+-- One byte of a frozen answer: the first `tag` (`<p>`, `<td>`) of the
+-- answers, its `<` and the letter after it made `<q`.
+function one_byte(s, tag)
+  local at = find(s, tag)
   if at == nil then return s end
   return sub(s, 1, at) .. "q" .. sub(s, at + 2)
 end
@@ -133,9 +142,9 @@ function one_hash(s)
   return sub(s, 1, d - 1) .. other .. sub(s, d + 1)
 end
 
--- A spec_diverge.txt id that matches CommonMark: the first spec_agree case
--- the list does not name.
-function stale_diverge(s)
+-- A spec_diverge.txt id that matches the spec: the first case of `corpus`
+-- (spec_agree, spec_tables) the list does not name.
+function stale_diverge(s, corpus)
   local listed = {}
   for line in split(s, "\n") do
     if line ~= "" and not starts_with(line, "#") then
@@ -144,7 +153,7 @@ function stale_diverge(s)
       listed[sub(line, 1, tab - 1)] = true
     end
   end
-  for line in split(read("judge/data/spec_agree.jsonl"), "\n") do
+  for line in split(read("judge/data/" .. corpus .. ".jsonl"), "\n") do
     if line ~= "" then
       local c = json_read(line)
       if get(listed, c.id, nil) == nil then return s .. c.id .. "\tplanted\ta case that matches\n" end
@@ -153,16 +162,17 @@ function stale_diverge(s)
   return s
 end
 
--- Plants `kind` into the copy's `file`, runs the judge on the copy,
--- requires red, and the judge's own line for that fault (`mark`, so a red
--- for any other reason is no pass), and puts the file back.
-function plant(what, file, kind, mark)
+-- Plants `kind` (with `with`, its tag or its corpus) into the copy's
+-- `file`, runs the judge on the copy, requires red, and the judge's own
+-- line for that fault (`mark`, so a red for any other reason is no pass),
+-- and puts the file back.
+function plant(what, file, kind, with, mark)
   local p = scratch_data .. "/" .. file
   local was = read(p)
   local now = was
-  if kind == "one_byte" then now = one_byte(was) end
+  if kind == "one_byte" then now = one_byte(was, with) end
   if kind == "one_hash" then now = one_hash(was) end
-  if kind == "stale_diverge" then now = stale_diverge(was) end
+  if kind == "stale_diverge" then now = stale_diverge(was, with) end
   if now == was then
     say(false, "plant: " .. what .. ": the plant changed nothing")
     return nil
@@ -177,9 +187,11 @@ function plant(what, file, kind, mark)
   say(r.code ~= 0 and named == 1, "plant: " .. what .. " is red (exit " .. r.code .. "; " .. named .. " `" .. trim(mark) .. "` line, want 1)")
 end
 
-plant("one byte of a frozen answer (adversarial)", "adversarial.answers.jsonl", "one_byte", "FAILID\tadversarial\t")
-plant("one wrong hostile hash", "hostile.answers.jsonl", "one_hash", "FAILID\thostile\t")
-plant("a spec_diverge id that now matches", "spec_diverge.txt", "stale_diverge", "SPECSTALE\t")
+plant("one byte of a frozen answer (adversarial)", "adversarial.answers.jsonl", "one_byte", "<p>", "FAILID\tadversarial\t")
+plant("one byte of a frozen table (spec_tables)", "spec_tables.answers.jsonl", "one_byte", "<td>", "FAILID\tspec_tables\t")
+plant("one wrong hostile hash", "hostile.answers.jsonl", "one_hash", nil, "FAILID\thostile\t")
+plant("a spec_diverge id that now matches", "spec_diverge.txt", "stale_diverge", "spec_agree", "SPECSTALE\t")
+plant("a spec_diverge table id that now matches", "spec_diverge.txt", "stale_diverge", "spec_tables", "SPECSTALE\t")
 
 -- ── the formatters ──
 local zf = run({"zig", "fmt", "--check", "build.zig", "judge"}, {cwd = ".", timeout_ms = 60000, tail = 20})
