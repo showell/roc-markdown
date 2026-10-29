@@ -1,1 +1,7 @@
-package [Md, MdFence, MdMedia] {}
+package
+	[
+		Md,
+		MdFence,
+		MdMedia,
+	]
+	{}
