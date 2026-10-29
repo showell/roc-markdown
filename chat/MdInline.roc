@@ -269,7 +269,7 @@ Link : [Edge, At(U64)]
 ## it may open and close, its neighbours on the stack (`below` is earlier),
 ## and the emphasis it opens after it and closes before it, each `1`
 ## (`<em>`) or `2` (`<strong>`), in the order matched.
-Run : {
+DelimiterRun : {
 	char : U8,
 	count : U64,
 	orig : U64,
@@ -316,7 +316,7 @@ emit : List(U8),
 {
 	text : List(U8),
 	pieces : List(Piece),
-	runs : List(Run),
+	runs : List(DelimiterRun),
 } -> List(U8)
 emit = |
 	out,
@@ -353,7 +353,7 @@ emit = |
 	$out
 }
 
-run_at : List(Run), U64 -> Run
+run_at : List(DelimiterRun), U64 -> DelimiterRun
 run_at = |runs, k| match List.get(runs, k) {
 	Ok(run) => run
 	Err(OutOfBounds) => crash "MdInline: a run's index past the runs"
@@ -365,19 +365,19 @@ index_of = |link| match link {
 	Edge => crash "MdInline: the stack's edge read as a run"
 }
 
-set_run : List(Run), { at : U64, run : Run } -> List(Run)
-set_run = |runs, { at, run }| List.set(
+set_run : List(DelimiterRun), { at : U64, delimiters : DelimiterRun } -> List(DelimiterRun)
+set_run = |runs, { at, delimiters }| List.set(
 	runs,
 	at,
-	run,
+	delimiters,
 ) ?? crash "MdInline: a run set past the runs"
 
 ## markdown_inline `processEmphasis`: the runs matched into emphasis by
 ## CommonMark's delimiter stack, the rule of 3 included. One unit per
 ## closer visited and per opener looked back at; blown on a closer is
 ## hostile, and the caller checks once more after.
-emphasis : { runs : List(Run), budget : MdText.Budget } -> Try(
-	{ runs : List(Run), budget : MdText.Budget },
+emphasis : { runs : List(DelimiterRun), budget : MdText.Budget } -> Try(
+	{ runs : List(DelimiterRun), budget : MdText.Budget },
 	[Hostile],
 )
 emphasis = |{ runs, budget }| {
@@ -441,7 +441,7 @@ emphasis = |{ runs, budget }| {
 					$runs,
 					{
 						at: oi,
-						run: {
+						delimiters: {
 							..opener,
 							count: opener.count - use,
 							above: At(ci),
@@ -453,7 +453,7 @@ emphasis = |{ runs, budget }| {
 					$runs,
 					{
 						at: ci,
-						run: {
+						delimiters: {
 							..closer,
 							count: closer.count - use,
 							below: At(oi),
@@ -494,15 +494,15 @@ emphasis = |{ runs, budget }| {
 
 ## markdown_inline `unlinkDelim`: run `k` off the stack; its place among the
 ## pieces, and its delimiters left, stay.
-unlinked : List(Run), U64 -> List(Run)
+unlinked : List(DelimiterRun), U64 -> List(DelimiterRun)
 unlinked = |runs, k| {
 	run = run_at(runs, k)
 	with_below = match run.below {
-		At(b) => set_run(runs, { at: b, run: { ..run_at(runs, b), above: run.above } })
+		At(b) => set_run(runs, { at: b, delimiters: { ..run_at(runs, b), above: run.above } })
 		Edge => runs
 	}
 	match run.above {
-		At(a) => set_run(with_below, { at: a, run: { ..run_at(with_below, a), below: run.below } })
+		At(a) => set_run(with_below, { at: a, delimiters: { ..run_at(with_below, a), below: run.below } })
 		Edge => with_below
 	}
 }
