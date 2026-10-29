@@ -75,7 +75,82 @@ pub fn build(b: *std.Build) void {
     repl_checked.has_side_effects = true;
     repl_checked.step.dependOn(&roc_test.step);
     tests.dependOn(&repl_checked.step);
+
+    // **THE WEB PLAYGROUND** (playground/): the package compiled to wasm32,
+    // and a static page around it, in zig-out/playground/.
+    const site = playgroundSite(b, roc);
+    b.step("playground", "The web playground: a folder of static files in zig-out/playground/").dependOn(site.step);
+
+    // The playground's wasm in node, held to the frozen answers
+    // (playground/check.zig), and its page run on a stand-in DOM.
+    const judge_lib = b.createModule(.{ .root_source_file = b.path("judge/judge.zig"), .target = target, .optimize = optimize });
+    judge_lib.addImport("judge_paths", paths.createModule());
+    const play_mod = b.createModule(.{
+        .root_source_file = b.path("playground/check.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    play_mod.addImport("judge", judge_lib);
+    play_mod.addImport("judge_paths", paths.createModule());
+    const play_exe = b.addExecutable(.{ .name = "playground_check", .root_module = play_mod });
+    const play_checked = b.addRunArtifact(play_exe);
+    play_checked.addArg(b.findProgram(.{ .names = &.{"node"} }) orelse std.process.fatal("the playground's test runs its wasm in node, and there is no `node` on the PATH", .{}));
+    play_checked.addFileArg(b.path("playground/check.mjs"));
+    play_checked.addDirectoryArg(site.folder);
+    play_checked.addFileInput(b.path("playground/page_check.mjs"));
+    play_checked.has_side_effects = true;
+    play_checked.step.dependOn(&roc_test.step);
+    tests.dependOn(&play_checked.step);
 }
+
+/// The playground's folder (in the cache) and the step installing it.
+const Site = struct { folder: std.Build.LazyPath, step: *std.Build.Step };
+
+/// **THE PLAYGROUND, A FOLDER OF STATIC FILES**: playground/platform/host.zig
+/// built to a wasm32 object where the platform's header expects it, the
+/// pinned Roc linking it with playground/answer.roc into `md.wasm`, and the
+/// page, its script and style and the canned examples beside it.
+fn playgroundSite(b: *std.Build, roc: []const u8) Site {
+    const host = b.addObject(.{
+        .name = "host",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("playground/platform/host.zig"),
+            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding, .abi = .none }),
+            .optimize = .ReleaseSmall,
+            .pic = true,
+        }),
+    });
+    host.use_llvm = true;
+    host.link_function_sections = true;
+    host.link_data_sections = true;
+    host.bundle_compiler_rt = true;
+    // **THE HOST IS BUILT, NEVER CHECKED IN**: the platform's header names
+    // it in its own folder (.gitignore'd), so it is copied there first.
+    const placed = b.addUpdateSourceFiles();
+    placed.addCopyFileToSource(host.getEmittedBin(), "playground/platform/targets/wasm32/host.wasm");
+
+    const wasm = b.addSystemCommand(&.{ roc, "build", "playground/answer.roc", "--target=wasm32", b.fmt("--opt={t}", .{playground_opt}) });
+    wasm.setCwd(b.path("."));
+    wasm.step.dependOn(&placed.step);
+    for (rocInputs(b)) |f| wasm.addFileInput(b.path(f));
+    for ([_][]const u8{ "playground/answer.roc", "playground/platform/main.roc", "playground/platform/host.zig" }) |f| wasm.addFileInput(b.path(f));
+    wasm.addFileInput(.{ .cwd_relative = roc });
+    const md_wasm = wasm.addPrefixedOutputFileArg("--output=", "md.wasm");
+
+    const files = b.addWriteFiles();
+    _ = files.addCopyFile(md_wasm, "md.wasm");
+    for ([_][]const u8{ "index.html", "app.js", "md_wasm.js", "style.css" }) |f|
+        _ = files.addCopyFile(b.path(b.fmt("playground/{s}", .{f})), f);
+    // The canned examples are the judge's corpus, one home.
+    _ = files.addCopyFile(b.path("judge/data/examples.jsonl"), "examples.jsonl");
+    const folder = files.getDirectory();
+    const install = b.addInstallDirectory(.{ .source_dir = folder, .install_dir = .prefix, .install_subdir = "playground" });
+    return .{ .folder = folder, .step = &install.step };
+}
+
+/// **THE PLAYGROUND'S ROC BUILD MODE**: chosen, not following Zig's (the
+/// folder the box serves is the same whichever way the tests were built).
+const playground_opt: RocOpt = .dev;
 
 /// judge/data, absolute (0.17 removed `b.pathFromRoot`).
 fn dataFolder(b: *std.Build) []const u8 {
