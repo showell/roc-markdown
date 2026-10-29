@@ -1,0 +1,209 @@
+-- **EVERY CHECK OF roc-markdown, IN ONE RUN** (metal-vmm QUEUE 310): the
+-- proof a change is sound, and the box's whole check of one. From the
+-- repository's root:
+--
+--   shale tools/verify.shale
+--
+-- It prints one line a check, `PASS` or `FAIL` with its numbers, then
+-- `verify: N of N passed` or `verify: FAILED`, and exits 0 only on the
+-- first. **IT NEVER TOUCHES THE TREE**: each planted fault is made in a
+-- copy of judge/data under .zig-cache/verify/, which the judge is pointed
+-- at with `--data`, and roc-chat is checked out there too.
+--
+-- The checks:
+--   - `zig build test`: the package's expects, then the judge, whose count
+--     a corpus must be exactly what `want` says: a different number is a
+--     FAIL, never a pass;
+--   - three planted faults, each red: one byte of a frozen answer, one
+--     hostile hash, and a spec_diverge.txt id that now matches;
+--   - `zig fmt --check` and `roc fmt --check` clean;
+--   - roc-chat's `roc test` against this package (roc-chat main, cloned
+--     beside a copy of package/);
+--   - gold (`gold=`, default repos:gopher-gold/gold.jsonl, the box's): every
+--     one of its 10,103 cases agrees. **ONLY COUNTS ARE PRINTED, NEVER A
+--     MESSAGE'S TEXT.** Where it is absent, `SKIP gold`, the one SKIP there
+--     is;
+--   - the judge's time, without gold and with it.
+--
+-- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
+
+-- Each corpus's case count, exactly.
+const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, pinned = 3, hostile = 983}
+const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "pinned", "hostile"}
+const want_total = 1356
+const gold_cases = 10103
+const scratch_dir = ".zig-cache/verify"
+const scratch_data = ".zig-cache/verify/data"
+-- A judge run: about 40 s on the dev backend; a build first.
+const judge_ms = 900000
+
+-- The checklist so far: each line, and how many failed.
+const board = {lines = {}, failed = 0}
+
+function say(ok, what)
+  local mark = "FAIL"
+  if ok then mark = "PASS" end
+  if not ok then board.failed = board.failed + 1 end
+  board.lines[#board.lines + 1] = mark .. "  " .. what
+  print(mark .. "  " .. what)
+end
+
+-- The judge's `== <label>: P/T hold ...` lines, as {label = {pass, total}}.
+function counts(out)
+  local got = {}
+  for line in split(out, "\n") do
+    local m = re_find(line, "^== (\\w+): (\\d+)/(\\d+) hold")
+    if m ~= nil then
+      local label = sub(line, 4, find(line, ":") - 1)
+      local nums = re_find(line, "(\\d+)/(\\d+)")
+      local slash = find(nums.text, "/")
+      got[label] = {pass = parse_int(sub(nums.text, 1, slash - 1)), total = parse_int(sub(nums.text, slash + 1))}
+    end
+  end
+  return got
+end
+
+function judge(args, keep)
+  local argv = {"zig", "build", "judge", "--"}
+  for a in args do argv[#argv + 1] = a end
+  local opts = {cwd = ".", timeout_ms = judge_ms, tail = 60}
+  if keep ~= nil then opts.re = keep end
+  return run(argv, opts)
+end
+
+-- ── zig build test, and the counts ──
+local t = run({"zig", "build", "test"}, {cwd = ".", timeout_ms = judge_ms, tail = 60})
+say(t.code == 0, "zig build test (exit " .. t.code .. ", " .. t.ms .. " ms)")
+local got = counts(t.out)
+local total = 0
+for label in want_order do
+  local g = get(got, label, nil)
+  local n = 0
+  local p = -1
+  if g ~= nil then
+    n = g.total
+    p = g.pass
+  end
+  total = total + n
+  say(n == want[label] and p == n, "cases: " .. label .. " " .. p .. "/" .. n .. " (want " .. want[label] .. ")")
+end
+say(total == want_total, "cases in all: " .. total .. " (want " .. want_total .. ")")
+
+-- ── the planted faults, each in a copy of judge/data ──
+if exists(scratch_dir) then remove_tree(scratch_dir) end
+mkdir(scratch_data)
+for name in ls("judge/data") do
+  replace(scratch_data .. "/" .. name, read("judge/data/" .. name))
+end
+
+-- One byte of a frozen answer: the first `<p>` of adversarial's answers.
+function one_byte(s)
+  local at = find(s, "<p>")
+  if at == nil then return s end
+  return sub(s, 1, at) .. "q" .. sub(s, at + 2)
+end
+
+-- One hostile hash: the first `html_hash`'s first hex digit, another.
+function one_hash(s)
+  local key = "\"html_hash\":\""
+  local at = find(s, key)
+  if at == nil then return s end
+  local d = at + #key
+  local other = "0"
+  if sub(s, d, d) == "0" then other = "1" end
+  return sub(s, 1, d - 1) .. other .. sub(s, d + 1)
+end
+
+-- A spec_diverge.txt id that matches CommonMark: the first spec_agree case
+-- the list does not name.
+function stale_diverge(s)
+  local listed = {}
+  for line in split(s, "\n") do
+    if line ~= "" and not starts_with(line, "#") then
+      local tab = find(line, "\t")
+      if tab == nil then tab = #line + 1 end
+      listed[sub(line, 1, tab - 1)] = true
+    end
+  end
+  for line in split(read("judge/data/spec_agree.jsonl"), "\n") do
+    if line ~= "" then
+      local c = json_read(line)
+      if get(listed, c.id, nil) == nil then return s .. c.id .. "\tplanted\ta case that matches\n" end
+    end
+  end
+  return s
+end
+
+-- Plants `kind` into the copy's `file`, runs the judge on the copy,
+-- requires red, and the judge's own line for that fault (`mark`, so a red
+-- for any other reason is no pass), and puts the file back.
+function plant(what, file, kind, mark)
+  local p = scratch_data .. "/" .. file
+  local was = read(p)
+  local now = was
+  if kind == "one_byte" then now = one_byte(was) end
+  if kind == "one_hash" then now = one_hash(was) end
+  if kind == "stale_diverge" then now = stale_diverge(was) end
+  if now == was then
+    say(false, "plant: " .. what .. ": the plant changed nothing")
+    return nil
+  end
+  replace(p, now)
+  local r = judge({"--data", real(scratch_data)}, "^(==|SPEC|FAILID)")
+  replace(p, was)
+  local named = 0
+  for line in split(r.out, "\n") do
+    if starts_with(line, mark) then named = named + 1 end
+  end
+  say(r.code ~= 0 and named == 1, "plant: " .. what .. " is red (exit " .. r.code .. "; " .. named .. " `" .. trim(mark) .. "` line, want 1)")
+end
+
+plant("one byte of a frozen answer (adversarial)", "adversarial.answers.jsonl", "one_byte", "FAILID\tadversarial\t")
+plant("one wrong hostile hash", "hostile.answers.jsonl", "one_hash", "FAILID\thostile\t")
+plant("a spec_diverge id that now matches", "spec_diverge.txt", "stale_diverge", "SPECSTALE\t")
+
+-- ── the formatters ──
+local zf = run({"zig", "fmt", "--check", "build.zig", "judge"}, {cwd = ".", timeout_ms = 60000, tail = 20})
+say(zf.code == 0, "zig fmt --check build.zig judge" .. (zf.code == 0 and "" or (": " .. trim(zf.out))))
+local rf = run({"roc", "fmt", "--check", "package", "judge"}, {cwd = ".", timeout_ms = 60000, tail = 20})
+say(rf.code == 0, "roc fmt --check package judge")
+
+-- ── roc-chat against this package ──
+-- roc-chat's app names `../../roc-markdown/package/main.roc`: a copy of
+-- package/ in .zig-cache/verify/roc-markdown, roc-chat's main beside it.
+local beside = scratch_dir .. "/roc-markdown/package"
+mkdir(beside)
+for name in ls("package") do replace(beside .. "/" .. name, read("package/" .. name)) end
+local clone = run({"git", "clone", "-q", "--depth", "1", "https://github.com/showell/roc-chat", real(scratch_dir) .. "/roc-chat"}, {cwd = ".", timeout_ms = 300000, tail = 10})
+if clone.code ~= 0 then
+  say(false, "roc-chat cloned (exit " .. clone.code .. ": " .. trim(clone.out) .. ")")
+else
+  local rt = run({"roc", "test", "app/main.roc"}, {cwd = scratch_dir .. "/roc-chat", timeout_ms = 600000, tail = 5})
+  say(rt.code == 0, "roc-chat's roc test against this package (exit " .. rt.code .. ": " .. trim(rt.out) .. ")")
+end
+
+-- ── the judge's time, and gold ──
+local plain = judge({}, "^==>")
+say(plain.code == 0, "the judge's time without gold: " .. plain.ms .. " ms")
+local gold = arg("gold", "repos:gopher-gold/gold.jsonl")
+if not exists(gold) then
+  board.lines[#board.lines + 1] = "SKIP  gold: not on this machine"
+  print("SKIP  gold: not on this machine")
+else
+  -- Only the summary lines are kept: no case's id, no message's text.
+  local g = judge({"--also", real(gold)}, "^== gold:|^==>")
+  local gc = get(counts(g.out), "gold", {pass = -1, total = -1})
+  say(g.code == 0 and gc.pass == gold_cases and gc.total == gold_cases, "gold: " .. gc.pass .. "/" .. gc.total .. " agree (want " .. gold_cases .. "); the judge's time with gold: " .. g.ms .. " ms")
+end
+
+remove_tree(scratch_dir)
+local checks = 0
+for l in board.lines do
+  if not starts_with(l, "SKIP") then checks = checks + 1 end
+end
+if board.failed == 0 then
+  print("verify: " .. checks .. " of " .. checks .. " passed")
+else
+  print("verify: FAILED")
+  fail(board.failed .. " of " .. checks .. " checks failed")
+end
