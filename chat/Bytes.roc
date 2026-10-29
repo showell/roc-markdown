@@ -58,12 +58,19 @@ Bytes := [].{
 	## later search from a place at or before it, so a scan that searches
 	## from each of many openers (`<img ` after `<img `, `![` after `![`)
 	## costs one pass of a message, not one per opener. `from` must not go
-	## back between calls that share one.
-	Seen : [
+	## back between calls that share one. Opaque (`::`): a scan starts at
+	## `unknown`, and `find_seen` is the only way on, so no caller can claim
+	## a place no search found.
+	Seen :: [
 		Unknown,
 		At(U64),
 		Never,
-	]
+	].{
+
+		## No search made yet: where every scan starts.
+		unknown : Seen
+		unknown = Seen.(Unknown)
+	}
 
 	find_seen : List(U8),
 	{
@@ -76,16 +83,16 @@ Bytes := [].{
 		{
 			byte: b,
 			from,
-			seen,
+			seen: Seen.(state),
 		},
 	|
-		match seen {
-			At(k) if k >= from => (Ok(k), seen)
-			Never => (Err(NotFound), Never)
+		match state {
+			At(k) if k >= from => (Ok(k), Seen.(state))
+			Never => (Err(NotFound), Seen.(Never))
 			_ =>
 				match find_byte(s, { byte: b, at: from }) {
-					Ok(k) => (Ok(k), At(k))
-					Err(NotFound) => (Err(NotFound), Never)
+					Ok(k) => (Ok(k), Seen.(At(k)))
+					Err(NotFound) => (Err(NotFound), Seen.(Never))
 				}
 		}
 
