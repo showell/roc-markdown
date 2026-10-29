@@ -527,6 +527,13 @@ const deep_shapes = [_]Shape{
     .{ .name = "lb-tilde-runs", .unit = "~a ", .after = " a~" },
     .{ .name = "lb-reference-like-brackets", .unit = "[a][", .after = "]" },
     .{ .name = "lb-unclosed-links-c", .unit = "[a](b \"" },
+    // A destination's parens balance (QUEUE 311): opens never closed, closes
+    // past the balance, a `](` each with an open paren, and links that each
+    // nest a pair, all linear by the one paren pass a line.
+    .{ .name = "rm-unbalanced-open-parens", .head = "[a](", .unit = "(", .tail = "b" },
+    .{ .name = "rm-unbalanced-close-parens", .head = "[a](b", .unit = ")" },
+    .{ .name = "rm-paren-bait", .unit = "[a]((" },
+    .{ .name = "rm-paren-links", .unit = "[a](b(c)) " },
     .{ .name = "lb-unclosed-processing-instructions", .unit = "<?" },
     .{ .name = "lb-unclosed-declarations", .unit = "<!A" },
     .{ .name = "lb-unclosed-open-tags", .unit = "<a b='" },

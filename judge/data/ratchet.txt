@@ -4,4 +4,4 @@ dialect 3
 unit_cases 69
 spec_agree 269
 pinned 3
-hostile 983
+hostile 1003

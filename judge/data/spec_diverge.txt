@@ -49,8 +49,6 @@ cm/405	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a 
 cm/423	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
 cm/432	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
 cm/488	Links	[gap?] a link destination may hold a space
-cm/496	Links	[gap?] a link destination ends at the first `)`: parens don't balance
-cm/497	Links	[gap?] a link destination ends at the first `)`: parens don't balance
 cm/512	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
 cm/514	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
 cm/518	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule

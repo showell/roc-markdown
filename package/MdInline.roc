@@ -43,7 +43,7 @@ MdInline := [].{
 		var $run_start = 0
 		var $i = 0
 		var $rb = MdText.find_or_end(text, { byte: ']', at: 0 })
-		var $rp = MdText.find_or_end(text, { byte: ')', at: 0 })
+		var $closes = Unscanned
 		var $email_dead = 0
 		while $i < len {
 			$budget = MdText.charge($budget, 1)
@@ -146,12 +146,12 @@ MdInline := [].{
 							{
 								at: $i,
 								rb: $rb,
-								rp: $rp,
+								closes: $closes,
 								budget: $budget,
 							},
 						)?
 						$rb = linked.rb
-						$rp = linked.rp
+						$closes = linked.closes
 						$budget = linked.budget
 						match linked.link {
 							Ok(link) => {
@@ -670,20 +670,23 @@ code_span_content = |content| {
 # ── [t](u) links ──
 
 ## markdown_inline `mdLinkAt`: the link `[label](url)` at `at`, rendered,
-## and the index past its `)`. `rb` and `rp`, the first `]` and `)` the
-## line has not yet passed, only move forward, so the scans cost the line's
-## length in all, not once a `[`. The label renders `InLabel`.
+## and the index past its `)`. `rb`, the first `]` the line has not yet
+## passed, only moves forward, so its scans cost the line's length in all,
+## not once a `[`. The destination's parens balance (CommonMark): it ends
+## at the `)` that closes its `(`, from `closes`, the line's one paren pass,
+## made at the first `](` and charged its length once. A `(` with no
+## balancing `)` is no link. The label renders `InLabel`.
 link_at : List(U8),
 {
 	at : U64,
 	rb : U64,
-	rp : U64,
+	closes : Closes,
 	budget : MdText.Budget,
 } -> Try(
 	{
 		link : Try({ html : List(U8), end : U64 }, [NotALink]),
 		rb : U64,
-		rp : U64,
+		closes : Closes,
 		budget : MdText.Budget,
 	},
 	[Hostile],
@@ -693,13 +696,12 @@ link_at = |
 	{
 		at,
 		rb,
-		rp,
+		closes,
 		budget,
 	},
 | {
 	len = List.len(text)
 	var $rb = rb
-	var $rp = rp
 	var $budget = budget
 	while $rb < len and $rb < at + 1 {
 		from = $rb
@@ -710,26 +712,26 @@ link_at = |
 		Ok({
 			link: Err(NotALink),
 			rb: $rb,
-			rp: $rp,
+			closes,
 			budget: $budget,
 		})
 	} else {
 		close_bracket = $rb
 		open_paren = close_bracket + 1
-		while $rp < len and $rp < open_paren + 1 {
-			from = $rp
-			$rp = MdText.find_or_end(text, { byte: ')', at: $rp + 1 })
-			$budget = MdText.charge($budget, $rp - from)
+		(table, scanned) = match closes {
+			Scanned(t) => (t, $budget)
+			Unscanned => (paren_closes(text), MdText.charge($budget, len))
 		}
-		if $rp >= len {
+		$budget = scanned
+		close_paren = List.get(table, open_paren) ?? len
+		if close_paren >= len {
 			Ok({
 				link: Err(NotALink),
 				rb: $rb,
-				rp: $rp,
+				closes: Scanned(table),
 				budget: $budget,
 			})
 		} else {
-			close_paren = $rp
 			url = MdText.cut(text, { start: open_paren + 1, end: close_paren })
 			href = if is_dangerous_url(url) a_open else MdText.escape_onto(a_open, url)
 			head = List.join([
@@ -747,11 +749,43 @@ link_at = |
 			Ok({
 				link: Ok({ html: List.concat(label.out, a_close), end: close_paren + 1 }),
 				rb: $rb,
-				rp: $rp,
+				closes: Scanned(table),
 				budget: label.budget,
 			})
 		}
 	}
+}
+
+## Each `(`'s balancing `)` in the line, found once, by a stack: the index
+## of the `)` that closes the `(` at `i`, or the line's length when none
+## does (and for every byte that is no `(`). One pass, so a line of
+## `[a](((…` costs its length once, not once a `](`.
+Closes : [Unscanned, Scanned(List(U64))]
+
+paren_closes : List(U8) -> List(U64)
+paren_closes = |text| {
+	len = List.len(text)
+	var $closes = List.repeat(len, len)
+	var $open = []
+	var $i = 0
+	while $i < len {
+		c = MdText.at(text, $i)
+		if c == '(' {
+			$open = List.append($open, $i)
+		} else if c == ')' {
+			match List.last($open) {
+				Ok(j) => {
+					$closes = List.set($closes, j, $i) ?? crash "MdInline.paren_closes: a ( past the line"
+					$open = List.drop_last($open, 1)
+				}
+				Err(ListWasEmpty) => {}
+			}
+		} else {
+			{}
+		}
+		$i = $i + 1
+	}
+	$closes
 }
 
 ## markdown_inline `isDangerousUrl`: `javascript:`, `vbscript:`, `file:`,
@@ -1049,7 +1083,7 @@ expect inline("a**b**c") == "a<strong>b</strong>c"
 expect inline("***x***") == "<em><strong>x</strong></em>"
 expect inline("see MSG_plans_3 now") == "see <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a> now"
 expect inline("[about MSG_plans_3](https://example.org)") == "<a href=\"https://example.org\" target=\"_blank\" rel=\"noopener\">about MSG_plans_3</a>"
-expect inline("[x](java\tscript:alert(1))") == "<a href=\"\">x</a>)"
+expect inline("[x](java\tscript:alert(1))") == "<a href=\"\">x</a>"
 expect inline("`a<b`") == "<code>a&lt;b</code>"
 expect inline("go to www.a.com, now") == "go to <a href=\"http://www.a.com\" target=\"_blank\" rel=\"noopener\">www.a.com</a>, now"
 expect inline("mail a.b@c.d.") == "mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a>."

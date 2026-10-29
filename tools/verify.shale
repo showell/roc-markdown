@@ -28,9 +28,9 @@
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
 -- Each corpus's case count, exactly.
-const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, pinned = 3, hostile = 983}
+const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, pinned = 3, hostile = 1003}
 const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "pinned", "hostile"}
-const want_total = 1356
+const want_total = 1376
 const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
 const scratch_data = ".zig-cache/verify/data"
@@ -88,6 +88,25 @@ for label in want_order do
   say(n == want[label] and p == n, "cases: " .. label .. " " .. p .. "/" .. n .. " (want " .. want[label] .. ")")
 end
 say(total == want_total, "cases in all: " .. total .. " (want " .. want_total .. ")")
+
+-- ── the paren shapes stay linear (QUEUE 311) ──
+-- Each shape's work units at 8,191 against its units at 1,000: linear is
+-- 8.19 times, and past 9 times is a re-scan creeping in.
+const linear_shapes = {"lb-nested-parens-in-dest", "rm-unbalanced-open-parens", "rm-unbalanced-close-parens", "rm-paren-bait", "rm-paren-links"}
+function units_of(answers, id)
+  local key = "{\"id\":\"" .. id .. "\""
+  local at = find(answers, key)
+  if at == nil then return -1 end
+  local m = re_find(sub(answers, at, at + 400), "\"work_units\":(\\d+)")
+  if m == nil then return -1 end
+  return parse_int(m.group)
+end
+local hostile_answers = read("judge/data/hostile.answers.jsonl")
+for shape in linear_shapes do
+  local small = units_of(hostile_answers, "hostile/" .. shape .. "/1000")
+  local big = units_of(hostile_answers, "hostile/" .. shape .. "/8191")
+  say(small > 0 and big > 0 and big * 10 <= small * 90, "linear: " .. shape .. " " .. small .. " units at 1,000, " .. big .. " at 8,191")
+end
 
 -- ── the planted faults, each in a copy of judge/data ──
 if exists(scratch_dir) then remove_tree(scratch_dir) end
