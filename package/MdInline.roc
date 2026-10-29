@@ -16,6 +16,7 @@ import Ascii
 import Bytes
 import MdText
 import MdMedia
+import MdSafety
 
 MdInline := [].{
 
@@ -591,18 +592,6 @@ msg_ref = |slug| List.join([
 	Str.to_utf8("</a>"),
 ])
 
-## markdown_links `isExternalHref`: a `scheme://…` href, which opens in a
-## new tab. `#msg-…`, `/chat/…` and `mailto:` are not.
-is_external_href : List(U8) -> Bool
-is_external_href = |href| match Bytes.find(href, { needle: scheme_end }) {
-	Ok(p) =>
-		p > 0 and Ascii.is_letter(MdText.at(href, 0)) and List.all(
-			MdText.cut(href, { start: 1, end: p }),
-			|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-',
-		)
-	Err(NotFound) => Bool.False
-}
-
 # ── code spans ──
 
 ## markdown_inline `codeSpanAt`: the backtick run at `at` closed by a run of
@@ -733,11 +722,11 @@ link_at = |
 			})
 		} else {
 			url = MdText.cut(text, { start: open_paren + 1, end: close_paren })
-			href = if is_dangerous_url(url) a_open else MdText.escape_onto(a_open, url)
+			href = if MdSafety.is_dangerous_url(url) a_open else MdText.escape_onto(a_open, url)
 			head = List.join([
 				href,
 				['"'],
-				if is_external_href(url) external_attrs else [],
+				if MdSafety.is_external_href(url) MdSafety.external_attrs else [],
 				['>'],
 			])
 			label = MdInline.render_onto({
@@ -786,45 +775,6 @@ paren_closes = |text| {
 		$i = $i + 1
 	}
 	$closes
-}
-
-## markdown_inline `isDangerousUrl`: `javascript:`, `vbscript:`, `file:`,
-## and `data:` but for an image's, **READ AS A BROWSER READS IT** (metal-vmm
-## QUEUE 172): its ends' control bytes and spaces dropped, and every tab
-## and newline inside, before the scheme is looked for. Only its first 32
-## bytes so read count.
-is_dangerous_url : List(U8) -> Bool
-is_dangerous_url = |raw| {
-	start = Bytes.count_while(raw, { keep: |c| c <= ' ', at: 0 })
-	trimmed = List.drop_first(raw, start)
-	kept = List.drop_last(trimmed, Bytes.count_back(trimmed, |c| c <= ' '))
-	var $seen = []
-	for c in kept {
-		if c == '\t' or c == '\n' or c == '\r' or List.len($seen) == 32 {
-			{}
-		} else {
-			$seen = List.append($seen, c)
-		}
-	}
-	url = $seen
-	starts_with = |prefix| MdText.is_prefixed_ignoring_case(
-		url,
-		{ at: 0, prefix: Str.to_utf8(prefix) },
-	)
-	if starts_with("data:image/") {
-		!List.any(
-			[
-				"png",
-				"gif",
-				"jpeg",
-				"webp",
-				"svg",
-			],
-			|kind| MdText.is_prefixed_ignoring_case(url, { at: 11, prefix: Str.to_utf8(kind) }),
-		)
-	} else {
-		List.any(dangerous_schemes, starts_with)
-	}
 }
 
 # ── autolinks ──
@@ -925,7 +875,7 @@ url_end = |text, { start, budget }| {
 	scanned = Bytes.count_while(text, { keep: |c| !MdText.is_space(c) and c != '<', at: start })
 	spent = MdText.charge(budget, scanned - start)
 	url = MdText.cut(text, { start, end: scanned })
-	host_start = match Bytes.find(url, { needle: scheme_end }) {
+	host_start = match Bytes.find(url, { needle: MdSafety.scheme_end }) {
 		Ok(p) => p + 3
 		Err(NotFound) => 0
 	}
@@ -1016,29 +966,14 @@ autolink_html = |link, kind| {
 	head = List.join([
 		href,
 		['"'],
-		if kind == Email [] else external_attrs,
+		if kind == Email [] else MdSafety.external_attrs,
 		['>'],
 	])
 	List.concat(MdText.escape_onto(head, link), a_close)
 }
 
-## markdown_links `external_attrs`: a new tab, without the opener.
-external_attrs : List(U8)
-external_attrs = Str.to_utf8(" target=\"_blank\" rel=\"noopener\"")
-
-dangerous_schemes : List(Str)
-dangerous_schemes = [
-	"javascript:",
-	"vbscript:",
-	"file:",
-	"data:",
-]
-
 trailing_punct : List(U8)
 trailing_punct = Str.to_utf8("?!.,:*_~'\"")
-
-scheme_end : List(U8)
-scheme_end = Str.to_utf8("://")
 
 msg_prefix : List(U8)
 msg_prefix = Str.to_utf8("MSG_")
