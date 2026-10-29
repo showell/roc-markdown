@@ -58,10 +58,9 @@ const data_path = @import("judge_paths").data;
 const corpora_list = "corpora.txt";
 const ratchet_path = "ratchet.txt";
 const hostile_answers_path = "hostile.answers.jsonl";
-/// The spec's corpora: CommonMark's and GFM's examples, GFM's table
-/// examples (QUEUE 311), and GFM's strikethrough and CommonMark's backslash
-/// escapes (QUEUE 316), and CommonMark's images (QUEUE 317), checked as one
-/// against spec_diverge.txt.
+/// The spec's corpora: CommonMark's and GFM's examples, GFM's table and
+/// strikethrough examples, and CommonMark's backslash escapes and images,
+/// checked as one against spec_diverge.txt.
 const spec_labels = [_][]const u8{ "spec_agree", "spec_tables", "spec_strike", "spec_escapes", "spec_images" };
 const spec_diverge_path = "spec_diverge.txt";
 
@@ -530,14 +529,14 @@ const deep_shapes = [_]Shape{
     .{ .name = "lb-tilde-runs", .unit = "~a ", .after = " a~" },
     .{ .name = "lb-reference-like-brackets", .unit = "[a][", .after = "]" },
     .{ .name = "lb-unclosed-links-c", .unit = "[a](b \"" },
-    // A destination's parens balance (QUEUE 311): opens never closed, closes
+    // A destination's parens balance: opens never closed, closes
     // past the balance, a `](` each with an open paren, and links that each
     // nest a pair, all linear by the one paren pass a line.
     .{ .name = "rm-unbalanced-open-parens", .head = "[a](", .unit = "(", .tail = "b" },
     .{ .name = "rm-unbalanced-close-parens", .head = "[a](b", .unit = ")" },
     .{ .name = "rm-paren-bait", .unit = "[a]((" },
     .{ .name = "rm-paren-links", .unit = "[a](b(c)) " },
-    // GFM's tables (QUEUE 311): a header row n cells wide, its delimiter as
+    // GFM's tables: a header row n cells wide, its delimiter as
     // wide, and a one-cell row padded to n; n body rows; a delimiter row
     // alone, again and again (the first two lines are a table, the rest its
     // rows); pipes in code spans, which split a cell all the same, a row's
@@ -553,7 +552,7 @@ const deep_shapes = [_]Shape{
     .{ .name = "lb-unclosed-autolinks", .unit = "<http:a" },
     .{ .name = "lb-entity-prefixes", .unit = "&#", .after = "&a" },
     .{ .name = "lb-hard-breaks", .unit = "a  \n", .after = "b\\\n" },
-    // GFM's strikethrough and CommonMark's backslash escapes (QUEUE 316):
+    // GFM's strikethrough and CommonMark's backslash escapes:
     // one `~` run n long (after a word, so no fence); `~~` openers nested
     // over as many closers, and never closed; `~~` among `*` and `_`, nested
     // and alternating; `~~` openers each escaped; and lines each ending in a
@@ -565,7 +564,7 @@ const deep_shapes = [_]Shape{
     .{ .name = "rm-strike-star-alternate", .unit = "~~a* " },
     .{ .name = "rm-escaped-strikes", .unit = "\\~~a " },
     .{ .name = "rm-backslash-breaks", .unit = "*a\\\n" },
-    // Markdown's images (QUEUE 317): `![` openers never closed; images one
+    // Markdown's images: `![` openers never closed; images one
     // after another; images nested in labels, same-origin (lb-nested-images'
     // src is refused); an alt of markup to read back as text; images refused
     // (another site's), each a link; `![a]` with no destination.
@@ -657,7 +656,7 @@ fn specNormal(a: std.mem.Allocator, html: []const u8) ![]const u8 {
 }
 
 /// The spec's html with its void tags written as ours are: `<img … />` is
-/// `<img …>` (QUEUE 317).
+/// `<img …>`.
 fn specVoid(a: std.mem.Allocator, html: []const u8) ![]const u8 {
     return std.mem.replaceOwned(u8, a, html, " />", ">");
 }

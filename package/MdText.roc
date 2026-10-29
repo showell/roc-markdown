@@ -1,17 +1,17 @@
-## **THE MARKDOWN'S TEXT PRIMITIVES** (chat-markdown markdown_text.zig): the
+## **THE MARKDOWN'S TEXT PRIMITIVES**: the
 ## work budget the renderer charges, HTML escaping, and the classes of byte
 ## the dialect's grammar asks about. Pure; every other `Md` module stands
 ## on it, and it on nothing of theirs.
 ##
 ## The renderer is byte-level parsing at the door: it reads a message's
-## bytes as the Zig does, so it works on `List(U8)` throughout and slices
+## bytes, so it works on `List(U8)` throughout and slices
 ## only at ASCII bytes, which leaves UTF-8 text whole.
 import Ascii
 import Bytes
 
 MdText := [].{
 
-	## The work one render may do (markdown_text `Budget`): the parser charges
+	## The work one render may do: the parser charges
 	## a unit per scan step, and a render whose `spent` passes `ceiling` at a
 	## check is hostile. The parser is linear by its cursors, so ordinary
 	## text stays far under; only a re-parse goes past.
@@ -58,8 +58,8 @@ MdText := [].{
 	is_blown : Budget -> Bool
 	is_blown = |budget| budget.spent > budget.ceiling
 
-	## `text` onto `out`, its `&`, `<`, `>`, `"` and `'` as entities
-	## (markdown_text `escapeInto`): THE escape, which every byte of a
+	## `text` onto `out`, its `&`, `<`, `>`, `"` and `'` as entities: THE
+	## escape, which every byte of a
 	## member's text the renderer writes passes through.
 	escape_onto : List(U8), List(U8) -> List(U8)
 	escape_onto = |out, text| {
@@ -88,31 +88,31 @@ MdText := [].{
 		Err(OutOfBounds) => crash "MdText.at: a read past the end the caller checked"
 	}
 
-	## markdown_text `isSpace`: space, tab, `\n`, `\r` and form feed; not a
+	## Space, tab, `\n`, `\r` and form feed; not a
 	## vertical tab, which `Ascii.is_whitespace` has.
 	is_space : U8 -> Bool
 	is_space = |c| c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == form_feed
 
-	## markdown_text `isWordChar`: what `\b` reads as a word.
+	## What `\b` reads as a word.
 	is_word_char : U8 -> Bool
 	is_word_char = |c| Ascii.is_alphanumeric(c) or c == '_'
 
-	## markdown_text `isAttrNameChar`: an HTML attribute's name.
+	## An HTML attribute's name.
 	is_attr_name_char : U8 -> Bool
 	is_attr_name_char = |c| Ascii.is_alphanumeric(c) or c == '-' or c == '_' or c == ':'
 
-	## markdown_text `allDigits`: one digit or more, and nothing else.
+	## One digit or more, and nothing else.
 	is_all_digits : List(U8) -> Bool
 	is_all_digits = |s| s != [] and List.all(s, Ascii.is_digit)
 
-	## markdown_text `eqlCI`: `s` is `lower`, a lowercase literal, in any case.
+	## `s` is `lower`, a lowercase literal, in any case.
 	is_same_ignoring_case : List(U8), List(U8) -> Bool
 	is_same_ignoring_case = |s, lower| List.len(s) == List.len(lower) and List.map(
 		s,
 		Ascii.to_lowercase,
 	) == lower
 
-	## markdown_text `startsWithCI`: `s` from `at` begins with `prefix`, in
+	## `s` from `at` begins with `prefix`, in
 	## any case.
 	is_prefixed_ignoring_case : List(U8), { at : U64, prefix : List(U8) } -> Bool
 	is_prefixed_ignoring_case = |s, { at: i, prefix }| {
@@ -132,7 +132,7 @@ MdText := [].{
 	find_or_end : List(U8), { byte : U8, at : U64 } -> U64
 	find_or_end = |s, wanted| Bytes.find_byte(s, wanted) ?? List.len(s)
 
-	## markdown.zig's `trimLine`: spaces, tabs and `\r` off both ends.
+	## Spaces, tabs and `\r` off both ends.
 	trim_line : List(U8) -> List(U8)
 	trim_line = |line| Bytes.trim(line, line_space)
 
@@ -157,11 +157,11 @@ MdText := [].{
 		$out
 	}
 
-	## markdown.zig's `isBlank`: nothing but spaces, tabs and `\r`.
+	## Nothing but spaces, tabs and `\r`.
 	is_blank : List(U8) -> Bool
 	is_blank = |line| List.all(line, |c| c == ' ' or c == '\t' or c == '\r')
 
-	## markdown.zig's `lineEnd`: the `\n` ending the line at `pos`, or the end.
+	## The `\n` ending the line at `pos`, or the end.
 	line_end : List(U8), U64 -> U64
 	line_end = |md, pos| find_or_end(md, { byte: '\n', at: pos })
 

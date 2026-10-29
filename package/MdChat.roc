@@ -22,7 +22,7 @@ import MdText
 
 MdChat := [].{
 
-	## markdown_links `msgRefEnd` and `appendMsgRef`: a message reference,
+	## A message reference,
 	## `\bMSG_([A-Za-z0-9-]+_[0-9]+)\b`, at `i`: its link, and the index past
 	## it. The pass reads one first, whole, as its `_`s would otherwise be read
 	## as emphasis and split it.
@@ -46,7 +46,7 @@ MdChat := [].{
 	is_quote_fence : List(U8) -> Bool
 	is_quote_fence = |lang| lang == Str.to_utf8("quote")
 
-	## markdown_fence `max_nest_levels` (8) plus 2: a level-8 quote-reply
+	## Eight quote-reply levels, plus 2: a level-8 quote-reply
 	## opens with 10 characters, and a longer run is no fence (MdFence).
 	max_fence_run : U64
 	max_fence_run = 10
@@ -85,7 +85,7 @@ msg_ref_end = |text, i| {
 	}
 }
 
-## markdown_text `isSlugChar`: a `MSG_` reference's slug.
+## A `MSG_` reference's slug.
 is_slug_char : U8 -> Bool
 is_slug_char = |c| Ascii.is_alphanumeric(c) or c == '-'
 

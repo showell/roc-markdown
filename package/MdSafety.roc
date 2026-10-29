@@ -1,7 +1,4 @@
-## **WHAT A MEMBER'S LINK OR MEDIA MAY BECOME** (chat-markdown
-## markdown_inline.zig's `isDangerousUrl`, markdown_links.zig's
-## `isExternalHref`, markdown_media.zig's allowlist): the
-## one home of the renderer's URL and attribute rules, for an audit to read
+## **WHAT A MEMBER'S LINK OR MEDIA MAY BECOME**: the one home of the renderer's URL and attribute rules, for an audit to read
 ## alone.
 ##   - **Links** (MdLinks finds them and asks here): one whose destination a
 ##     browser would run (`javascript:` and its kin) keeps its label but
@@ -32,9 +29,8 @@ import MdText
 
 MdSafety := [].{
 
-	## markdown_inline `isDangerousUrl`: `javascript:`, `vbscript:`, `file:`,
-	## and `data:` but for an image's, **READ AS A BROWSER READS IT** (metal-vmm
-	## QUEUE 172): its ends' control bytes and spaces dropped, and every tab
+	## `javascript:`, `vbscript:`, `file:`,
+	## and `data:` but for an image's, **READ AS A BROWSER READS IT**: its ends' control bytes and spaces dropped, and every tab
 	## and newline inside, before the scheme is looked for. Only its first 32
 	## bytes so read count.
 	is_dangerous_url : List(U8) -> Bool
@@ -71,7 +67,7 @@ MdSafety := [].{
 		}
 	}
 
-	## markdown_links `isExternalHref`: a `scheme://…` href, which opens in a
+	## A `scheme://…` href, which opens in a
 	## new tab. `#msg-…`, `/chat/…` and `mailto:` are not.
 	is_external_href : List(U8) -> Bool
 	is_external_href = |href| match Bytes.find(href, { needle: MdSafety.scheme_end }) {
@@ -125,7 +121,7 @@ MdSafety := [].{
 
 	## **AN UPLOAD, AND ONLY AN UPLOAD**: a path under the chat's uploads
 	## prefix (`MdChat.uploads_prefix`, `/user_uploads/`), read as a browser
-	## reads it (metal-vmm QUEUE 172, 318):
+	## reads it:
 	##   - no control byte and no backslash anywhere: a browser strips tabs
 	##     and newlines inside a URL and reads `\` as `/`, so `/\t/evil` is
 	##     `//evil`;

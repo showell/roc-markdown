@@ -1,5 +1,4 @@
-## **THE EMPHASIS ENGINE** (chat-markdown markdown_inline.zig's delimiter
-## runs and `processEmphasis`): which `*` and `_` runs become `<em>` and
+## **THE EMPHASIS ENGINE**: which `*` and `_` runs become `<em>` and
 ## `<strong>`, and which `~~` runs become GFM's `<del>`. The hardest code
 ## in the package, and the most self-contained:
 ## the inline pass (MdInline) hands it each run as it meets one, then the
@@ -32,8 +31,7 @@
 ## A matched run is never cut up: it records the emphasis it opens and
 ## closes (`opens`, `closes`) and keeps its unused delimiters as text, so the
 ## pass's pieces never move. **EVERY STEP IS CHARGED** to the budget, one
-## unit per closer visited and per opener looked back at, the Zig's charges
-## unit for unit. Pure.
+## unit per closer visited and per opener looked back at. Pure.
 import Ascii
 import MdHtml
 import MdText
@@ -82,7 +80,7 @@ MdEmphasis := [].{
 		}
 	}
 
-	## markdown_inline `processEmphasis`: the runs matched into emphasis by
+	## The runs matched into emphasis by
 	## CommonMark's delimiter stack, the rule of 3 included. One unit per
 	## closer visited and per opener looked back at; blown on a closer is
 	## hostile, and the caller checks once more after.
@@ -210,10 +208,9 @@ MdEmphasis := [].{
 	}
 
 	## A matched run written onto `out`: the emphasis it closes, its
-	## delimiters left, and the emphasis it opens, innermost nearest. (The Zig
-	## splices marker nodes into its linked list beside each run; a marker is
-	## only ever spliced beside a run, so a run's own lists, in this order,
-	## are the same sequence.)
+	## delimiters left, and the emphasis it opens, innermost nearest: the
+	## order the tags nest in, since a run's own lists hold them in the order
+	## matched.
 	run_onto : List(U8), DelimiterRun -> List(U8)
 	run_onto = |out, run| {
 		var $o = out
@@ -254,8 +251,7 @@ set_run = |runs, { at, delimiters }| List.set(
 ## run's length as written, mod 3. A closer that failed sets the floor only
 ## for closers that would fail the same way: the rule of 3 reads both of
 ## these, so a key without them lets one closer's failure stop another that
-## would have matched (`*a**b** c**`'s last `**`). The Zig keys on what is
-## left of the run and its character alone.
+## would have matched (`*a**b** c**`'s last `**`).
 floor_key : MdEmphasis.DelimiterRun -> U64
 floor_key = |closer| {
 	opens = if closer.can_open 3 else 0
@@ -268,7 +264,7 @@ floor_key = |closer| {
 floor_keys : U64
 floor_keys = 18
 
-## markdown_inline `unlinkDelim`: run `k` off the stack; its place among the
+## Run `k` off the stack; its place among the
 ## pieces, and its delimiters left, stay.
 unlinked : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRun)
 unlinked = |runs, k| {
@@ -283,7 +279,7 @@ unlinked = |runs, k| {
 	}
 }
 
-## markdown_inline `flanking`: CommonMark's left- and right-flanking for the
+## CommonMark's left- and right-flanking for the
 ## run `text[start..end]`; the line's ends count as space.
 flanking : List(U8),
 {
@@ -309,3 +305,58 @@ flanking = |text, { start, end }| {
 		after_punct,
 	}
 }
+
+# ── worked examples ──
+# A line's `*`, `_` and `~` runs matched and written back between its text:
+# the inline pass's part in it, and no other markup.
+em : Str -> Str
+em = |line| {
+	text = Str.to_utf8(line)
+	len = List.len(text)
+	var $runs = []
+	var $texts = []
+	var $text_start = 0
+	var $i = 0
+	while $i < len {
+		c = MdText.at(text, $i)
+		if c == '*' or c == '_' or c == '~' {
+			var $end = $i
+			while $end < len and MdText.at(text, $end) == c {
+				$end = $end + 1
+			}
+			$texts = List.append($texts, MdText.cut(text, { start: $text_start, end: $i }))
+			$runs = List.append($runs, MdEmphasis.delimiter_run(text, { start: $i, end: $end }))
+			$i = $end
+			$text_start = $end
+		} else {
+			$i = $i + 1
+		}
+	}
+	matched = match MdEmphasis.emphasis({ runs: $runs, budget: MdText.unlimited }) {
+		Ok(m) => m.runs
+		Err(Hostile) => crash "MdEmphasis: an unlimited budget blown"
+	}
+	var $out = []
+	var $k = 0
+	for run in matched {
+		$out = MdEmphasis.run_onto(List.concat($out, List.get($texts, $k) ?? []), run)
+		$k = $k + 1
+	}
+	Str.from_utf8(List.concat($out, MdText.cut(text, { start: $text_start, end: len }))) ?? "not text"
+}
+
+# The nearest opener wins, and two from each side is `<strong>`.
+expect em("*foo**bar**baz*") == "<em>foo<strong>bar</strong>baz</em>"
+expect em("foo***bar***baz") == "foo<em><strong>bar</strong></em>baz"
+# The rule of 3: the `**` after `foo` may open and close, and `*`+`**` sums
+# to 3, so it pairs with neither `*`; the outer pair matches around it.
+expect em("*foo**bar*") == "<em>foo**bar</em>"
+expect em("**foo*bar*") == "**foo<em>bar</em>"
+# An `_` inside a word neither opens nor closes.
+expect em("_foo_bar_") == "<em>foo_bar</em>"
+# The floor: the first `**` closer finds its opener, the last `**` fails and
+# sets a floor for its key alone, so the `*` closer before it still matches
+# (a floor keyed on the character alone would have stopped it).
+expect em("*a**b** c**") == "<em>a<strong>b</strong> c</em>*"
+# Strikethrough: only `~~`, matched whole; one `~` or three are text.
+expect em("~~a~~ ~b~ ~~~c~~~") == "<del>a</del> ~b~ ~~~c~~~"

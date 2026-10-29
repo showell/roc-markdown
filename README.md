@@ -5,8 +5,9 @@ whatever a user typed, with a hard limit on the work any one message can
 cost. It is a Roc package with no dependencies and no platform, pure
 functions from bytes to bytes, so any Roc app can import it. It is the
 dialect of Gopher Chat (lynrummy.com), and it is held, case by case, to
-frozen answers for CommonMark's and GFM's spec examples, thousands of hostile
-inputs, and ten thousand real chat messages.
+frozen answers for 314 of CommonMark's and GFM's spec examples (TESTING.md
+says how they were chosen), about a thousand hostile inputs, and ten
+thousand real chat messages.
 
 **Try it:** [the playground](https://roc.lynrummy.com/markdown/) runs this
 package, compiled to WebAssembly, as you type. It has dense examples to edit.
@@ -71,6 +72,12 @@ import md.Md
 | `Md.work_units : List(U8) -> U64` | what a render costs |
 | `Md.render_trusted : List(U8) -> List(U8)` | your own docs, no budget |
 | `Md.render_trusted_reflow : List(U8) -> List(U8)` | the same, a newline as a space |
+| `Md.escape : List(U8) -> List(U8)` | text made safe for HTML, the renderer's own escape, for your pages |
+
+`MdFence`, `MdMedia` and `MdTable` are exposed for a host that reads one of
+those blocks outside a render, so it reads the renderer's own grammar: a
+fence's open and close (a feed of code excerpts), a stored `<img>` rebuilt
+by the media rule (`MdMedia.rebuild`, a feed of images), a table row's cells.
 
 ## Changing it
 

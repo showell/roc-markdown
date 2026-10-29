@@ -1,8 +1,7 @@
-## **A MARKDOWN FENCE AS chat-markdown's markdown_fence.zig READS IT**: where a
-## code fence opens (its character, its length, its indent, its language)
-## and where it closes. The renderer's fences (Md) and the code feed's and
-## Recent's excerpt's (Feeds, Recent, metal-vmm QUEUE 300) are this one
-## grammar. Pure.
+## **A MARKDOWN FENCE**: where a code fence opens (its character, its
+## length, its indent, its language) and where it closes. Exposed, so a host
+## that reads fences outside a render (a code feed, an excerpt) reads the
+## very grammar the renderer does. Pure.
 import Bytes
 import MdChat
 import MdText
@@ -18,7 +17,7 @@ MdFence := [].{
 		lang : List(U8),
 	}
 
-	## markdown_fence `parseOpen`: up to three spaces, 3 to 10 of '`' or '~'
+	## Up to three spaces, 3 to 10 of '`' or '~'
 	## (a longer run is past the quote-reply's nesting cap, MdChat's, and
 	## ordinary text), and an info
 	## string whose first word is the language; a backtick fence's info
@@ -64,7 +63,7 @@ MdFence := [].{
 		Ok({ open: fence, body_start: MdText.next_line(md, eol) })
 	}
 
-	## markdown_fence `isClose`: up to three spaces, at least `count` of
+	## Up to three spaces, at least `count` of
 	## `char`, then only whitespace (a close carries no info string).
 	is_close : List(U8), { char : U8, count : U64 } -> Bool
 	is_close = |line, { char, count }| {
@@ -109,7 +108,8 @@ info_space = [
 	'\r',
 ]
 
-# markdown_fence's own cases.
+# Where a fence opens and closes: its run's length and cap, its indent, its
+# language, and a backtick fence's info string.
 expect MdFence.open(Str.to_utf8("~~~~ quote")) == Ok({
 	char: '~',
 	count: 4,

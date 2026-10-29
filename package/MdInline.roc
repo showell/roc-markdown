@@ -1,5 +1,4 @@
-## **THE INLINE PASS** (chat-markdown markdown_inline.zig): one line of inline content to
-## HTML. The line is cut into pieces (text to escape; html made here, for a
+## **THE INLINE PASS**: one line of inline content to HTML. The line is cut into pieces (text to escape; html made here, for a
 ## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link,
 ## a same-origin `![alt](src)` image or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
 ## `*`/`_`/`~` runs), the
@@ -18,8 +17,8 @@
 ## no email can start), which only ever move forward, so no suffix is
 ## scanned again from every `[` or `_`. Each step and each byte an inner
 ## scan reads is charged to the budget, and the walk stops as hostile the
-## moment it is blown: the Zig's charges, unit for unit, so a message the
-## Zig refuses is a message this refuses.
+## moment it is blown. The frozen work units (the judge's) are the
+## charges' definition.
 import Ascii
 import Bytes
 import MdChat
@@ -32,7 +31,7 @@ import MdSafety
 
 MdInline := [].{
 
-	## markdown_inline `renderInline`: `text` rendered onto `out`. `Linked`
+	## `text` rendered onto `out`. `Linked`
 	## turns the chat's `MSG_` reference (MdChat) into its link; `InLabel` leaves it text, as a
 	## link's label must be, being inside an `<a>` already.
 	render_onto : {
@@ -53,9 +52,9 @@ MdInline := [].{
 		var $budget = budget
 		var $pieces = []
 		var $runs = []
-		var $run_start = 0
+		var $text_start = 0
 		var $i = 0
-		var $rb = MdText.find_or_end(text, { byte: ']', at: 0 })
+		var $next_bracket = MdText.find_or_end(text, { byte: ']', at: 0 })
 		var $closes = Unscanned
 		var $email_dead = 0
 		while $i < len {
@@ -66,93 +65,25 @@ MdInline := [].{
 				{}
 			}
 			c = MdText.at(text, $i)
-			# The chat's reference (MdChat) is read first, whole.
+			# Each byte class's scan says what it found (a `Step`); the step is
+			# taken once, below. The chat's reference (MdChat) is read first,
+			# whole.
 			reference = if refs == Linked MdChat.reference_at(text, $i) else Err(NoRef)
-			match reference {
-				Ok(ref) => {
-					$pieces = with_token(
-						$pieces,
-						{
-							run_start: $run_start,
-							at: $i,
-							token: Html(ref.html),
-						},
-					)
-					$i = ref.end
-					$run_start = ref.end
-				}
+			step = match reference {
+				Ok(ref) => Token(Html(ref.html), ref.end)
 				Err(NoRef) =>
 					if c == '\\' and is_escapable(text, $i + 1) {
-						$pieces = with_token(
-							$pieces,
-							{
-								run_start: $run_start,
-								at: $i,
-								token: Text($i + 1, $i + 2),
-							},
-						)
-						$i = $i + 2
-						$run_start = $i
+						Token(Text($i + 1, $i + 2), $i + 2)
 					} else if c == '<' {
-						match MdMedia.img_at(text, $i) {
-							Ok(tag) => {
-								$pieces = with_token(
-									$pieces,
-									{
-										run_start: $run_start,
-										at: $i,
-										token: Html(tag.html),
-									},
-								)
-								$i = tag.end
-								$run_start = tag.end
-							}
-							Err(NotSafe) =>
-								match MdMedia.video_at(text, $i) {
-									Ok(tag) => {
-										$pieces = with_token(
-											$pieces,
-											{
-												run_start: $run_start,
-												at: $i,
-												token: Html(tag.html),
-											},
-										)
-										$i = tag.end
-										$run_start = tag.end
-									}
-									Err(NotSafe) => {
-										$i = $i + 1
-									}
-								}
+						match media_at(text, $i) {
+							Ok(media) => Token(Html(media.html), media.end)
+							Err(NotMedia) => Skip($i + 1)
 						}
 					} else if c == '`' {
 						scanned = code_span_at(text, { at: $i, budget: $budget })
 						$budget = scanned.budget
 						match scanned.span {
-							Ok(span) => {
-								code = code_span_content(
-									MdText.cut(
-										text,
-										{ start: span.content_start, end: span.content_end },
-									),
-								)
-								$pieces = with_token(
-									$pieces,
-									{
-										run_start: $run_start,
-										at: $i,
-										token: Html(
-											List.concat(
-												MdText.escape_onto(MdHtml.code_open, code),
-												MdHtml.code_close,
-											),
-										),
-									},
-								)
-								$i = span.end
-								$run_start = span.end
-							}
+							Ok(span) => Token(Html(code_html(text, { start: span.content_start, end: span.content_end })), span.end)
 							Err(NoClose) => {
 								# No closing run of its length: the whole opening run is
 								# literal, and is skipped, so no shorter run inside it
@@ -160,22 +91,22 @@ MdInline := [].{
 								# in the pending text.
 								n = run_length(text, { byte: '`', at: $i })
 								$budget = MdText.charge($budget, n)
-								$i = $i + n
+								Skip($i + n)
 							}
 						}
 					} else if c == '!' and List.get(text, $i + 1) == Ok('[') {
-						# `![alt](src)`: an image where its src is same-origin, else
+						# `![alt](src)`: an image where its src is an upload, else
 						# the `!` is dropped and the `[` read as a link (MdSafety).
 						linked = MdLinks.link_at(
 							text,
 							{
 								at: $i + 1,
-								rb: $rb,
+								next_bracket: $next_bracket,
 								closes: $closes,
 								budget: $budget,
 							},
 						)
-						$rb = linked.rb
+						$next_bracket = linked.next_bracket
 						$closes = linked.closes
 						$budget = linked.budget
 						image = match linked.link {
@@ -199,36 +130,23 @@ MdInline := [].{
 									})?
 									$budget = alt.budget
 									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title }) ?? []
-									$pieces = with_token(
-										$pieces,
-										{
-											run_start: $run_start,
-											at: $i,
-											token: Html(html),
-										},
-									)
-									$i = found.link.end
-									$run_start = found.link.end
+									Token(Html(html), found.link.end)
 								} else {
-									$pieces = flushed($pieces, { run_start: $run_start, at: $i })
-									$i = $i + 1
-									$run_start = $i
+									Cut($i + 1)
 								}
-							Err(NotAnImage) => {
-								$i = $i + 1
-							}
+							Err(NotAnImage) => Skip($i + 1)
 						}
 					} else if c == '[' {
 						linked = MdLinks.link_at(
 							text,
 							{
 								at: $i,
-								rb: $rb,
+								next_bracket: $next_bracket,
 								closes: $closes,
 								budget: $budget,
 							},
 						)
-						$rb = linked.rb
+						$next_bracket = linked.next_bracket
 						$closes = linked.closes
 						$budget = linked.budget
 						match linked.link {
@@ -242,20 +160,9 @@ MdInline := [].{
 									budget: $budget,
 								})?
 								$budget = label.budget
-								$pieces = with_token(
-									$pieces,
-									{
-										run_start: $run_start,
-										at: $i,
-										token: Html(List.concat(label.out, MdHtml.link_close)),
-									},
-								)
-								$i = link.end
-								$run_start = link.end
+								Token(Html(List.concat(label.out, MdHtml.link_close)), link.end)
 							}
-							Err(NotALink) => {
-								$i = $i + 1
-							}
+							Err(NotALink) => Skip($i + 1)
 						}
 					} else if c == '*' or c == '_' or c == '~' {
 						n = run_length(text, { byte: c, at: $i })
@@ -265,13 +172,10 @@ MdInline := [].{
 						# `~~` between spaces) is text: on the stack it would only
 						# lengthen every look-back past it.
 						if c == '~' and !run.can_open and !run.can_close {
-							$i = $i + n
+							Skip($i + n)
 						} else {
-							$pieces = flushed($pieces, { run_start: $run_start, at: $i })
-							$pieces = List.append($pieces, Run(List.len($runs)))
 							$runs = List.append($runs, run)
-							$i = $i + n
-							$run_start = $i
+							Token(Run(List.len($runs) - 1), $i + n)
 						}
 					} else if MdLinks.is_autolink_boundary(text, $i) {
 						found = MdLinks.autolink_at(
@@ -285,33 +189,36 @@ MdInline := [].{
 						$budget = found.budget
 						$email_dead = found.email_dead
 						match found.link {
-							Ok(link) => {
-								$pieces = with_token(
-									$pieces,
-									{
-										run_start: $run_start,
-										at: $i,
-										token: Html(
-											MdLinks.autolink_html(
-												MdText.cut(text, { start: $i, end: link.end }),
-												link.kind,
-											),
-										),
-									},
+							Ok(link) =>
+								Token(
+									Html(MdLinks.autolink_html(MdText.cut(text, { start: $i, end: link.end }), link.kind)),
+									link.end,
 								)
-								$i = link.end
-								$run_start = link.end
-							}
-							Err(NotALink) => {
-								$i = $i + 1
-							}
+							Err(NotALink) => Skip($i + 1)
 						}
 					} else {
-						$i = $i + 1
+						Skip($i + 1)
 					}
 			}
+			# The one place the cursors move: a piece taken (the pending text
+			# before it flushed), the pending text cut, or bytes left in it.
+			match step {
+				Token(piece, end) => {
+					$pieces = with_token($pieces, { text_start: $text_start, at: $i, token: piece })
+					$i = end
+					$text_start = end
+				}
+				Cut(end) => {
+					$pieces = flushed($pieces, { text_start: $text_start, at: $i })
+					$i = end
+					$text_start = end
+				}
+				Skip(end) => {
+					$i = end
+				}
+			}
 		}
-		pieces = flushed($pieces, { run_start: $run_start, at: len })
+		pieces = flushed($pieces, { text_start: $text_start, at: len })
 		matched = MdEmphasis.emphasis({ runs: $runs, budget: $budget })?
 		if MdText.is_blown(matched.budget) {
 			Err(Hostile)
@@ -348,27 +255,56 @@ Piece : [
 	Run(U64),
 ]
 
-## The pending text from `run_start` up to `at`, as a piece when any.
-flushed : List(Piece), { run_start : U64, at : U64 } -> List(Piece)
-flushed = |pieces, { run_start, at }| if at > run_start List.append(
+## The pending text from `text_start` up to `at`, as a piece when any.
+flushed : List(Piece), { text_start : U64, at : U64 } -> List(Piece)
+flushed = |pieces, { text_start, at }| if at > text_start List.append(
 	pieces,
-	Text(run_start, at),
+	Text(text_start, at),
 ) else pieces
 
 with_token : List(Piece),
 {
-	run_start : U64,
+	text_start : U64,
 	at : U64,
 	token : Piece,
 } -> List(Piece)
 with_token = |
 	pieces,
 	{
-		run_start,
+		text_start,
 		at,
 		token,
 	},
-| List.append(flushed(pieces, { run_start, at }), token)
+| List.append(flushed(pieces, { text_start, at }), token)
+
+## What one byte's scan found: a piece, ending at `end` (the pending text
+## before it flushed first); the pending text cut at `end` with nothing taken
+## (an image's dropped `!`); or bytes up to `end` left in the pending text.
+Step : [
+	Token(Piece, U64),
+	Cut(U64),
+	Skip(U64),
+]
+
+## A same-origin `<img>` or `<video>` at `at`, rebuilt (MdMedia).
+media_at : List(U8), U64 -> Try(MdMedia.Rebuilt, [NotMedia])
+media_at = |text, at|
+	match MdMedia.img_at(text, at) {
+		Ok(tag) => Ok(tag)
+		Err(NotSafe) =>
+			match MdMedia.video_at(text, at) {
+				Ok(tag) => Ok(tag)
+				Err(NotSafe) => Err(NotMedia)
+			}
+	}
+
+## A code span's html: its content `text[start..end]`, as CommonMark trims
+## it, escaped.
+code_html : List(U8), { start : U64, end : U64 } -> List(U8)
+code_html = |text, span| List.concat(
+	MdText.escape_onto(MdHtml.code_open, code_span_content(MdText.cut(text, span))),
+	MdHtml.code_close,
+)
 
 ## How many `byte`s run from `at`.
 run_length : List(U8), { byte : U8, at : U64 } -> U64
@@ -403,7 +339,7 @@ emit = |
 
 # ── code spans ──
 
-## markdown_inline `codeSpanAt`: the backtick run at `at` closed by a run of
+## The backtick run at `at` closed by a run of
 ## exactly its length, its content's span, and the index past the close.
 code_span_at : List(U8),
 {
@@ -450,7 +386,7 @@ code_span_at = |text, { at, budget }| {
 	{ span: Err(NoClose), budget: $budget }
 }
 
-## markdown_inline `codeSpanContent`: one space off each end when both ends
+## One space off each end when both ends
 ## are spaces and it is not all spaces.
 code_span_content : List(U8) -> List(U8)
 code_span_content = |content| {
@@ -485,6 +421,7 @@ expect inline("[x](java\tscript:alert(1))") == "<a href=\"\">x</a>"
 expect inline("`a<b`") == "<code>a&lt;b</code>"
 expect inline("go to www.a.com, now") == "go to <a href=\"http://www.a.com\" target=\"_blank\" rel=\"noopener\">www.a.com</a>, now"
 expect inline("mail a.b@c.d.") == "mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a>."
+# A host without a dot is no autolink: `localhost` is a word.
 expect inline("http://localhost:9100/x.md") == "http://localhost:9100/x.md"
 # The floor keys on a closer's can_open and its run's length as written
 # (CommonMark's, commonmark.js's and markdown-it's).

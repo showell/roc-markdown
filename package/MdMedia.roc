@@ -1,12 +1,12 @@
-## **THE ONE PLACE THE DIALECT LETS A MEMBER'S TAG THROUGH** (chat-markdown
-## markdown_media.zig): a same-origin `<img>` or `<video>`. A tag a member
-## wrote is never passed on as written: it is scanned here, its attributes
-## by name, the last of a name winning, and REBUILT from MdSafety's
-## allowlist (`media_attrs`, which also holds the same-origin rule), each
-## value escaped (MdHtml). A tag that does not parse cleanly, or that
+## **THE ONE PLACE THE DIALECT LETS A MEMBER'S TAG THROUGH**: an uploaded
+## `<img>` or `<video>`. A tag a member wrote is never passed on as written:
+## it is scanned here, its attributes by name, the last of a name winning,
+## and REBUILT from MdSafety's allowlist (`media_attrs`, which also holds the
+## uploads rule), each value escaped (MdHtml). A tag that does not parse cleanly, or that
 ## MdSafety refuses, is refused whole; the caller escapes it as text. Pure,
-## over bytes: the renderer (Md, MdInline) and the Images feed (Feeds,
-## metal-vmm QUEUE 266) ask it.
+## over bytes: the renderer (Md, MdInline) asks it, and it is exposed, so a
+## host that shows a stored tag outside a render (a feed of images) rebuilds
+## it by the same rule (`rebuild`).
 import MdHtml
 import MdSafety
 import MdText
@@ -19,7 +19,7 @@ MdMedia := [].{
 		end : U64,
 	}
 
-	## markdown_media `safeImgAt`: the `<img …>` at `raw[start]` rebuilt,
+	## The `<img …>` at `raw[start]` rebuilt,
 	## and the index past its `>`.
 	img_at : List(U8), U64 -> Try(Rebuilt, [NotSafe])
 	img_at = |raw, start| {
@@ -28,7 +28,7 @@ MdMedia := [].{
 		Ok({ html: MdHtml.img(attrs), end: tag.end })
 	}
 
-	## markdown_media `safeVideoAt`: the `<video …></video>` pair at
+	## The `<video …></video>` pair at
 	## `raw[start]` rebuilt as a locked player, and the index past its
 	## `</video>`. Only whitespace may stand between the two tags: no
 	## fallback content is carried through.
@@ -60,7 +60,7 @@ Tag : {
 	end : U64,
 }
 
-## markdown_media `tagNameAt` and `TagScan`: `<name` (any case) at `start`,
+## `<name` (any case) at `start`,
 ## then a space, `>` or `/`; then each `name=value` up to the tag's `>`,
 ## quotes respected, a bare name's value empty. Running off the end, a name
 ## of no name bytes, or `=` with nothing after is no tag.
@@ -161,7 +161,7 @@ skip_spaces = |raw, from| {
 	$i
 }
 
-## markdown_media `matchCloseTag`: `</name>` at `at` (any case, spaces
+## `</name>` at `at` (any case, spaces
 ## before the `>`), and the index past it.
 close_tag_end : List(U8), { at : U64, name : List(U8) } -> Try(U64, [NotSafe])
 close_tag_end = |raw, { at, name }| {

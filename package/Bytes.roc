@@ -1,8 +1,8 @@
 ## BYTES AS ZIG'S std.mem HANDLES THEM: the searches, scans and trims the
 ## markdown's modules share, each in one place (`std.mem.indexOf`,
 ## `indexOfScalar`, `trim`), on bytes, never Str; a byte's class is Ascii's.
-## Pure. The package's own: roc-webbox's chat has a Bytes of its own, and the
-## two are free to differ.
+## Pure. The package's own: roc-chat has a Bytes of its own, and the two are
+## free to differ.
 
 Bytes := [].{
 

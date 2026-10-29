@@ -11,6 +11,7 @@ spec_escapes.jsonl
 spec_images.jsonl
 # Pinned departures from CommonMark (each its own note).
 pinned.jsonl
-# The REPL's canned examples (judge/repl.zig: `:examples`), each
+# The canned examples of the REPL (judge/repl.zig: `:examples`) and the
+# playground, each
 # {"id", "caption", "md"}, dense with the dialect's features.
 examples.jsonl

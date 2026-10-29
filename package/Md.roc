@@ -1,5 +1,4 @@
-## **THE CHAT'S MARKDOWN** (ported from chat-markdown markdown.zig, metal-vmm
-## QUEUE 305; this is the dialect's definition now): a member's message to
+## **THE CHAT'S MARKDOWN**, the dialect's definition: a member's message to
 ## HTML. GFM-style paragraphs with hard wraps, ATX headings, fenced code
 ## (with the chat's `quote` fence of a reply, MdChat), lists (MdList),
 ## blockquotes (MdQuote), GFM's pipe tables (MdTable), and the raw HTML
@@ -40,17 +39,17 @@ import MdTable
 
 Md := [].{
 
-	## markdown `render`: a member's message, with its budget; a hostile one
+	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
 	render : List(U8) -> List(U8)
 	render = |md| rendered(md, { wrap: HardWrap, budget: MdText.for_input(md) })
 
-	## markdown `renderTrusted`: server-owned text, never a request's, with no
+	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
 	render_trusted : List(U8) -> List(U8)
 	render_trusted = |md| rendered(md, { wrap: HardWrap, budget: MdText.unlimited })
 
-	## markdown `renderTrustedReflow`: server-owned prose, whose source line
+	## Server-owned prose, whose source line
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
 	render_trusted_reflow : List(U8) -> List(U8)
@@ -62,37 +61,23 @@ Md := [].{
 	escape : List(U8) -> List(U8)
 	escape = |text| MdText.escape_onto([], text)
 
-	## markdown `workUnits`: the work a render of `md` costs, unlimited, the
+	## The work a render of `md` costs, unlimited, the
 	## measure the budget caps.
 	work_units : List(U8) -> U64
-	work_units = |md| match blocks_onto({
-		out: [],
-		md,
-		spacing: Loose,
-		depth: 0,
-		wrap: HardWrap,
-		budget: MdText.unlimited,
-	}) {
+	work_units = |md| match run(md, { wrap: HardWrap, budget: MdText.unlimited }) {
 		Ok(done) => done.budget.spent
 		Err(Hostile) => crash "Md.work_units: an unlimited budget blown"
 	}
 
-	## markdown `hostileReason`: whether `md` would blow its budget, so a POST
+	## Whether `md` would blow its budget, so a POST
 	## refuses it. One render in good faith with the real budget.
 	hostility : List(U8) -> [Renderable, TooMuchFormatting]
-	hostility = |md| match blocks_onto({
-		out: [],
-		md,
-		spacing: Loose,
-		depth: 0,
-		wrap: HardWrap,
-		budget: MdText.for_input(md),
-	}) {
+	hostility = |md| match run(md, { wrap: HardWrap, budget: MdText.for_input(md) }) {
 		Ok(_) => Renderable
 		Err(Hostile) => TooMuchFormatting
 	}
 
-	## The words a refused POST says, the Zig's.
+	## The words a refused POST says.
 	too_much_formatting : Str
 	too_much_formatting = "too much markdown formatting"
 
@@ -102,26 +87,31 @@ Md := [].{
 	malformed_html = MdHtml.malformed
 }
 
-rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget } -> List(U8)
-rendered = |md, { wrap, budget }| match blocks_onto({
+## The one seed every render grows from: `md`'s blocks from the top, as a
+## document's, in `wrap` and against `budget`.
+run : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget } -> Try(MdText.Rendered, [Hostile])
+run = |md, { wrap, budget }| blocks_onto({
 	out: [],
 	md,
 	spacing: Loose,
 	depth: 0,
 	wrap,
 	budget,
-}) {
+})
+
+rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget } -> List(U8)
+rendered = |md, { wrap, budget }| match run(md, { wrap, budget }) {
 	Ok(done) => done.out
 	Err(Hostile) => Md.malformed_html
 }
 
-## markdown `max_block_depth`: quotes and lists nest at most this deep;
+## Quotes and lists nest at most this deep;
 ## past it, the rest renders as one paragraph. Ordinary conversation never
 ## nests past about 10 (Steve, 2026-06-19).
 max_block_depth : U64
 max_block_depth = 16
 
-## markdown `renderBlocksInto`, the block dispatcher: `md`'s blocks onto
+## The block dispatcher: `md`'s blocks onto
 ## `out`. `Tight` spacing is a tight list item's content: its paragraphs have no
 ## `<p>`, and its blocks are joined by one newline. One unit a block line,
 ## and a check, where the previous line's inline charges are noticed too.
@@ -181,122 +171,89 @@ blocks_onto = |
 			if MdText.is_blank(line) {
 				$pos = next
 			} else {
-				# A fence, a heading, a list and a quote can each interrupt a
-				# paragraph, so each is asked first.
-				match MdFence.open_at(md, $pos) {
-					Ok(open) => {
-						fenced = fence_onto(
-							tight_sep($out, spacing),
-							{
-								md,
-								open,
-								budget: $budget,
-							},
-						)
-						$out = fenced.out
-						$budget = fenced.budget
-						$pos = fenced.after
-					}
-					Err(NotAFence) =>
-						match atx_heading(line) {
-							Ok(h) => {
-								heading = MdInline.render_onto({
-									out: List.concat(tight_sep($out, spacing), MdHtml.heading_open(h.level)),
-									text: h.content,
-									refs: Linked,
-									budget: $budget,
-								})?
-								$out = List.concat(heading.out, MdHtml.heading_close(h.level))
-								$budget = heading.budget
-								$pos = next
-							}
-							Err(NotAHeading) =>
-								match MdList.list_marker_at(md, $pos) {
-									Ok(marker) => {
-										listed = MdList.list_onto(
-											tight_sep($out, spacing),
-											{
-												md,
-												pos: $pos,
-												first: marker,
-												budget: $budget,
-												nested,
-												is_block_start,
-											},
-										)?
-										$out = listed.out
-										$budget = listed.budget
-										$pos = listed.after
-									}
-									Err(NotAMarker) =>
-										if MdQuote.is_quote_line(line) {
-											quoted = MdQuote.quote_onto(
-												tight_sep($out, spacing),
-												{
-													md,
-													pos: $pos,
-													budget: $budget,
-													nested,
-													is_block_start,
-												},
-											)?
-											$out = quoted.out
-											$budget = quoted.budget
-											$pos = quoted.after
-										} else if is_html_block_start(line) {
-											# CommonMark's type 7: only at a block's start, and
-											# up to a blank line, its source passed through the
-											# escape but for a same-origin <img> or <video>, with
-											# no <p> and no newline added.
-											var $p = next
-											while $p < len and !MdText.is_blank(
-												MdText.cut(
-													md,
-													{ start: $p, end: MdText.line_end(md, $p) },
-												),
-											) {
-												$p = MdText.next_line(md, MdText.line_end(md, $p))
-											}
-											raw = raw_html_onto(
-												tight_sep($out, spacing),
-												{
-													raw: MdText.cut(md, { start: $pos, end: $p }),
-													budget: $budget,
-												},
-											)
-											$out = raw.out
-											$budget = raw.budget
-											$pos = $p
-										} else if MdTable.is_table_at(md, $pos) {
-											tabled = table_onto(
-												tight_sep($out, spacing),
-												{ md, pos: $pos, budget: $budget },
-											)?
-											$out = tabled.out
-											$budget = tabled.budget
-											$pos = tabled.after
-										} else {
-											para = paragraph_onto(
-												tight_sep($out, spacing),
-												{
-													md,
-													pos: $pos,
-													spacing,
-													wrap,
-													budget: $budget,
-												},
-											)?
-											$out = para.out
-											$budget = para.budget
-											$pos = para.after
-										}
-								}
-						}
-				}
+				block = block_at(
+					tight_sep($out, spacing),
+					{
+						md,
+						pos: $pos,
+						line,
+						next,
+						spacing,
+						wrap,
+						budget: $budget,
+						nested,
+					},
+				)?
+				$out = block.out
+				$budget = block.budget
+				$pos = block.after
 			}
 		}
 		Ok({ out: $out, budget: $budget })
 	}
+
+## The block at `pos` (its line `line`, the line after it at `next`) onto
+## `out`, already separated from the block before: the dispatcher's one
+## question, its blocks in the order they are asked. A fence, a heading, a
+## list and a quote can each interrupt a paragraph, so each is asked first;
+## then an HTML block and a table; else a paragraph.
+block_at : List(U8),
+{
+	md : List(U8),
+	pos : U64,
+	line : List(U8),
+	next : U64,
+	spacing : [Tight, Loose],
+	wrap : [HardWrap, Reflow],
+	budget : MdText.Budget,
+	nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
+} -> Try(MdText.Block, [Hostile])
+block_at = |
+	out,
+	{
+		md,
+		pos,
+		line,
+		next,
+		spacing,
+		wrap,
+		budget,
+		nested,
+	},
+|
+	match MdFence.open_at(md, pos) {
+		Ok(open) => Ok(fence_onto(out, { md, open, budget }))
+		Err(NotAFence) =>
+			match atx_heading(line) {
+				Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget })
+				Err(NotAHeading) =>
+					match MdList.list_marker_at(md, pos) {
+						Ok(marker) => MdList.list_onto(out, { md, pos, first: marker, budget, nested, is_block_start })
+						Err(NotAMarker) =>
+							if MdQuote.is_quote_line(line) {
+								MdQuote.quote_onto(out, { md, pos, budget, nested, is_block_start })
+							} else if is_html_block_start(line) {
+								Ok(raw_html_onto(out, { md, pos, budget }))
+							} else if MdTable.is_table_at(md, pos) {
+								table_onto(out, { md, pos, budget })
+							} else {
+								paragraph_onto(out, { md, pos, spacing, wrap, budget })
+							}
+					}
+			}
+	}
+
+## An ATX heading, its content's inlines rendered between its tags.
+heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget } -> Try(MdText.Block, [Hostile])
+heading_onto = |out, { level, content, after, budget }| {
+	heading = MdInline.render_onto({
+		out: List.concat(out, MdHtml.heading_open(level)),
+		text: content,
+		refs: Linked,
+		budget,
+	})?
+	Ok({ out: List.concat(heading.out, MdHtml.heading_close(level)), budget: heading.budget, after })
+}
 
 ## A paragraph: the longest run of lines that are not blank and start no
 ## block that may interrupt one. In the hard-wrap dialect each line is
@@ -409,7 +366,7 @@ paragraph_onto = |
 ends_in_hard_break : List(U8) -> Bool
 ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
 
-## markdown `tightSep`: inside a tight list item, a block after a bare
+## Inside a tight list item, a block after a bare
 ## paragraph starts on a line of its own.
 tight_sep : List(U8), [Tight, Loose] -> List(U8)
 tight_sep = |
@@ -419,7 +376,7 @@ tight_sep = |
 
 # ── fenced code ──
 
-## markdown `renderFence`: the code block, up to its closing fence or the
+## The code block, up to its closing fence or the
 ## end (an unclosed fence runs to the end). Its body is charged whole, its
 ## close-scan and escape being linear in it; no check follows here.
 fence_onto : List(U8),
@@ -464,7 +421,7 @@ fence_onto = |
 	}
 }
 
-## markdown `writeCodeLines`: each line escaped and ended with a newline,
+## Each line escaped and ended with a newline,
 ## less up to the fence's own indent of spaces.
 code_lines_onto : List(U8), { content : List(U8), indent : U64 } -> List(U8)
 code_lines_onto = |out, { content, indent }| {
@@ -483,7 +440,7 @@ code_lines_onto = |out, { content, indent }| {
 
 # ── headings ──
 
-## markdown `atxHeading`: 1 to 6 `#` after up to three spaces, then a space,
+## 1 to 6 `#` after up to three spaces, then a space,
 ## a tab or the line's end; a closing run of `#` is no content.
 atx_heading : List(U8) -> Try({ level : U64, content : List(U8) }, [NotAHeading])
 atx_heading = |line| {
@@ -517,7 +474,7 @@ atx_heading = |line| {
 
 # ── block starts ──
 
-## markdown `lineStartsBlock`: the line at `pos` starts a block a lazy
+## The line at `pos` starts a block a lazy
 ## continuation may not take in (a blank line, a list item, a quote, a
 ## fence, a heading).
 is_block_start : List(U8), U64 -> Bool
@@ -613,10 +570,18 @@ row_onto = |out, { cells, aligns, tag, budget }| {
 
 # ── raw HTML ──
 
-## markdown `writeRawHtml`: a raw block, every same-origin `<img>` and
+## A raw block, every same-origin `<img>` and
 ## `<video>` rebuilt (MdMedia), every other byte escaped. One unit a byte.
-raw_html_onto : List(U8), { raw : List(U8), budget : MdText.Budget } -> MdText.Rendered
-raw_html_onto = |out, { raw, budget }| {
+raw_html_onto : List(U8), { md : List(U8), pos : U64, budget : MdText.Budget } -> MdText.Block
+raw_html_onto = |out, { md, pos, budget }| {
+	# CommonMark's type 7: only at a block's start, and up to a blank line,
+	# with no <p> and no newline added.
+	md_len = List.len(md)
+	var $p = MdText.next_line(md, MdText.line_end(md, pos))
+	while $p < md_len and !MdText.is_blank(MdText.cut(md, { start: $p, end: MdText.line_end(md, $p) })) {
+		$p = MdText.next_line(md, MdText.line_end(md, $p))
+	}
+	raw = MdText.cut(md, { start: pos, end: $p })
 	len = List.len(raw)
 	var $out = out
 	var $last = 0
@@ -647,10 +612,11 @@ raw_html_onto = |out, { raw, budget }| {
 	{
 		out: MdText.escape_onto($out, List.drop_first(raw, $last)),
 		budget: MdText.charge(budget, len),
+		after: $p,
 	}
 }
 
-## markdown `isHtmlBlockStart`: a whole open or close tag, then only
+## A whole open or close tag, then only
 ## whitespace (CommonMark's type 7).
 is_html_block_start : List(U8) -> Bool
 is_html_block_start = |line| {
@@ -665,7 +631,7 @@ is_html_block_start = |line| {
 	}
 }
 
-## markdown `htmlTagEnd`: the index past the `>` closing the tag at `t[0]`,
+## The index past the `>` closing the tag at `t[0]`,
 ## quoted values respected.
 html_tag_end : List(U8) -> Try(U64, [Unterminated])
 html_tag_end = |t| {
@@ -695,7 +661,8 @@ heading_space = [' ', '\t']
 md : Str -> Str
 md = |text| Str.from_utf8(Md.render(Str.to_utf8(text))) ?? "not text"
 
-# markdown.zig's own cases.
+# Whole messages, block by block: the media rule, hard wraps and their
+# backslash, fences, lists, quotes and headings as the dialect renders them.
 expect md("<video src=\"/user_uploads/1_3/abc.mp4\"></video>") == "<p><video controls preload=\"metadata\" src=\"/user_uploads/1_3/abc.mp4\"></video></p>\n"
 # Media outside the uploads prefix is text, the old chat's upload paths too.
 expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p>&lt;video src=&quot;/chat/c/1_3/yo/uploads/abc.mp4&quot;&gt;&lt;/video&gt;</p>\n"

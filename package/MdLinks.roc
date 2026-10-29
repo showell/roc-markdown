@@ -1,16 +1,15 @@
-## **LINKS AND AUTOLINKS** (chat-markdown markdown_inline.zig's `mdLinkAt`,
-## `autolinkAt` and their scans): where a `[label](url)` link or a GFM
+## **LINKS AND AUTOLINKS**: where a `[label](url)` link or a GFM
 ## autolink (`http://…`, `https://…`, `www.…`, `local@domain.tld`) stands in
 ## a line, and the `<a>` each becomes (its tags MdHtml's). Which hrefs are
 ## dangerous and which open in a new tab is MdSafety's; a link's label is the inline pass's
 ## (MdInline), which renders it as it renders a line. Pure.
 ##
-## **LINEAR BY ITS CURSORS**: the first `]` ahead (`rb`), the line's paren
+## **LINEAR BY ITS CURSORS**: the first `]` ahead (`next_bracket`), the line's paren
 ## table (`Closes`), and the floor below which no email can start
 ## (`email_dead`) are each found once and only move forward, so no suffix is
 ## scanned again from every `[` or every `_`. The pass holds them across its
 ## walk and passes them back in. Every byte a scan reads is charged to the
-## budget, the Zig's charges unit for unit.
+## budget.
 import Ascii
 import Bytes
 import MdHtml
@@ -19,8 +18,8 @@ import MdSafety
 
 MdLinks := [].{
 
-	## markdown_inline `mdLinkAt`: the link `[label](url)` at `at`: its
-	## label's span, its destination, and the index past its `)`. `rb`, the
+	## The link `[label](url)` at `at`: its
+	## label's span, its destination, and the index past its `)`. `next_bracket`, the
 	## first `]` the line has not yet passed, only moves forward, so its scans
 	## cost the line's length in all, not once a `[`. The destination's parens
 	## balance (CommonMark): it ends at the `)` that closes its `(`, from
@@ -33,7 +32,7 @@ MdLinks := [].{
 	link_at : List(U8),
 	{
 		at : U64,
-		rb : U64,
+		next_bracket : U64,
 		closes : Closes,
 		budget : MdText.Budget,
 	} -> {
@@ -45,7 +44,7 @@ MdLinks := [].{
 			},
 			[NotALink],
 		),
-		rb : U64,
+		next_bracket : U64,
 		closes : Closes,
 		budget : MdText.Budget,
 	}
@@ -53,28 +52,28 @@ MdLinks := [].{
 		text,
 		{
 			at,
-			rb,
+			next_bracket,
 			closes,
 			budget,
 		},
 	| {
 		len = List.len(text)
-		var $rb = rb
+		var $next_bracket = next_bracket
 		var $budget = budget
-		while $rb < len and $rb < at + 1 {
-			from = $rb
-			$rb = MdText.find_or_end(text, { byte: ']', at: $rb + 1 })
-			$budget = MdText.charge($budget, $rb - from)
+		while $next_bracket < len and $next_bracket < at + 1 {
+			from = $next_bracket
+			$next_bracket = MdText.find_or_end(text, { byte: ']', at: $next_bracket + 1 })
+			$budget = MdText.charge($budget, $next_bracket - from)
 		}
-		if $rb >= len or $rb + 1 >= len or MdText.at(text, $rb + 1) != '(' {
+		if $next_bracket >= len or $next_bracket + 1 >= len or MdText.at(text, $next_bracket + 1) != '(' {
 			{
 				link: Err(NotALink),
-				rb: $rb,
+				next_bracket: $next_bracket,
 				closes,
 				budget: $budget,
 			}
 		} else {
-			close_bracket = $rb
+			close_bracket = $next_bracket
 			open_paren = close_bracket + 1
 			(table, scanned) = match closes {
 				Scanned(t) => (t, $budget)
@@ -85,7 +84,7 @@ MdLinks := [].{
 			if close_paren >= len {
 				{
 					link: Err(NotALink),
-					rb: $rb,
+					next_bracket: $next_bracket,
 					closes: Scanned(table),
 					budget: $budget,
 				}
@@ -96,7 +95,7 @@ MdLinks := [].{
 						url: MdText.unescaped(MdText.cut(text, { start: open_paren + 1, end: close_paren })),
 						end: close_paren + 1,
 					}),
-					rb: $rb,
+					next_bracket: $next_bracket,
 					closes: Scanned(table),
 					budget: $budget,
 				}
@@ -167,7 +166,7 @@ MdLinks := [].{
 		tab: if MdSafety.is_external_href(url) NewTab else SameTab,
 	})
 
-	## markdown_inline `autolinkBoundary`: an autolink starts only at the line's
+	## An autolink starts only at the line's
 	## start, or after a space or one of `*`, `_`, `~` and `(`.
 	is_autolink_boundary : List(U8), U64 -> Bool
 	is_autolink_boundary = |text, i|
@@ -184,7 +183,7 @@ MdLinks := [].{
 		Email,
 	]
 
-	## markdown_inline `autolinkAt`: a GFM autolink at `at`, and the index past
+	## A GFM autolink at `at`, and the index past
 	## it. `email_dead` is the floor below which no email can start: when one
 	## fails, every position in its local part fails the same way, so the floor
 	## moves past it (without it, `a_b_a_b…` is quadratic).
@@ -250,7 +249,7 @@ MdLinks := [].{
 		}
 	}
 
-	## markdown_inline `emitAutolink`: the link, a URL's and a `www.`'s opening
+	## The link, a URL's and a `www.`'s opening
 	## in a new tab, an email's as `mailto:`.
 	autolink_html : List(U8), AutoKind -> List(U8)
 	autolink_html = |link, kind| {
@@ -289,7 +288,7 @@ paren_closes = |text| {
 	$closes
 }
 
-## markdown_inline `urlEnd`: URL bytes from `start` up to a space or `<`,
+## URL bytes from `start` up to a space or `<`,
 ## less GFM's trailing punctuation and any `)` without its `(`. The host
 ## (after the scheme, before a port, path, query or fragment) must hold a
 ## `.`.
@@ -334,7 +333,7 @@ url_end = |text, { start, budget }| {
 	}
 }
 
-## markdown_inline `emailEnd`: `local@domain.tld` at `start`, a trailing
+## `local@domain.tld` at `start`, a trailing
 ## `.`, `-` or `_` not its.
 email_end : List(U8),
 { start : U64, budget : MdText.Budget } -> {

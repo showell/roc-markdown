@@ -1,4 +1,4 @@
-## **A BLOCKQUOTE** (chat-markdown markdown.zig's `renderQuote`): where a
+## **A BLOCKQUOTE**: where a
 ## quote's line starts, and the quote rendered, its `>` lines (and a
 ## paragraph's lazy lines) stripped and rendered as blocks one level deeper.
 ## Pure.
@@ -21,7 +21,7 @@ MdQuote := [].{
 	is_quote_line : List(U8) -> Bool
 	is_quote_line = |line| quote_marker_len(line).is_ok()
 
-	## markdown `renderQuote`: the quote from `pos`, its `>` lines (and a
+	## The quote from `pos`, its `>` lines (and a
 	## paragraph's lazy lines, up to a blank one) stripped and rendered as
 	## blocks one level deeper.
 	quote_onto : List(U8),
@@ -92,7 +92,7 @@ MdQuote := [].{
 	}
 }
 
-## markdown `quoteMarkerLen`: the prefix a quote's line drops: up to three
+## The prefix a quote's line drops: up to three
 ## spaces, a `>`, and one space after it.
 quote_marker_len : List(U8) -> Try(U64, [NotAQuote])
 quote_marker_len = |line| {

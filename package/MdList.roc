@@ -1,4 +1,4 @@
-## **A LIST** (chat-markdown markdown.zig's `renderList`): a list item's
+## **A LIST**: a list item's
 ## marker, which lists continue one another and which may interrupt a
 ## paragraph, and the list rendered, each item's content gathered dedented
 ## and rendered as blocks one level deeper. Pure.
@@ -27,7 +27,7 @@ MdList := [].{
 		content_start : U64,
 	}
 
-	## markdown `listMarkerAt`: up to three spaces, then `-`, `+`, `*`, or up to
+	## Up to three spaces, then `-`, `+`, `*`, or up to
 	## nine digits and `.` or `)`, then a space, a tab or the line's end. One
 	## to four spaces after are the content's indent; more is one, the rest the
 	## content's.
@@ -92,7 +92,7 @@ MdList := [].{
 		}
 	}
 
-	## markdown `listInterruptsAt`: a list may interrupt a paragraph when its
+	## A list may interrupt a paragraph when its
 	## first item is not empty, and an ordered one only when it starts at 1.
 	is_list_interrupting : List(U8), U64 -> Bool
 	is_list_interrupting = |md, pos| match list_marker_at(md, pos) {
@@ -104,7 +104,7 @@ MdList := [].{
 		Err(NotAMarker) => Bool.False
 	}
 
-	## markdown `renderList`: the whole list from `pos`, its first marker
+	## The whole list from `pos`, its first marker
 	## `first`. Each item's content is gathered dedented, its inner blank lines
 	## kept, and rendered as blocks one level deeper; a blank line between
 	## items, or inside one, makes the list loose, whose paragraphs keep their
@@ -220,7 +220,7 @@ MdList := [].{
 	}
 }
 
-## markdown `sameListType`: the same bullet, or the same ordered delimiter.
+## The same bullet, or the same ordered delimiter.
 is_same_list : MdList.Marker, MdList.Marker -> Bool
 is_same_list = |a, b| match (a.kind, b.kind) {
 	(Bullet(x), Bullet(y)) => x == y
@@ -228,7 +228,7 @@ is_same_list = |a, b| match (a.kind, b.kind) {
 	_ => Bool.False
 }
 
-## markdown `firstItemChildIsBlock`: a tight item starts on a line of its
+## A tight item starts on a line of its
 ## own when its first child is a list, a quote, a fence, a heading or a
 ## table, not a paragraph: its first line that is not blank starts a block
 ## (`is_block_start`, which asks the first four in that order) or a table.

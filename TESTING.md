@@ -25,16 +25,23 @@ beside it (`<name>.answers.jsonl`):
   the dialect's deliberate departures from CommonMark.
 - **unit_cases:** every input of the original Zig renderer's unit tests,
   where the dialect came from.
-- **spec_agree:** CommonMark's and GFM's spec examples, held to the spec's
-  HTML, less the deliberate divergences `spec_diverge.txt` lists. A check
+- **spec_agree:** 269 of CommonMark's and GFM's spec examples, held to the
+  spec's HTML, less the deliberate divergences `spec_diverge.txt` lists.
+  They are the examples of the sections the dialect covers (emphasis, code
+  spans, links, lists, quotes, ATX headings, fences, GFM's autolinks), less
+  every one whose markdown held a feature it had no rule for when they were
+  chosen (`\`, `&`, `<`, `![`, `]:`, `"`, a tab, a 4-space indent):
+  401 considered, 269 kept (`SPEC-LICENSE`). A check
   fails both ways: a listed case that now matches is stale and must come off
   the list.
 - **spec_tables**, **spec_strike**, **spec_escapes**, **spec_images:** GFM's
   table and strikethrough examples, and CommonMark's backslash escapes and
-  images. The spec corpora are CC BY-SA 4.0 (`SPEC-LICENSE`).
-- **examples:** the playground's canned examples, frozen so a change that
+  images, every example of their sections. The spec corpora are CC BY-SA 4.0 (`SPEC-LICENSE`).
+- **examples:** the canned examples of the playground and the REPL
+  (`:examples`), one file for both, frozen so a change that
   moves one fails loudly.
-- **hostile:** shapes the judge generates itself at sizes from 1 to 8,191
+- **hostile:** about a thousand cases (1,097), shapes the judge generates
+  itself at sizes from 1 to 8,191
   (deep nesting, long delimiter runs, wide tables). Their answers are hashed
   to keep the file small. Verify also holds their work units linear.
 

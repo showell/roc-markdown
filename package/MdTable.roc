@@ -1,4 +1,4 @@
-## **GFM'S PIPE TABLES, A LINE AT A TIME** (metal-vmm QUEUE 311): where a
+## **GFM'S PIPE TABLES, A LINE AT A TIME**: where a
 ## table stands, a row's cells and the delimiter row's alignments, as the GFM
 ## spec's "Tables (extension)" reads them. Md's dispatcher, MdList and
 ## MdQuote ask here where a table opens; Md renders it. Pure.
