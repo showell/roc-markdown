@@ -582,9 +582,10 @@ is_list_interrupting = |md, pos| match list_marker_at(md, pos) {
 }
 
 ## markdown `renderList`: the whole list from `pos`, its first marker
-## `first`. Each item's content is gathered dedented and rendered as blocks
-## one level deeper; a blank line between items, or inside one, makes the
-## list loose, whose paragraphs keep their `<p>`.
+## `first`. Each item's content is gathered dedented, its inner blank lines
+## kept, and rendered as blocks one level deeper; a blank line between
+## items, or inside one, makes the list loose, whose paragraphs keep their
+## `<p>`.
 list_onto : List(U8),
 {
 	md : List(U8),
@@ -644,7 +645,10 @@ list_onto = |
 				_ =>
 					if indent >= $cur_col and $have_item {
 						# An indented line: the item's own, its nested blocks.
+						# The blank lines before it are the item's too: they
+						# part its paragraphs and stay in its fences.
 						$loose = $loose or $blanks > 0
+						$cur = List.concat($cur, List.repeat('\n', $blanks))
 						$blanks = 0
 						$cur = List.append(List.concat($cur, List.drop_first(line, $cur_col)), '\n')
 					} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
@@ -913,6 +917,9 @@ expect md("hello\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("# about MSG_plans_3") == "<h1>about <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></h1>\n"
 expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;b\n</code></pre>\n<p>after</p>\n"
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
+# A blank line inside an item stays: two paragraphs, a fence's blank line.
+expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
+expect md("- ```\n  a\n\n  b\n  ```") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
 expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("A **bold phrase that\nspans two lines** here."))) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
 expect Md.hostility(Str.to_utf8("some **bold** text and a [link](http://x.com)")) == Renderable
