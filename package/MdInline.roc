@@ -1,23 +1,24 @@
-## **THE INLINE PASS** (chat-markdown markdown_inline.zig, with the rules of
-## markdown_links.zig, whose one caller it is): one line of inline content
-## to HTML. The line is cut into pieces (text to escape; html made here, for
-## a code span, a same-origin `<img>` or `<video>`, a `[t](u)` link, an
-## autolink or a `MSG_` reference; and `*`/`_` runs), the runs are matched
-## into `<em>` and `<strong>` by CommonMark's delimiter stack, and the
-## pieces are written out. Pure.
+## **THE INLINE PASS** (chat-markdown markdown_inline.zig, with the
+## `MSG_` references of markdown_links.zig): one line of inline content to
+## HTML. The line is cut into pieces (text to escape; html made here, for a
+## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link
+## or an autolink (MdLinks), or a `MSG_` reference; and `*`/`_` runs), the
+## runs are matched into `<em>` and `<strong>` (MdEmphasis), and the pieces
+## are written out. Pure.
 ##
-## **LINEAR BY ITS CURSORS, AND CHARGED FOR EVERY STEP**: the first `]` and
-## `)` ahead, and the floor below which no email can start, only ever move
-## forward, so no suffix is scanned again from every `[` or `_`. Each step
-## and each byte an inner scan reads is charged to the budget, and the walk
-## stops as hostile the moment it is blown: the Zig's charges, unit for
-## unit, so a message the Zig refuses is a message this refuses.
+## **LINEAR BY ITS CURSORS, AND CHARGED FOR EVERY STEP**: the walk holds
+## MdLinks's cursors (the first `]` and `)` ahead, and the floor below which
+## no email can start), which only ever move forward, so no suffix is
+## scanned again from every `[` or `_`. Each step and each byte an inner
+## scan reads is charged to the budget, and the walk stops as hostile the
+## moment it is blown: the Zig's charges, unit for unit, so a message the
+## Zig refuses is a message this refuses.
 import Ascii
 import Bytes
 import MdText
 import MdMedia
-import MdSafety
 import MdEmphasis
+import MdLinks
 
 MdInline := [].{
 
@@ -143,7 +144,7 @@ MdInline := [].{
 							}
 						}
 					} else if c == '[' {
-						linked = link_at(
+						linked = MdLinks.link_at(
 							text,
 							{
 								at: $i,
@@ -151,18 +152,27 @@ MdInline := [].{
 								closes: $closes,
 								budget: $budget,
 							},
-						)?
+						)
 						$rb = linked.rb
 						$closes = linked.closes
 						$budget = linked.budget
 						match linked.link {
 							Ok(link) => {
+								# The label is a line of its own, rendered `InLabel`
+								# inside the `<a>`.
+								label = MdInline.render_onto({
+									out: MdLinks.link_open(link.url),
+									text: MdText.cut(text, link.label),
+									refs: InLabel,
+									budget: $budget,
+								})?
+								$budget = label.budget
 								$pieces = with_token(
 									$pieces,
 									{
 										run_start: $run_start,
 										at: $i,
-										token: Html(link.html),
+										token: Html(List.concat(label.out, MdLinks.link_close)),
 									},
 								)
 								$i = link.end
@@ -180,8 +190,8 @@ MdInline := [].{
 						$runs = List.append($runs, MdEmphasis.delimiter_run(text, { start: $i, end: $i + n }))
 						$i = $i + n
 						$run_start = $i
-					} else if is_autolink_boundary(text, $i) {
-						found = autolink_at(
+					} else if MdLinks.is_autolink_boundary(text, $i) {
+						found = MdLinks.autolink_at(
 							text,
 							{
 								at: $i,
@@ -199,7 +209,7 @@ MdInline := [].{
 										run_start: $run_start,
 										at: $i,
 										token: Html(
-											autolink_html(
+											MdLinks.autolink_html(
 												MdText.cut(text, { start: $i, end: link.end }),
 												link.kind,
 											),
@@ -403,333 +413,8 @@ code_span_content = |content| {
 	}
 }
 
-# ── [t](u) links ──
-
-## markdown_inline `mdLinkAt`: the link `[label](url)` at `at`, rendered,
-## and the index past its `)`. `rb`, the first `]` the line has not yet
-## passed, only moves forward, so its scans cost the line's length in all,
-## not once a `[`. The destination's parens balance (CommonMark): it ends
-## at the `)` that closes its `(`, from `closes`, the line's one paren pass,
-## made at the first `](` and charged its length once. A `(` with no
-## balancing `)` is no link. The label renders `InLabel`.
-link_at : List(U8),
-{
-	at : U64,
-	rb : U64,
-	closes : Closes,
-	budget : MdText.Budget,
-} -> Try(
-	{
-		link : Try({ html : List(U8), end : U64 }, [NotALink]),
-		rb : U64,
-		closes : Closes,
-		budget : MdText.Budget,
-	},
-	[Hostile],
-)
-link_at = |
-	text,
-	{
-		at,
-		rb,
-		closes,
-		budget,
-	},
-| {
-	len = List.len(text)
-	var $rb = rb
-	var $budget = budget
-	while $rb < len and $rb < at + 1 {
-		from = $rb
-		$rb = MdText.find_or_end(text, { byte: ']', at: $rb + 1 })
-		$budget = MdText.charge($budget, $rb - from)
-	}
-	if $rb >= len or $rb + 1 >= len or MdText.at(text, $rb + 1) != '(' {
-		Ok({
-			link: Err(NotALink),
-			rb: $rb,
-			closes,
-			budget: $budget,
-		})
-	} else {
-		close_bracket = $rb
-		open_paren = close_bracket + 1
-		(table, scanned) = match closes {
-			Scanned(t) => (t, $budget)
-			Unscanned => (paren_closes(text), MdText.charge($budget, len))
-		}
-		$budget = scanned
-		close_paren = List.get(table, open_paren) ?? len
-		if close_paren >= len {
-			Ok({
-				link: Err(NotALink),
-				rb: $rb,
-				closes: Scanned(table),
-				budget: $budget,
-			})
-		} else {
-			url = MdText.cut(text, { start: open_paren + 1, end: close_paren })
-			href = if MdSafety.is_dangerous_url(url) a_open else MdText.escape_onto(a_open, url)
-			head = List.join([
-				href,
-				['"'],
-				if MdSafety.is_external_href(url) MdSafety.external_attrs else [],
-				['>'],
-			])
-			label = MdInline.render_onto({
-				out: head,
-				text: MdText.cut(text, { start: at + 1, end: close_bracket }),
-				refs: InLabel,
-				budget: $budget,
-			})?
-			Ok({
-				link: Ok({ html: List.concat(label.out, a_close), end: close_paren + 1 }),
-				rb: $rb,
-				closes: Scanned(table),
-				budget: label.budget,
-			})
-		}
-	}
-}
-
-## Each `(`'s balancing `)` in the line, found once, by a stack: the index
-## of the `)` that closes the `(` at `i`, or the line's length when none
-## does (and for every byte that is no `(`). One pass, so a line of
-## `[a](((…` costs its length once, not once a `](`.
-Closes : [Unscanned, Scanned(List(U64))]
-
-paren_closes : List(U8) -> List(U64)
-paren_closes = |text| {
-	len = List.len(text)
-	var $closes = List.repeat(len, len)
-	var $open = []
-	var $i = 0
-	while $i < len {
-		c = MdText.at(text, $i)
-		if c == '(' {
-			$open = List.append($open, $i)
-		} else if c == ')' {
-			match List.last($open) {
-				Ok(j) => {
-					$closes = List.set($closes, j, $i) ?? crash "MdInline.paren_closes: a ( past the line"
-					$open = List.drop_last($open, 1)
-				}
-				Err(ListWasEmpty) => {}
-			}
-		} else {
-			{}
-		}
-		$i = $i + 1
-	}
-	$closes
-}
-
-# ── autolinks ──
-
-## markdown_inline `autolinkBoundary`: an autolink starts only at the line's
-## start, or after a space or one of `*`, `_`, `~` and `(`.
-is_autolink_boundary : List(U8), U64 -> Bool
-is_autolink_boundary = |text, i|
-	if i == 0 {
-		Bool.True
-	} else {
-		p = MdText.at(text, i - 1)
-		MdText.is_space(p) or p == '*' or p == '_' or p == '~' or p == '('
-	}
-
-AutoKind : [
-	Url,
-	Www,
-	Email,
-]
-
-## markdown_inline `autolinkAt`: a GFM autolink at `at`, and the index past
-## it. `email_dead` is the floor below which no email can start: when one
-## fails, every position in its local part fails the same way, so the floor
-## moves past it (without it, `a_b_a_b…` is quadratic).
-autolink_at : List(U8),
-{
-	at : U64,
-	email_dead : U64,
-	budget : MdText.Budget,
-} -> {
-	link : Try({ end : U64, kind : AutoKind }, [NotALink]),
-	email_dead : U64,
-	budget : MdText.Budget,
-}
-autolink_at = |
-	text,
-	{
-		at,
-		email_dead,
-		budget,
-	},
-| {
-	starts_with = |prefix| MdText.is_prefixed_ignoring_case(
-		text,
-		{ at, prefix: Str.to_utf8(prefix) },
-	)
-	if starts_with("http://") or starts_with("https://") {
-		u = url_end(text, { start: at, budget })
-		{
-			link: u.end.map_ok(|end| { end, kind: Url }),
-			email_dead,
-			budget: u.budget,
-		}
-	} else if starts_with("www.") {
-		u = url_end(text, { start: at, budget })
-		{
-			link: u.end.map_ok(|end| { end, kind: Www }),
-			email_dead,
-			budget: u.budget,
-		}
-	} else if at >= email_dead {
-		e = email_end(text, { start: at, budget })
-		match e.end {
-			Ok(end) => {
-				link: Ok({ end, kind: Email }),
-				email_dead,
-				budget: e.budget,
-			}
-			Err(NotALink) => {
-				j = Bytes.count_while(text, { keep: is_email_local_char, at })
-				{
-					link: Err(NotALink),
-					email_dead: if j > at j else at + 1,
-					budget: MdText.charge(e.budget, j - at),
-				}
-			}
-		}
-	} else {
-		{
-			link: Err(NotALink),
-			email_dead,
-			budget,
-		}
-	}
-}
-
-## markdown_inline `urlEnd`: URL bytes from `start` up to a space or `<`,
-## less GFM's trailing punctuation and any `)` without its `(`. The host
-## (after the scheme, before a port, path, query or fragment) must hold a
-## `.`.
-url_end : List(U8),
-{ start : U64, budget : MdText.Budget } -> {
-	end : Try(U64, [NotALink]),
-	budget : MdText.Budget,
-}
-url_end = |text, { start, budget }| {
-	scanned = Bytes.count_while(text, { keep: |c| !MdText.is_space(c) and c != '<', at: start })
-	spent = MdText.charge(budget, scanned - start)
-	url = MdText.cut(text, { start, end: scanned })
-	host_start = match Bytes.find(url, { needle: MdSafety.scheme_end }) {
-		Ok(p) => p + 3
-		Err(NotFound) => 0
-	}
-	host_end = Bytes.count_while(
-		url,
-		{ keep: |c| c != '/' and c != '?' and c != '#' and c != ':', at: host_start },
-	)
-	if !List.contains(
-		MdText.cut(url, { start: host_start, end: U64.max(host_start, host_end) }),
-		'.',
-	) {
-		{ end: Err(NotALink), budget: spent }
-	} else {
-		opens = List.count_if(url, |c| c == '(')
-		var $closes = List.count_if(url, |c| c == ')')
-		var $end = scanned
-		while $end > start {
-			c = MdText.at(text, $end - 1)
-			if List.contains(trailing_punct, c) {
-				$end = $end - 1
-			} else if c == ')' and $closes > opens {
-				$end = $end - 1
-				$closes = $closes - 1
-			} else {
-				break
-			}
-		}
-		{ end: if $end <= start + 4 Err(NotALink) else Ok($end), budget: spent }
-	}
-}
-
-## markdown_inline `emailEnd`: `local@domain.tld` at `start`, a trailing
-## `.`, `-` or `_` not its.
-email_end : List(U8),
-{ start : U64, budget : MdText.Budget } -> {
-	end : Try(U64, [NotALink]),
-	budget : MdText.Budget,
-}
-email_end = |text, { start, budget }| {
-	local_end = Bytes.count_while(text, { keep: is_email_local_char, at: start })
-	local_spent = MdText.charge(budget, local_end - start)
-	if local_end == start or local_end >= List.len(text) or MdText.at(text, local_end) != '@' {
-		{ end: Err(NotALink), budget: local_spent }
-	} else {
-		domain_start = local_end + 1
-		domain_end = Bytes.count_while(
-			text,
-			{
-				keep: |c| Ascii.is_alphanumeric(c) or c == '.' or c == '-' or c == '_',
-				at: domain_start,
-			},
-		)
-		spent = MdText.charge(local_spent, domain_end - domain_start)
-		if domain_end == domain_start or !List.contains(
-			MdText.cut(text, { start: domain_start, end: domain_end }),
-			'.',
-		) {
-			{ end: Err(NotALink), budget: spent }
-		} else {
-			var $j = domain_end
-			while $j > domain_start and List.contains(
-				[
-					'.',
-					'-',
-					'_',
-				],
-				MdText.at(text, $j - 1),
-			) {
-				$j = $j - 1
-			}
-			{ end: Ok($j), budget: spent }
-		}
-	}
-}
-
-is_email_local_char : U8 -> Bool
-is_email_local_char = |c| Ascii.is_alphanumeric(c) or c == '.' or c == '_' or c == '+' or c == '-'
-
-## markdown_inline `emitAutolink`: the link, a URL's and a `www.`'s opening
-## in a new tab, an email's as `mailto:`.
-autolink_html : List(U8), AutoKind -> List(U8)
-autolink_html = |link, kind| {
-	href = match kind {
-		Url => MdText.escape_onto(a_open, link)
-		Www => MdText.escape_onto(List.concat(a_open, Str.to_utf8("http://")), link)
-		Email => MdText.escape_onto(List.concat(a_open, Str.to_utf8("mailto:")), link)
-	}
-	head = List.join([
-		href,
-		['"'],
-		if kind == Email [] else MdSafety.external_attrs,
-		['>'],
-	])
-	List.concat(MdText.escape_onto(head, link), a_close)
-}
-
-trailing_punct : List(U8)
-trailing_punct = Str.to_utf8("?!.,:*_~'\"")
-
 msg_prefix : List(U8)
 msg_prefix = Str.to_utf8("MSG_")
-
-a_open : List(U8)
-a_open = Str.to_utf8("<a href=\"")
-
-a_close : List(U8)
-a_close = Str.to_utf8("</a>")
 
 code_open : List(U8)
 code_open = Str.to_utf8("<code>")

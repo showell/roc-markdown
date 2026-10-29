@@ -91,7 +91,11 @@ The Roc is pinned (`roc-version`): `roc` on the PATH, or `-Droc=<path>`
 
 - `package/main.roc`: the package and what it exposes.
 - `package/Md.roc`: the blocks and the render.
-- `package/MdInline.roc`: a line's inline markup and links.
+- `package/MdInline.roc`: the inline pass: a line's pieces, code spans and
+  `MSG_` references.
+- `package/MdEmphasis.roc`: the emphasis engine, CommonMark's delimiter stack.
+- `package/MdLinks.roc`: `[t](u)` links and autolinks.
+- `package/MdSafety.roc`: which hrefs are dangerous and which are external.
 - `package/MdText.roc`: lines, escaping and the work budget.
 - `package/MdFence.roc`: code fences.
 - `package/MdMedia.roc`: images and video.
