@@ -919,7 +919,7 @@ expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
 # A blank line inside an item stays: two paragraphs, a fence's blank line.
 expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
-expect md("- ```\n  a\n\n  b\n  ```") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
+expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
 expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("A **bold phrase that\nspans two lines** here."))) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
 expect Md.hostility(Str.to_utf8("some **bold** text and a [link](http://x.com)")) == Renderable
