@@ -1,18 +1,15 @@
 ## **THE ONE PLACE THE DIALECT LETS A MEMBER'S TAG THROUGH** (chat-markdown
 ## markdown_media.zig): a same-origin `<img>` or `<video>`. A tag a member
-## wrote is never passed on as written: it is REBUILT from a fixed
-## allowlist (src, alt and title for an image; src for a video; width and
-## height when all digits, which the page needs to hold the media's place
-## while it loads), each value escaped, the last of a name winning, and
-## only when its src is same-origin and root-relative. Anything else
-## (onerror=, onload=, style=, an off-site or protocol-relative src) is
-## dropped, and a tag that does not parse cleanly, or has no such src, is
-## refused whole; the caller escapes it as text. A video gains `controls`
-## and `preload="metadata"`, never autoplay. Pure, over bytes: the renderer
-## (Md, MdInline) and the Images feed (Feeds, metal-vmm QUEUE 266) ask it.
+## wrote is never passed on as written: it is scanned here, its attributes
+## by name, the last of a name winning, and REBUILT from MdSafety's
+## allowlist (`media_attrs`, which also holds the same-origin rule), each
+## value escaped (MdHtml). A tag that does not parse cleanly, or that
+## MdSafety refuses, is refused whole; the caller escapes it as text. Pure,
+## over bytes: the renderer (Md, MdInline) and the Images feed (Feeds,
+## metal-vmm QUEUE 266) ask it.
 import MdHtml
+import MdSafety
 import MdText
-import Bytes
 
 MdMedia := [].{
 
@@ -27,18 +24,8 @@ MdMedia := [].{
 	img_at : List(U8), U64 -> Try(Rebuilt, [NotSafe])
 	img_at = |raw, start| {
 		tag = scan(raw, { start, name: Str.to_utf8("img") })?
-		src = local_src(tag.attrs)?
-		texts = List.join_map(
-			[Str.to_utf8("alt"), Str.to_utf8("title")],
-			|name| match last_of(tag.attrs, name) {
-				Ok(v) => [{ name, value: Is(v) }]
-				Err(Absent) => []
-			},
-		)
-		Ok({
-			html: MdHtml.img(List.join([[src_attr(src)], texts, digit_attrs(tag.attrs)])),
-			end: tag.end,
-		})
+		attrs = MdSafety.media_attrs({ kind: Img, value_of: |name| last_of(tag.attrs, name) })?
+		Ok({ html: MdHtml.img(attrs), end: tag.end })
 	}
 
 	## markdown_media `safeVideoAt`: the `<video …></video>` pair at
@@ -48,18 +35,9 @@ MdMedia := [].{
 	video_at : List(U8), U64 -> Try(Rebuilt, [NotSafe])
 	video_at = |raw, start| {
 		tag = scan(raw, { start, name: Str.to_utf8("video") })?
-		src = local_src(tag.attrs)?
+		attrs = MdSafety.media_attrs({ kind: Video, value_of: |name| last_of(tag.attrs, name) })?
 		close = close_tag_end(raw, { at: skip_spaces(raw, tag.end), name: Str.to_utf8("video") })?
-		Ok({
-			html: MdHtml.video(
-				List.join([
-					[{ name: Str.to_utf8("controls"), value: Bare }, { name: Str.to_utf8("preload"), value: Is(Str.to_utf8("metadata")) }],
-					[src_attr(src)],
-					digit_attrs(tag.attrs),
-				]),
-			),
-			end: close,
-		})
+		Ok({ html: MdHtml.video(attrs), end: close })
 	}
 
 	## The image tag `tag` (`<img …>`, from its `<`) rebuilt, or `Unsafe`:
@@ -210,44 +188,6 @@ last_of = |attrs, name| match List.find_last(
 	Ok((_, v)) => Ok(v)
 	Err(NotFound) => Err(Absent)
 }
-
-## The src, when it is same-origin, as written (its ends' spaces kept).
-local_src : List((List(U8), List(U8))) -> Try(List(U8), [NotSafe])
-local_src = |attrs| match last_of(attrs, Str.to_utf8("src")) {
-	Ok(src) => if is_local_url(Bytes.trim(src, Bytes.zig_spaces)) Ok(src) else Err(NotSafe)
-	Err(Absent) => Err(NotSafe)
-}
-
-## Width and height, each kept only when all digits.
-digit_attrs : List((List(U8), List(U8))) -> List(MdHtml.Attr)
-digit_attrs = |attrs| List.join_map(
-	[Str.to_utf8("width"), Str.to_utf8("height")],
-	|name| match last_of(attrs, name) {
-		Ok(v) if MdText.is_all_digits(v) => [{ name, value: Is(v) }]
-		_ => []
-	},
-)
-
-src_attr : List(U8) -> MdHtml.Attr
-src_attr = |src| { name: Str.to_utf8("src"), value: Is(src) }
-
-## markdown_media `isLocalUrl`: `/` then anything but `/` or `\`, and no
-## control byte or backslash anywhere: a browser strips tabs and newlines
-## inside a URL and reads `\` as `/`, so `/\t/evil` is `//evil` (metal-vmm
-## QUEUE 172).
-is_local_url : List(U8) -> Bool
-is_local_url = |src|
-	match src {
-		[
-			'/',
-			second,
-			..,
-		] if second != '/' and second != '\\' => List.all(
-			src,
-			|c| c >= 0x20 and c != 0x7f and c != '\\',
-		)
-		_ => Bool.False
-	}
 
 # markdown_media's cases, each as its test has it.
 img : Str -> Str

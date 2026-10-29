@@ -1,16 +1,22 @@
-## **WHAT A MEMBER'S LINK MAY BECOME** (chat-markdown markdown_inline.zig's
-## `isDangerousUrl`, markdown_links.zig's `isExternalHref`): the one home of
-## the inline pass's link rules, for an audit to read alone. A link whose
-## destination a browser would run (`javascript:` and its kin) keeps its
-## label but loses its href; a `scheme://` link opens in a new tab without
-## the opener. The links themselves are found in MdLinks, which asks here.
+## **WHAT A MEMBER'S LINK OR MEDIA MAY BECOME** (chat-markdown
+## markdown_inline.zig's `isDangerousUrl`, markdown_links.zig's
+## `isExternalHref`, markdown_media.zig's `isLocalUrl` and allowlist): the
+## one home of the renderer's URL and attribute rules, for an audit to read
+## alone.
+##   - **Links** (MdLinks finds them and asks here): one whose destination a
+##     browser would run (`javascript:` and its kin) keeps its label but
+##     loses its href; a `scheme://` link opens in a new tab without the
+##     opener.
+##   - **Media** (MdMedia scans a member's `<img>` or `<video>` and asks
+##     here): the tag is rebuilt from an allowlist, and only when its src is
+##     same-origin and root-relative. Anything else (onerror=, onload=,
+##     style=, an off-site or protocol-relative src) is dropped.
 ##
-## The dialect's other safety rules have their own homes: every byte a
-## member wrote is escaped (MdText), and the one tag a member may write, a
-## same-origin `<img>` or `<video>`, is rebuilt from an allowlist (MdMedia).
-## Pure.
+## The other safety rule has its own home: every byte a member wrote is
+## escaped (MdText). Pure.
 import Ascii
 import Bytes
+import MdHtml
 import MdText
 
 MdSafety := [].{
@@ -66,11 +72,76 @@ MdSafety := [].{
 		Err(NotFound) => Bool.False
 	}
 
+	## markdown_media's allowlist: the attributes a member's `<img>` or
+	## `<video>` is rebuilt with, in order, `value_of` giving the tag's last
+	## value of a name; `NotSafe` when its src is no same-origin path
+	## (`is_local_url`). An image keeps its src, alt and title; a video its
+	## src, and is a player: `controls` and `preload="metadata"`, never
+	## autoplay. Both keep width and height when all digits, which the page
+	## needs to hold the media's place while it loads.
+	media_attrs : {
+		kind : [Img, Video],
+		value_of : List(U8) -> Try(List(U8), [Absent]),
+	} -> Try(List(MdHtml.Attr), [NotSafe])
+	media_attrs = |{ kind, value_of }| {
+		src = match value_of(Str.to_utf8("src")) {
+			Ok(v) => v
+			Err(Absent) => return Err(NotSafe)
+		}
+		if !MdSafety.is_local_url(Bytes.trim(src, Bytes.zig_spaces)) {
+			Err(NotSafe)
+		} else {
+			kept = |names, keep| List.join_map(
+				names,
+				|name| match value_of(name) {
+					Ok(v) if keep(v) => [{ name, value: Is(v) }]
+					_ => []
+				},
+			)
+			player = if kind == Video video_player else []
+			texts = if kind == Img kept([Str.to_utf8("alt"), Str.to_utf8("title")], |_| Bool.True) else []
+			# The src as written, its ends' spaces kept.
+			Ok(
+				List.join([
+					player,
+					[{ name: Str.to_utf8("src"), value: Is(src) }],
+					texts,
+					kept([Str.to_utf8("width"), Str.to_utf8("height")], MdText.is_all_digits),
+				]),
+			)
+		}
+	}
+
+	## markdown_media `isLocalUrl`: `/` then anything but `/` or `\`, and no
+	## control byte or backslash anywhere: a browser strips tabs and newlines
+	## inside a URL and reads `\` as `/`, so `/\t/evil` is `//evil` (metal-vmm
+	## QUEUE 172).
+	is_local_url : List(U8) -> Bool
+	is_local_url = |src|
+		match src {
+			[
+				'/',
+				second,
+				..,
+			] if second != '/' and second != '\\' => List.all(
+				src,
+				|c| c >= 0x20 and c != 0x7f and c != '\\',
+			)
+			_ => Bool.False
+		}
+
 	## The `://` that ends a URL's scheme: what makes a link external here,
 	## and where an autolink's host starts (MdLinks).
 	scheme_end : List(U8)
 	scheme_end = Str.to_utf8("://")
 }
+
+## A video is a player the reader starts: never autoplay.
+video_player : List(MdHtml.Attr)
+video_player = [
+	{ name: Str.to_utf8("controls"), value: Bare },
+	{ name: Str.to_utf8("preload"), value: Is(Str.to_utf8("metadata")) },
+]
 
 dangerous_schemes : List(Str)
 dangerous_schemes = [
