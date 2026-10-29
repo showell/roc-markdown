@@ -677,12 +677,11 @@ list_onto = |
 			wrap,
 			budget: $budget,
 		})?
-		$out = List.join([
-			$out,
-			Str.to_utf8("<li>"),
-			inner.out,
-			Str.to_utf8("</li>\n"),
-		])
+		# Appended in place, `$out` unique and first: a List.join of it
+		# copies every byte so far, once an item.
+		$out = List.concat($out, Str.to_utf8("<li>"))
+		$out = List.concat($out, inner.out)
+		$out = List.concat($out, Str.to_utf8("</li>\n"))
 		$budget = inner.budget
 	}
 	close = match first.kind {
