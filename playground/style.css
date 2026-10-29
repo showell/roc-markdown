@@ -1,0 +1,109 @@
+:root {
+  --bg: #fdfdfc;
+  --fg: #1d1f21;
+  --muted: #6a6f75;
+  --line: #d6d8da;
+  --panel: #f3f4f5;
+  --accent: #2d5fa8;
+  --bad: #b3261e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17191b;
+    --fg: #e4e6e8;
+    --muted: #9aa0a6;
+    --line: #3a3e42;
+    --panel: #212427;
+    --accent: #8ab4f8;
+    --bad: #f28b82;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+header h1 { font-size: 17px; margin: 0; }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 10px; }
+legend { float: left; margin-right: 6px; color: var(--muted); padding: 0; }
+select { font: inherit; }
+#caption { margin: 6px 16px 0; color: var(--muted); min-height: 1.45em; }
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 8px 16px;
+  min-height: 0;
+}
+#source, #output {
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: auto;
+}
+#source {
+  width: 100%;
+  resize: none;
+  padding: 10px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  tab-size: 4;
+}
+#output { padding: 0 12px; }
+#html {
+  margin: 10px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font: 12px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+footer { padding: 4px 16px 10px; border-top: 1px solid var(--line); }
+#answers { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 0; }
+#answers dt { color: var(--muted); }
+#answers dt::after { content: ":"; }
+#answers dd { margin: 0 14px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
+#hostility.hostile, #error { color: var(--bad); }
+.legend { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+a { color: var(--accent); }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; }
+  #source { min-height: 220px; }
+}
+
+/* The rendered message: the tags package/MdHtml.roc writes. */
+.md code, .md pre {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  background: var(--panel);
+}
+.md code { padding: 0 3px; border-radius: 3px; }
+.md pre { padding: 8px 10px; border-radius: 4px; overflow-x: auto; }
+.md pre code { padding: 0; background: none; }
+.md pre.chat-quote {
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre-wrap;
+  border-left: 3px solid var(--accent);
+}
+.md blockquote { margin: 8px 0; padding: 0 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.md table { border-collapse: collapse; margin: 8px 0; }
+.md th, .md td { border: 1px solid var(--line); padding: 3px 8px; }
+.md th { background: var(--panel); }
+.md img, .md video { max-width: 100%; }
+.md a.msg-ref { font-family: ui-monospace, Menlo, Consolas, monospace; }

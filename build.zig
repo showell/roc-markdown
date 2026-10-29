@@ -83,15 +83,16 @@ pub fn build(b: *std.Build) void {
 
     // The playground's wasm in node, held to the frozen answers
     // (playground/check.zig), and its page run on a stand-in DOM.
+    const paths_mod = paths.createModule();
     const judge_lib = b.createModule(.{ .root_source_file = b.path("judge/judge.zig"), .target = target, .optimize = optimize });
-    judge_lib.addImport("judge_paths", paths.createModule());
+    judge_lib.addImport("judge_paths", paths_mod);
     const play_mod = b.createModule(.{
         .root_source_file = b.path("playground/check.zig"),
         .target = target,
         .optimize = optimize,
     });
     play_mod.addImport("judge", judge_lib);
-    play_mod.addImport("judge_paths", paths.createModule());
+    play_mod.addImport("judge_paths", paths_mod);
     const play_exe = b.addExecutable(.{ .name = "playground_check", .root_module = play_mod });
     const play_checked = b.addRunArtifact(play_exe);
     play_checked.addArg(b.findProgram(.{ .names = &.{"node"} }) orelse std.process.fatal("the playground's test runs its wasm in node, and there is no `node` on the PATH", .{}));
