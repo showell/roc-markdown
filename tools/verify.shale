@@ -11,7 +11,8 @@
 -- at with `--data`, and roc-chat is checked out there too.
 --
 -- The checks:
---   - `zig build test`: the package's expects, then the judge, whose count
+--   - `zig build test`: the package's expects, the judge, and the REPL
+--     piped against the frozen answers (judge/repl_check.zig); the judge's count
 --     a corpus must be exactly what `want` says: a different number is a
 --     FAIL, never a pass;
 --   - the paren and table shapes linear in their work units, and a ragged
@@ -31,9 +32,9 @@
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
 -- Each corpus's case count, exactly.
-const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, spec_tables = 8, pinned = 3, hostile = 1032}
-const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "spec_tables", "pinned", "hostile"}
-const want_total = 1413
+const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, spec_tables = 8, pinned = 3, examples = 4, hostile = 1032}
+const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "spec_tables", "pinned", "examples", "hostile"}
+const want_total = 1417
 const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
 const scratch_data = ".zig-cache/verify/data"
@@ -91,6 +92,9 @@ for label in want_order do
   say(n == want[label] and p == n, "cases: " .. label .. " " .. p .. "/" .. n .. " (want " .. want[label] .. ")")
 end
 say(total == want_total, "cases in all: " .. total .. " (want " .. want_total .. ")")
+-- The REPL, piped, against the frozen answers (judge/repl_check.zig).
+local rl = re_find(t.out, "== repl: [^\n]*")
+say(rl ~= nil and re_find(rl.text, " 0 fail$") ~= nil, "the REPL: " .. (rl ~= nil and sub(rl.text, 9) or "no `== repl` line"))
 
 -- ── the paren and table shapes stay linear (QUEUE 311) ──
 -- Each shape's work units at 8,191 against its units at 1,000: linear is

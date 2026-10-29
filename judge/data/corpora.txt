@@ -8,3 +8,6 @@ spec_agree.jsonl
 spec_tables.jsonl
 # Pinned departures from CommonMark (each its own note).
 pinned.jsonl
+# The REPL's canned examples (judge/repl.zig: `:examples`), each
+# {"id", "caption", "md"}, dense with the dialect's features.
+examples.jsonl

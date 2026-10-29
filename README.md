@@ -87,6 +87,53 @@ shale tools/verify.shale               # every check, the planted faults, a chec
 The Roc is pinned (`roc-version`): `roc` on the PATH, or `-Droc=<path>`
 (showell/roc-apps release `toolchain-2026-10-27` carries it).
 
+## The REPL
+
+`zig build repl` renders markdown as you type it: each block's html, its
+work units and its hostility verdict (`Renderable`, or `TooMuchFormatting`
+with the words the chat refuses the message with). It calls the package
+through the judge's seam (`judge/answers.roc`), so it shows what the judge
+holds. The program is `judge/repl.zig`.
+
+- **A block** is the lines you type, each with its newline, up to an empty
+  line. A block with empty lines inside (a loose list, a fence) begins with
+  an empty line, and two empty lines in a row end it. `:load PATH` takes a
+  file's bytes exactly. End of input ends the last block and quits.
+- **A command** is a line starting with `:` where a block would begin:
+
+  ```
+  :mode             the mode now
+  :mode chat        Md.render: the chat's, with its budget (the start)
+  :mode trusted     Md.render_trusted: docs, no budget
+  :mode reflow      Md.render_trusted_reflow: docs, newlines as spaces
+  :examples         the canned examples, each named with its caption
+  :ex NAME          one example: its source, then its answer
+  :load PATH        a file's bytes, exactly (PATH from the repo's root)
+  :help             the commands
+  :quit             quit (so does end of input)
+  ```
+
+- **Piped, it is plain:** no banner, no prompts, a mode switch silent, and a
+  command that fails stops the run (exit 1).
+
+  ```
+  $ printf '**hi**\n\n' | zig build repl
+  <p><strong>hi</strong></p>
+  work units: 16
+  hostility: Renderable
+  ```
+
+- **The canned examples** are `judge/data/examples.jsonl`, one
+  `{"id", "caption", "md"}` a line: a dense example each of the inline
+  styles, the blocks, the hard wraps and the escaping, each caption saying
+  where the dialect departs from GitHub's. They are a corpus of the judge, so
+  their answers are frozen (`examples.answers.jsonl`); a change that moves
+  one is a re-freeze (`--refreeze examples`).
+- **Its test** (`judge/repl_check.zig`, in `zig build test`) pipes a table,
+  a list and a fence with empty lines inside, every canned example and a
+  hostile shape through the REPL in each mode, and holds its output byte for
+  byte to the frozen answers.
+
 ## Layout
 
 - `package/main.roc`: the package and what it exposes.

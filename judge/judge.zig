@@ -63,18 +63,17 @@ const hostile_answers_path = "hostile.answers.jsonl";
 const spec_labels = [_][]const u8{ "spec_agree", "spec_tables" };
 const spec_diverge_path = "spec_diverge.txt";
 
-/// The five answers, in judge/answers.roc's order.
-const Part = enum { render, work_units, hostile_reason, trusted, trusted_reflow };
+const Part = roc.Part;
 const part_count = std.enums.values(Part).len;
 const Answers = [part_count][]const u8;
 
 /// A case; `html`, where a corpus has it, is another renderer's answer (the
 /// spec's, for the spec check), never the frozen one.
-const Case = struct { id: []const u8, md: []const u8, html: ?[]const u8 = null };
+pub const Case = struct { id: []const u8, md: []const u8, html: ?[]const u8 = null };
 
 /// A case's answers as its corpus's answers file records them: each html
 /// as its text, or (a generated corpus's) as its hash, never both.
-const Frozen = struct {
+pub const Frozen = struct {
     id: []const u8,
     md_hash: []const u8,
     html: ?[]const u8 = null,
@@ -96,7 +95,7 @@ const Wants = [part_count]Want;
 const Keep = enum { whole, hashed };
 
 /// A corpus's answers, by case id.
-const Book = std.StringHashMapUnmanaged(Frozen);
+pub const Book = std.StringHashMapUnmanaged(Frozen);
 
 /// A case's verdict: the parts that differ, a package that gave the wrong
 /// number of answers, or a case the answers do not cover. (A Roc crash
@@ -167,7 +166,7 @@ fn wantOf(id: []const u8, part: []const u8, text: ?[]const u8, hash: ?[]const u8
 
 /// A text named by its hash: a case's, so a frozen answer knows its case,
 /// and a generated case's html.
-fn textHash(a: std.mem.Allocator, text: []const u8) ![]const u8 {
+pub fn textHash(a: std.mem.Allocator, text: []const u8) ![]const u8 {
     return std.fmt.allocPrint(a, "{x:0>16}", .{std.hash.Wyhash.hash(0, text)});
 }
 
@@ -231,7 +230,7 @@ fn judgeFrozenCases(arena: *std.heap.ArenaAllocator, label: []const u8, cases: [
 
 /// The cases of a jsonl corpus, `path` in `dir`, in `a`. An id twice is
 /// refused: an answer is found by its case's id.
-fn readCorpus(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) ![]Case {
+pub fn readCorpus(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) ![]Case {
     const data = dir.readFileAlloc(io, path, a, .unlimited) catch |e| {
         std.debug.print("cannot read the corpus {s}: {s}\n", .{ path, @errorName(e) });
         return e;
@@ -258,7 +257,7 @@ fn readCorpus(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) ![]Ca
 
 /// A corpus's answers file, `path` in `dir`, by id, in `a`; null when there
 /// is none yet.
-fn readAnswers(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) !?Book {
+pub fn readAnswers(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) !?Book {
     const data = dir.readFileAlloc(io, path, a, .unlimited) catch |e| switch (e) {
         error.FileNotFound => return null,
         else => {
@@ -559,7 +558,7 @@ const deep_sizes = [_]usize{ 1, 10, 100, 1000, 8191 };
 /// Every shape at every size, and the two shapes that are no repeat: a list
 /// whose every line indents one level more (the nesting cap), and a run of
 /// backtick runs each one longer (cmark's "backticks").
-fn hostileCases(a: std.mem.Allocator) ![]Case {
+pub fn hostileCases(a: std.mem.Allocator) ![]Case {
     var cases: std.ArrayList(Case) = .empty;
     const lists = [_]struct { shapes: []const Shape, sizes: []const usize }{
         .{ .shapes = &shapes, .sizes = &sizes },

@@ -7,6 +7,7 @@ const std = @import("std");
 ///
 ///   zig build test                     roc test, then the judge
 ///   zig build judge -- --also <gold>   the judge, with a private corpus
+///   zig build repl                     markdown at a prompt, or piped
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -34,6 +35,19 @@ pub fn build(b: *std.Build) void {
     judge.has_side_effects = true;
     b.step("judge", "Every corpus through the package, held to its frozen answers (-- --also <corpus>, --raise, --time)").dependOn(&judge.step);
 
+    // **THE PACKAGE AT A PROMPT** (judge/repl.zig): the judge's seam, the
+    // same archive, at a terminal or a pipe.
+    const repl_mod = b.createModule(.{
+        .root_source_file = b.path("judge/repl.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    repl_mod.addObjectFile(answers);
+    const repl_exe = b.addExecutable(.{ .name = "repl", .root_module = repl_mod });
+    const repl = b.addRunArtifact(repl_exe);
+    repl.stdio = .inherit;
+    b.step("repl", "Type markdown, see the package's answers (:help at the prompt)").dependOn(&repl.step);
+
     // **ONE COMMAND RUNS EVERY TEST**: the package's own expects, then the
     // judge over the committed corpora.
     const tests = b.step("test", "Every test: roc test package/main.roc, then the judge");
@@ -46,6 +60,21 @@ pub fn build(b: *std.Build) void {
     judged.has_side_effects = true;
     judged.step.dependOn(&roc_test.step);
     tests.dependOn(&judged.step);
+
+    // The REPL, piped, against the judge's frozen answers
+    // (judge/repl_check.zig).
+    const check_mod = b.createModule(.{
+        .root_source_file = b.path("judge/repl_check.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    check_mod.addImport("judge_paths", paths.createModule());
+    const check_exe = b.addExecutable(.{ .name = "repl_check", .root_module = check_mod });
+    const repl_checked = b.addRunArtifact(check_exe);
+    repl_checked.addArtifactArg(repl_exe);
+    repl_checked.has_side_effects = true;
+    repl_checked.step.dependOn(&roc_test.step);
+    tests.dependOn(&repl_checked.step);
 }
 
 /// judge/data, absolute (0.17 removed `b.pathFromRoot`).

@@ -47,6 +47,9 @@ const RocBytesList = extern struct {
     }
 };
 
+/// The five answers, in judge/answers.roc's order.
+pub const Part = enum { render, work_units, hostile_reason, trusted, trusted_reflow };
+
 extern fn roc_judge_answers(md: RocBytes) callconv(.c) RocBytesList;
 
 var arena: ?std.heap.ArenaAllocator = null;
