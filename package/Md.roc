@@ -28,6 +28,7 @@ import Ascii
 import Bytes
 import MdText
 import MdFence
+import MdHtml
 import MdInline
 import MdList
 import MdMedia
@@ -89,7 +90,7 @@ Md := [].{
 	## What a hostile message renders as: an escaped paragraph, the client
 	## free to style `.md-malformed`.
 	malformed_html : List(U8)
-	malformed_html = Str.to_utf8("<p class=\"md-malformed\">⚠️ malformed markdown — not rendered</p>\n")
+	malformed_html = MdHtml.malformed
 }
 
 rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget } -> List(U8)
@@ -136,12 +137,12 @@ blocks_onto = |
 	if depth > max_block_depth {
 		start = if out != [] and List.last(out) != Ok('\n') List.append(out, '\n') else out
 		flat = MdInline.render_onto({
-			out: List.concat(start, p_open),
+			out: List.concat(start, MdHtml.p_open),
 			text: md,
 			refs: Linked,
 			budget,
 		})?
-		Ok({ out: List.concat(flat.out, p_close), budget: flat.budget })
+		Ok({ out: List.concat(flat.out, MdHtml.p_close), budget: flat.budget })
 	} else {
 		len = List.len(md)
 		# A container's content is blocks one level deeper, in this render's
@@ -190,32 +191,13 @@ blocks_onto = |
 					Err(NotAFence) =>
 						match atx_heading(line) {
 							Ok(h) => {
-								digit = '0' + h.level.to_u8_wrap()
 								heading = MdInline.render_onto({
-									out: List.concat(
-										tight_sep($out, spacing),
-										[
-											'<',
-											'h',
-											digit,
-											'>',
-										],
-									),
+									out: List.concat(tight_sep($out, spacing), MdHtml.heading_open(h.level)),
 									text: h.content,
 									refs: Linked,
 									budget: $budget,
 								})?
-								$out = List.concat(
-									heading.out,
-									[
-										'<',
-										'/',
-										'h',
-										digit,
-										'>',
-										'\n',
-									],
-								)
+								$out = List.concat(heading.out, MdHtml.heading_close(h.level))
 								$budget = heading.budget
 								$pos = next
 							}
@@ -332,7 +314,7 @@ paragraph_onto = |
 	},
 | {
 	len = List.len(md)
-	var $out = if spacing == Tight out else List.concat(out, Str.to_utf8("<p>"))
+	var $out = if spacing == Tight out else List.concat(out, MdHtml.p_open)
 	var $budget = budget
 	var $reflow = []
 	var $first = Bool.True
@@ -358,7 +340,7 @@ paragraph_onto = |
 			)
 		} else {
 			wrapped = MdInline.render_onto({
-				out: if $first $out else List.concat($out, br),
+				out: if $first $out else List.concat($out, MdHtml.br),
 				text: MdText.trim_line(line),
 				refs: Linked,
 				budget: $budget,
@@ -382,7 +364,7 @@ paragraph_onto = |
 		{}
 	}
 	Ok({
-		out: if spacing == Tight $out else List.concat($out, p_close),
+		out: if spacing == Tight $out else List.concat($out, MdHtml.p_close),
 		budget: $budget,
 		after: $p,
 	})
@@ -442,20 +424,10 @@ fence_onto = |
 	}
 	content = MdText.cut(md, { start: body_start, end: $content_end })
 	is_quote = open.lang == Str.to_utf8("quote")
-	head =
-		if is_quote {
-			Str.to_utf8("<pre class=\"chat-quote\">")
-		} else if open.lang == [] {
-			Str.to_utf8("<pre><code>")
-		} else {
-			List.concat(
-				MdText.escape_onto(Str.to_utf8("<pre><code class=\"language-"), open.lang),
-				['"', '>'],
-			)
-		}
+	(head, tail) = if is_quote (MdHtml.chat_quote_open, MdHtml.chat_quote_close) else (MdHtml.code_block_open(open.lang), MdHtml.code_block_close)
 	code = code_lines_onto(List.concat(out, head), { content, indent: open.indent })
 	{
-		out: List.concat(code, Str.to_utf8(if is_quote "</pre>\n" else "</code></pre>\n")),
+		out: List.concat(code, tail),
 		budget: MdText.charge(budget, List.len(content)),
 		after: $after,
 	}
@@ -577,17 +549,17 @@ table_onto = |out, { md, pos, budget }| match table_at(md, pos) {
 	Ok(table) => {
 		len = List.len(md)
 		head = row_onto(
-			List.concat(out, Str.to_utf8("<table>\n<thead>\n")),
+			List.concat(out, MdHtml.table_open),
 			{ cells: table.header, aligns: table.aligns, tag: Th, budget },
 		)?
-		var $out = List.concat(head.out, Str.to_utf8("</thead>\n"))
+		var $out = List.concat(head.out, MdHtml.thead_close)
 		var $budget = head.budget
 		var $rows = 0
 		var $p = table.body
 		while $p < len and !is_block_start(md, $p) {
 			eol = MdText.line_end(md, $p)
 			row = row_onto(
-				if $rows == 0 List.concat($out, Str.to_utf8("<tbody>\n")) else $out,
+				if $rows == 0 List.concat($out, MdHtml.tbody_open) else $out,
 				{
 					cells: MdTable.cells(MdText.cut(md, { start: $p, end: eol })),
 					aligns: table.aligns,
@@ -601,7 +573,7 @@ table_onto = |out, { md, pos, budget }| match table_at(md, pos) {
 			$p = MdText.next_line(md, eol)
 		}
 		Ok({
-			out: List.concat($out, Str.to_utf8(if $rows == 0 "</table>\n" else "</tbody>\n</table>\n")),
+			out: List.concat(if $rows == 0 $out else List.concat($out, MdHtml.tbody_close), MdHtml.table_close),
 			budget: $budget,
 			after: $p,
 		})
@@ -618,7 +590,7 @@ row_onto : List(U8),
 	budget : MdText.Budget,
 } -> Try(MdText.Rendered, [Hostile])
 row_onto = |out, { cells, aligns, tag, budget }| {
-	var $out = List.concat(out, Str.to_utf8("<tr>\n"))
+	var $out = List.concat(out, MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
 	var $k = 0
 	for align in aligns {
@@ -629,29 +601,16 @@ row_onto = |out, { cells, aligns, tag, budget }| {
 			{}
 		}
 		cell = MdInline.render_onto({
-			out: List.concat($out, cell_open(tag, align)),
+			out: List.concat($out, MdHtml.cell_open(tag, align)),
 			text: List.get(cells, $k) ?? [],
 			refs: Linked,
 			budget: $budget,
 		})?
-		$out = List.concat(cell.out, Str.to_utf8(if tag == Th "</th>\n" else "</td>\n"))
+		$out = List.concat(cell.out, MdHtml.cell_close(tag))
 		$budget = cell.budget
 		$k = $k + 1
 	}
-	Ok({ out: List.concat($out, Str.to_utf8("</tr>\n")), budget: $budget })
-}
-
-## `<th>` or `<td>`, with GFM's `align` when the column has one.
-cell_open : [Th, Td], MdTable.Align -> List(U8)
-cell_open = |tag, align| {
-	name = if tag == Th "<th" else "<td"
-	attr = match align {
-		Plain => ""
-		Left => " align=\"left\""
-		Center => " align=\"center\""
-		Right => " align=\"right\""
-	}
-	List.append(List.concat(Str.to_utf8(name), Str.to_utf8(attr)), '>')
+	Ok({ out: List.concat($out, MdHtml.tr_close), budget: $budget })
 }
 
 # ── raw HTML ──
@@ -734,15 +693,6 @@ html_tag_end = |t| {
 
 heading_space : List(U8)
 heading_space = [' ', '\t']
-
-p_open : List(U8)
-p_open = Str.to_utf8("<p>")
-
-p_close : List(U8)
-p_close = Str.to_utf8("</p>\n")
-
-br : List(U8)
-br = Str.to_utf8("<br>\n")
 
 md : Str -> Str
 md = |text| Str.from_utf8(Md.render(Str.to_utf8(text))) ?? "not text"

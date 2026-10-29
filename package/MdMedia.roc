@@ -10,6 +10,7 @@
 ## refused whole; the caller escapes it as text. A video gains `controls`
 ## and `preload="metadata"`, never autoplay. Pure, over bytes: the renderer
 ## (Md, MdInline) and the Images feed (Feeds, metal-vmm QUEUE 266) ask it.
+import MdHtml
 import MdText
 import Bytes
 
@@ -27,22 +28,15 @@ MdMedia := [].{
 	img_at = |raw, start| {
 		tag = scan(raw, { start, name: Str.to_utf8("img") })?
 		src = local_src(tag.attrs)?
-		dims = digit_attrs(tag.attrs)
 		texts = List.join_map(
 			[Str.to_utf8("alt"), Str.to_utf8("title")],
 			|name| match last_of(tag.attrs, name) {
-				Ok(v) => attr(name, v)
+				Ok(v) => [{ name, value: Is(v) }]
 				Err(Absent) => []
 			},
 		)
 		Ok({
-			html: List.join([
-				Str.to_utf8("<img"),
-				attr(Str.to_utf8("src"), src),
-				texts,
-				dims,
-				['>'],
-			]),
+			html: MdHtml.img(List.join([[src_attr(src)], texts, digit_attrs(tag.attrs)])),
 			end: tag.end,
 		})
 	}
@@ -57,12 +51,13 @@ MdMedia := [].{
 		src = local_src(tag.attrs)?
 		close = close_tag_end(raw, { at: skip_spaces(raw, tag.end), name: Str.to_utf8("video") })?
 		Ok({
-			html: List.join([
-				Str.to_utf8("<video controls preload=\"metadata\""),
-				attr(Str.to_utf8("src"), src),
-				digit_attrs(tag.attrs),
-				Str.to_utf8("></video>"),
-			]),
+			html: MdHtml.video(
+				List.join([
+					[{ name: Str.to_utf8("controls"), value: Bare }, { name: Str.to_utf8("preload"), value: Is(Str.to_utf8("metadata")) }],
+					[src_attr(src)],
+					digit_attrs(tag.attrs),
+				]),
+			),
 			end: close,
 		})
 	}
@@ -224,14 +219,17 @@ local_src = |attrs| match last_of(attrs, Str.to_utf8("src")) {
 }
 
 ## Width and height, each kept only when all digits.
-digit_attrs : List((List(U8), List(U8))) -> List(U8)
+digit_attrs : List((List(U8), List(U8))) -> List(MdHtml.Attr)
 digit_attrs = |attrs| List.join_map(
 	[Str.to_utf8("width"), Str.to_utf8("height")],
 	|name| match last_of(attrs, name) {
-		Ok(v) if MdText.is_all_digits(v) => attr(name, v)
+		Ok(v) if MdText.is_all_digits(v) => [{ name, value: Is(v) }]
 		_ => []
 	},
 )
+
+src_attr : List(U8) -> MdHtml.Attr
+src_attr = |src| { name: Str.to_utf8("src"), value: Is(src) }
 
 ## markdown_media `isLocalUrl`: `/` then anything but `/` or `\`, and no
 ## control byte or backslash anywhere: a browser strips tabs and newlines
@@ -250,20 +248,6 @@ is_local_url = |src|
 		)
 		_ => Bool.False
 	}
-
-## ` name="value"`, the value escaped.
-attr : List(U8), List(U8) -> List(U8)
-attr = |name, value| List.append(
-	MdText.escape_onto(
-		List.join([
-			[' '],
-			name,
-			['=', '"'],
-		]),
-		value,
-	),
-	'"',
-)
 
 # markdown_media's cases, each as its test has it.
 img : Str -> Str

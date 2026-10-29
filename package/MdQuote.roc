@@ -12,6 +12,7 @@
 ## `is_table_at`. Md stays the one home of each, and a quote reads in one
 ## module.
 import Bytes
+import MdHtml
 import MdText
 
 MdQuote := [].{
@@ -80,13 +81,13 @@ MdQuote := [].{
 			$p = MdText.next_line(md, eol)
 		}
 		quoted = nested({
-			out: List.concat(out, Str.to_utf8("<blockquote>\n")),
+			out: List.concat(out, MdHtml.blockquote_open),
 			md: $inner,
 			spacing: Loose,
 			budget,
 		})?
 		Ok({
-			out: List.concat(quoted.out, Str.to_utf8("</blockquote>\n")),
+			out: List.concat(quoted.out, MdHtml.blockquote_close),
 			budget: quoted.budget,
 			after: $p,
 		})

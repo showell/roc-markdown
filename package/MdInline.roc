@@ -15,6 +15,7 @@
 ## Zig refuses is a message this refuses.
 import Ascii
 import Bytes
+import MdHtml
 import MdText
 import MdMedia
 import MdEmphasis
@@ -66,7 +67,7 @@ MdInline := [].{
 						{
 							run_start: $run_start,
 							at: $i,
-							token: Html(msg_ref(MdText.cut(text, { start: $i + 4, end }))),
+							token: Html(MdHtml.msg_ref({ slug: MdText.cut(text, { start: $i + 4, end }), label: MdText.cut(text, { start: $i, end }) })),
 						},
 					)
 					$i = end
@@ -124,8 +125,8 @@ MdInline := [].{
 										at: $i,
 										token: Html(
 											List.concat(
-												MdText.escape_onto(code_open, code),
-												code_close,
+												MdText.escape_onto(MdHtml.code_open, code),
+												MdHtml.code_close,
 											),
 										),
 									},
@@ -172,7 +173,7 @@ MdInline := [].{
 									{
 										run_start: $run_start,
 										at: $i,
-										token: Html(List.concat(label.out, MdLinks.link_close)),
+										token: Html(List.concat(label.out, MdHtml.link_close)),
 									},
 								)
 								$i = link.end
@@ -338,17 +339,6 @@ msg_ref_end = |text, i| {
 	}
 }
 
-## markdown_links `appendMsgRef`: the reference's link. Its slug grammar has
-## no byte HTML gives a meaning, so it is written as it is.
-msg_ref : List(U8) -> List(U8)
-msg_ref = |slug| List.join([
-	Str.to_utf8("<a href=\"#msg-"),
-	slug,
-	Str.to_utf8("\" class=\"msg-ref\">MSG_"),
-	slug,
-	Str.to_utf8("</a>"),
-])
-
 # ── code spans ──
 
 ## markdown_inline `codeSpanAt`: the backtick run at `at` closed by a run of
@@ -415,12 +405,6 @@ code_span_content = |content| {
 
 msg_prefix : List(U8)
 msg_prefix = Str.to_utf8("MSG_")
-
-code_open : List(U8)
-code_open = Str.to_utf8("<code>")
-
-code_close : List(U8)
-code_close = Str.to_utf8("</code>")
 
 inline : Str -> Str
 inline = |text| match MdInline.render_onto({

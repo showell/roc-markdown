@@ -1,8 +1,8 @@
 ## **LINKS AND AUTOLINKS** (chat-markdown markdown_inline.zig's `mdLinkAt`,
 ## `autolinkAt` and their scans): where a `[label](url)` link or a GFM
 ## autolink (`http://…`, `https://…`, `www.…`, `local@domain.tld`) stands in
-## a line, and the `<a>` each becomes. Which hrefs are dangerous and which
-## open in a new tab is MdSafety's; a link's label is the inline pass's
+## a line, and the `<a>` each becomes (its tags MdHtml's). Which hrefs are
+## dangerous and which open in a new tab is MdSafety's; a link's label is the inline pass's
 ## (MdInline), which renders it as it renders a line. Pure.
 ##
 ## **LINEAR BY ITS CURSORS**: the first `]` ahead (`rb`), the line's paren
@@ -13,6 +13,7 @@
 ## budget, the Zig's charges unit for unit.
 import Ascii
 import Bytes
+import MdHtml
 import MdText
 import MdSafety
 
@@ -108,19 +109,10 @@ MdLinks := [].{
 	## A `[label](url)` link's opening tag: its href dropped when dangerous,
 	## and a new tab when external (MdSafety's rules both).
 	link_open : List(U8) -> List(U8)
-	link_open = |url| {
-		href = if MdSafety.is_dangerous_url(url) a_open else MdText.escape_onto(a_open, url)
-		List.join([
-			href,
-			['"'],
-			if MdSafety.is_external_href(url) MdSafety.external_attrs else [],
-			['>'],
-		])
-	}
-
-	## A link's closing tag.
-	link_close : List(U8)
-	link_close = Str.to_utf8("</a>")
+	link_open = |url| MdHtml.link_open({
+		href: if MdSafety.is_dangerous_url(url) [] else url,
+		tab: if MdSafety.is_external_href(url) NewTab else SameTab,
+	})
 
 	## markdown_inline `autolinkBoundary`: an autolink starts only at the line's
 	## start, or after a space or one of `*`, `_`, `~` and `(`.
@@ -209,18 +201,12 @@ MdLinks := [].{
 	## in a new tab, an email's as `mailto:`.
 	autolink_html : List(U8), AutoKind -> List(U8)
 	autolink_html = |link, kind| {
-		href = match kind {
-			Url => MdText.escape_onto(a_open, link)
-			Www => MdText.escape_onto(List.concat(a_open, Str.to_utf8("http://")), link)
-			Email => MdText.escape_onto(List.concat(a_open, Str.to_utf8("mailto:")), link)
+		head = match kind {
+			Url => MdHtml.link_open({ href: link, tab: NewTab })
+			Www => MdHtml.link_open({ href: List.concat(Str.to_utf8("http://"), link), tab: NewTab })
+			Email => MdHtml.link_open({ href: List.concat(Str.to_utf8("mailto:"), link), tab: SameTab })
 		}
-		head = List.join([
-			href,
-			['"'],
-			if kind == Email [] else MdSafety.external_attrs,
-			['>'],
-		])
-		List.concat(MdText.escape_onto(head, link), MdLinks.link_close)
+		List.concat(MdText.escape_onto(head, link), MdHtml.link_close)
 	}
 }
 
@@ -344,6 +330,3 @@ is_email_local_char = |c| Ascii.is_alphanumeric(c) or c == '.' or c == '_' or c 
 
 trailing_punct : List(U8)
 trailing_punct = Str.to_utf8("?!.,:*_~'\"")
-
-a_open : List(U8)
-a_open = Str.to_utf8("<a href=\"")

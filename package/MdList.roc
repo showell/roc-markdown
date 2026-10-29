@@ -13,6 +13,7 @@
 ## module.
 import Ascii
 import Bytes
+import MdHtml
 import MdText
 
 MdList := [].{
@@ -187,9 +188,8 @@ MdList := [].{
 		}
 		items = if $have_item List.append($items, $cur) else $items
 		open = match first.kind {
-			Ordered(o) if o.start == 1 => Str.to_utf8("<ol>\n")
-			Ordered(o) => Str.to_utf8("<ol start=\"${o.start.to_str()}\">\n")
-			Bullet(_) => Str.to_utf8("<ul>\n")
+			Ordered(o) => MdHtml.ol_open(o.start)
+			Bullet(_) => MdHtml.ul_open
 		}
 		var $out = List.concat(out, open)
 		var $budget = budget
@@ -205,14 +205,14 @@ MdList := [].{
 			})?
 			# Appended in place, `$out` unique and first: a List.join of it
 			# copies every byte so far, once an item.
-			$out = List.concat($out, Str.to_utf8("<li>"))
+			$out = List.concat($out, MdHtml.li_open)
 			$out = List.concat($out, inner.out)
-			$out = List.concat($out, Str.to_utf8("</li>\n"))
+			$out = List.concat($out, MdHtml.li_close)
 			$budget = inner.budget
 		}
 		close = match first.kind {
-			Ordered(_) => Str.to_utf8("</ol>\n")
-			Bullet(_) => Str.to_utf8("</ul>\n")
+			Ordered(_) => MdHtml.ol_close
+			Bullet(_) => MdHtml.ul_close
 		}
 		Ok({
 			out: List.concat($out, close),

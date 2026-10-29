@@ -28,6 +28,7 @@
 ## unit per closer visited and per opener looked back at, the Zig's charges
 ## unit for unit. Pure.
 import Ascii
+import MdHtml
 import MdText
 
 MdEmphasis := [].{
@@ -208,7 +209,7 @@ MdEmphasis := [].{
 	run_onto = |out, run| {
 		var $o = out
 		for use in run.closes {
-			$o = List.concat($o, if use == 2 strong_close else em_close)
+			$o = List.concat($o, if use == 2 MdHtml.strong_close else MdHtml.em_close)
 		}
 		$o = List.concat($o, List.repeat(run.char, run.count))
 		var $n = List.len(run.opens)
@@ -216,7 +217,7 @@ MdEmphasis := [].{
 			$n = $n - 1
 			$o = List.concat(
 				$o,
-				if (List.get(run.opens, $n) ?? 0) == 2 strong_open else em_open,
+				if (List.get(run.opens, $n) ?? 0) == 2 MdHtml.strong_open else MdHtml.em_open,
 			)
 		}
 		$o
@@ -297,15 +298,3 @@ flanking = |text, { start, end }| {
 		after_punct,
 	}
 }
-
-em_open : List(U8)
-em_open = Str.to_utf8("<em>")
-
-em_close : List(U8)
-em_close = Str.to_utf8("</em>")
-
-strong_open : List(U8)
-strong_open = Str.to_utf8("<strong>")
-
-strong_close : List(U8)
-strong_close = Str.to_utf8("</strong>")

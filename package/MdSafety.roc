@@ -66,10 +66,6 @@ MdSafety := [].{
 		Err(NotFound) => Bool.False
 	}
 
-	## markdown_links `external_attrs`: a new tab, without the opener.
-	external_attrs : List(U8)
-	external_attrs = Str.to_utf8(" target=\"_blank\" rel=\"noopener\"")
-
 	## The `://` that ends a URL's scheme: what makes a link external here,
 	## and where an autolink's host starts (MdLinks).
 	scheme_end : List(U8)
