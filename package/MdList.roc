@@ -6,14 +6,14 @@
 ## **A CONTAINER, SO Md HANDS IN WHAT IT ASKS OF THE DISPATCHER**: Md
 ## dispatches to a list, and an item's content is blocks again, so an
 ## import of Md here would be a cycle, which Roc refuses. `list_onto` takes
-## the three things it needs from Md as arguments instead: `nested` (an
-## item's content as blocks, one level deeper: the depth and the wrap are
-## Md's, captured there), `is_block_start` (the lines a lazy one may not be)
-## and `is_table_at`. Md stays the one home of each, and a list reads in one
-## module.
+## the two things it needs from Md as arguments instead: `nested` (an item's
+## content as blocks, one level deeper: the depth and the wrap are Md's,
+## captured there) and `is_block_start` (the lines a lazy one may not be).
+## Md stays the one home of each, and a list reads in one module.
 import Ascii
 import Bytes
 import MdHtml
+import MdTable
 import MdText
 
 MdList := [].{
@@ -117,7 +117,6 @@ MdList := [].{
 		budget : MdText.Budget,
 		nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
 		is_block_start : List(U8), U64 -> Bool,
-		is_table_at : List(U8), U64 -> Bool,
 	} -> Try(MdText.Block, [Hostile])
 	list_onto = |
 		out,
@@ -128,7 +127,6 @@ MdList := [].{
 			budget,
 			nested,
 			is_block_start,
-			is_table_at,
 		},
 	| {
 		len = List.len(md)
@@ -196,7 +194,7 @@ MdList := [].{
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
 			# separator sees only its content, not the <li>.
-			lead = if $loose or is_first_child_block(item, { is_block_start, is_table_at }) ['\n'] else []
+			lead = if $loose or is_first_child_block(item, is_block_start) ['\n'] else []
 			inner = nested({
 				out: lead,
 				md: item,
@@ -234,15 +232,15 @@ is_same_list = |a, b| match (a.kind, b.kind) {
 ## own when its first child is a list, a quote, a fence, a heading or a
 ## table, not a paragraph: its first line that is not blank starts a block
 ## (`is_block_start`, which asks the first four in that order) or a table.
-is_first_child_block : List(U8), { is_block_start : List(U8), U64 -> Bool, is_table_at : List(U8), U64 -> Bool } -> Bool
-is_first_child_block = |item, { is_block_start, is_table_at }| {
+is_first_child_block : List(U8), (List(U8), U64 -> Bool) -> Bool
+is_first_child_block = |item, is_block_start| {
 	len = List.len(item)
 	var $pos = 0
 	while $pos < len {
 		eol = MdText.line_end(item, $pos)
 		line = MdText.cut(item, { start: $pos, end: eol })
 		if !MdText.is_blank(line) {
-			return is_block_start(item, $pos) or is_table_at(item, $pos)
+			return is_block_start(item, $pos) or MdTable.is_table_at(item, $pos)
 		} else {
 			$pos = MdText.next_line(item, eol)
 		}

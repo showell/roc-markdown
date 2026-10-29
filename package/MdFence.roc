@@ -5,6 +5,7 @@
 ## grammar. Pure.
 import Bytes
 import MdChat
+import MdText
 
 MdFence := [].{
 
@@ -49,6 +50,15 @@ MdFence := [].{
 					}
 				}
 		}
+	}
+
+	## A fence's opening at the line of `md` at `pos`, and where its body
+	## starts: the block dispatcher's (Md) question.
+	open_at : List(U8), U64 -> Try({ open : Open, body_start : U64 }, [NotAFence])
+	open_at = |md, pos| {
+		eol = MdText.line_end(md, pos)
+		fence = MdFence.open(MdText.cut(md, { start: pos, end: eol }))?
+		Ok({ open: fence, body_start: MdText.next_line(md, eol) })
 	}
 
 	## markdown_fence `isClose`: up to three spaces, at least `count` of

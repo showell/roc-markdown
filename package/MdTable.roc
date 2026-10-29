@@ -1,7 +1,7 @@
-## **GFM'S PIPE TABLES, A LINE AT A TIME** (metal-vmm QUEUE 311): a row's
-## cells and the delimiter row's alignments, as the GFM spec's "Tables
-## (extension)" reads them. Md finds a table and renders it; this is the
-## grammar of its lines. Pure.
+## **GFM'S PIPE TABLES, A LINE AT A TIME** (metal-vmm QUEUE 311): where a
+## table stands, a row's cells and the delimiter row's alignments, as the GFM
+## spec's "Tables (extension)" reads them. Md's dispatcher, MdList and
+## MdQuote ask here where a table opens; Md renders it. Pure.
 import MdText
 
 MdTable := [].{
@@ -45,6 +45,39 @@ MdTable := [].{
 		# A trailing `|` closes the last cell; it opens none.
 		if $after_pipe $cells else List.append($cells, MdText.trim_line($cell))
 	}
+
+	## GFM's table at the line at `pos`: that line is its header row and the
+	## next a delimiter row of as many cells. Its header's cells, each
+	## column's alignment, and where its body starts.
+	Table : {
+		header : List(List(U8)),
+		aligns : List(Align),
+		body : U64,
+	}
+
+	table_at : List(U8), U64 -> Try(Table, [NotATable])
+	table_at = |md, pos| {
+		eol = MdText.line_end(md, pos)
+		if eol >= List.len(md) {
+			Err(NotATable)
+		} else {
+			delim_end = MdText.line_end(md, eol + 1)
+			match delimiter_row(MdText.cut(md, { start: eol + 1, end: delim_end })) {
+				Err(NotADelimiter) => Err(NotATable)
+				Ok(aligns) => {
+					header = cells(MdText.cut(md, { start: pos, end: eol }))
+					if List.len(header) == List.len(aligns) {
+						Ok({ header, aligns, body: MdText.next_line(md, delim_end) })
+					} else {
+						Err(NotATable)
+					}
+				}
+			}
+		}
+	}
+
+	is_table_at : List(U8), U64 -> Bool
+	is_table_at = |md, pos| table_at(md, pos).is_ok()
 
 	## The delimiter row: a `|` somewhere (so a line of dashes alone is no
 	## delimiter), and every cell one `-` or more, a `:` before them, after

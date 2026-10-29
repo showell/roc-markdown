@@ -11,8 +11,9 @@
 ## blocks. The containers, lists and quotes, are modules of their own; their
 ## content is blocks again, so `blocks_onto` hands each the recursion
 ## (`nested`, at one level deeper, in this render's wrap) and the block
-## starts it asks about (`is_block_start`, `is_table_at`), rather than each
-## importing Md, a cycle. A new block kind is a branch of `blocks_onto`, and
+## starts it asks about (`is_block_start`), rather than each importing Md,
+## a cycle. Each block's grammar (where a fence or a table opens) is its own
+## module's (MdFence, MdTable). A new block kind is a branch of `blocks_onto`, and
 ## a line of `is_block_start` (and of `paragraph_onto`'s stop) when it
 ## interrupts a paragraph.
 ##
@@ -176,7 +177,7 @@ blocks_onto = |
 			} else {
 				# A fence, a heading, a list and a quote can each interrupt a
 				# paragraph, so each is asked first.
-				match fence_open_at(md, $pos) {
+				match MdFence.open_at(md, $pos) {
 					Ok(open) => {
 						fenced = fence_onto(
 							tight_sep($out, spacing),
@@ -215,7 +216,6 @@ blocks_onto = |
 												budget: $budget,
 												nested,
 												is_block_start,
-												is_table_at,
 											},
 										)?
 										$out = listed.out
@@ -232,7 +232,6 @@ blocks_onto = |
 													budget: $budget,
 													nested,
 													is_block_start,
-													is_table_at,
 												},
 											)?
 											$out = quoted.out
@@ -262,7 +261,7 @@ blocks_onto = |
 											$out = raw.out
 											$budget = raw.budget
 											$pos = $p
-										} else if is_table_at(md, $pos) {
+										} else if MdTable.is_table_at(md, $pos) {
 											tabled = table_onto(
 												tight_sep($out, spacing),
 												{ md, pos: $pos, budget: $budget },
@@ -324,13 +323,13 @@ paragraph_onto = |
 	while $p < len {
 		eol = MdText.line_end(md, $p)
 		line = MdText.cut(md, { start: $p, end: eol })
-		if MdText.is_blank(line) or fence_open_at(
+		if MdText.is_blank(line) or MdFence.open_at(
 			md,
 			$p,
 		).is_ok() or atx_heading(line).is_ok() or MdList.is_list_interrupting(
 			md,
 			$p,
-		) or MdQuote.is_quote_line(line) or ($p > pos and is_table_at(md, $p)) {
+		) or MdQuote.is_quote_line(line) or ($p > pos and MdTable.is_table_at(md, $p)) {
 			break
 		} else {
 			{}
@@ -381,14 +380,6 @@ tight_sep = |
 | if spacing == Tight and out != [] and List.last(out) != Ok('\n') List.append(out, '\n') else out
 
 # ── fenced code ──
-
-## A fence's opening at the line at `pos`, and where its body starts.
-fence_open_at : List(U8), U64 -> Try({ open : MdFence.Open, body_start : U64 }, [NotAFence])
-fence_open_at = |md, pos| {
-	eol = MdText.line_end(md, pos)
-	open = MdFence.open(MdText.cut(md, { start: pos, end: eol }))?
-	Ok({ open, body_start: MdText.next_line(md, eol) })
-}
 
 ## markdown `renderFence`: the code block, up to its closing fence or the
 ## end (an unclosed fence runs to the end). Its body is charged whole, its
@@ -497,45 +488,12 @@ is_block_start = |md, pos| {
 	MdText.is_blank(line) or MdList.list_marker_at(
 		md,
 		pos,
-	).is_ok() or MdQuote.is_quote_line(line) or fence_open_at(md, pos).is_ok() or atx_heading(line).is_ok()
+	).is_ok() or MdQuote.is_quote_line(line) or MdFence.open_at(md, pos).is_ok() or atx_heading(line).is_ok()
 }
 
 # ── tables ──
 
-## GFM's table at the line at `pos`: that line is its header row and the
-## next a delimiter row (MdTable) of as many cells. Its header's cells, each
-## column's alignment, and where its body starts.
-Table : {
-	header : List(List(U8)),
-	aligns : List(MdTable.Align),
-	body : U64,
-}
-
-table_at : List(U8), U64 -> Try(Table, [NotATable])
-table_at = |md, pos| {
-	eol = MdText.line_end(md, pos)
-	if eol >= List.len(md) {
-		Err(NotATable)
-	} else {
-		delim_end = MdText.line_end(md, eol + 1)
-		match MdTable.delimiter_row(MdText.cut(md, { start: eol + 1, end: delim_end })) {
-			Err(NotADelimiter) => Err(NotATable)
-			Ok(aligns) => {
-				header = MdTable.cells(MdText.cut(md, { start: pos, end: eol }))
-				if List.len(header) == List.len(aligns) {
-					Ok({ header, aligns, body: MdText.next_line(md, delim_end) })
-				} else {
-					Err(NotATable)
-				}
-			}
-		}
-	}
-}
-
-is_table_at : List(U8), U64 -> Bool
-is_table_at = |md, pos| table_at(md, pos).is_ok()
-
-## GFM's table from `pos`: its header row in `<thead>`, then a body row a
+## GFM's table from `pos` (MdTable `table_at`): its header row in `<thead>`, then a body row a
 ## line, up to a blank line or one that starts a block (is_block_start),
 ## each cut or padded to the header's width with empty cells. No body, no
 ## `<tbody>`. A unit a row and a unit a cell, checked a cell: a short row's
@@ -546,7 +504,7 @@ table_onto : List(U8),
 	pos : U64,
 	budget : MdText.Budget,
 } -> Try(MdText.Block, [Hostile])
-table_onto = |out, { md, pos, budget }| match table_at(md, pos) {
+table_onto = |out, { md, pos, budget }| match MdTable.table_at(md, pos) {
 	Err(NotATable) => crash "Md.table_onto: no table where the dispatcher found one"
 	Ok(table) => {
 		len = List.len(md)
