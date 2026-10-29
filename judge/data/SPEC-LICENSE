@@ -1,4 +1,5 @@
-spec_agree.jsonl and spec_tables.jsonl are derived from two specifications,
+spec_agree.jsonl, spec_tables.jsonl, spec_strike.jsonl and
+spec_escapes.jsonl are derived from two specifications,
 both under the Creative Commons Attribution-ShareAlike 4.0 International
 license:
 
@@ -11,7 +12,12 @@ license:
   https://github.github.com/gfm/
   (as vendored in grayrest/roc-markdown, spec/gfm-extensions.txt; for
   spec_tables.jsonl, its section "Tables (extension)", examples 198 to 205,
-  from github/cmark-gfm's test/spec.txt, the same spec)
+  from github/cmark-gfm's test/spec.txt, the same spec; for
+  spec_strike.jsonl, its section "Strikethrough (extension)", examples 491
+  and 492, from the same file)
+
+  For spec_escapes.jsonl, CommonMark's section "Backslash escapes",
+  examples 12 to 24, from commonmark/commonmark-spec's spec.txt at 0.31.2.
 
 License: CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/
 
@@ -20,7 +26,7 @@ and strong emphasis, Code spans, Links, List items, Lists, Block quotes, ATX
 headings and Fenced code blocks (CommonMark), and Autolinks (extension)
 (GFM's, in place of CommonMark's Autolinks), less every example whose
 markdown holds `\`, `&`, `<`, `![`, `]:`, `"`, a tab, or a line starting
-with 4 spaces; spec_tables.jsonl is every example of Tables (extension),
-none left out. Each is re-encoded as one JSON line with an id ("cm/<n>" or "gfm/<n>", the spec's example number). The markdown and the
+with 4 spaces; spec_tables.jsonl, spec_strike.jsonl and spec_escapes.jsonl are
+every example of their sections, none left out. Each is re-encoded as one JSON line with an id ("cm/<n>" or "gfm/<n>", the spec's example number). The markdown and the
 expected html are the spec's, unchanged. The derived files are shared under
 the same license.

@@ -18,10 +18,19 @@ Zig is no longer its judge. Its judge is a set of frozen answers (below).
   follow a paragraph's line directly. Its HTML is the spec's own: `table`,
   `thead`, `tbody`, `tr`, `th`, `td` and `align="left|center|right"`, no
   class.
-- **Inline markup is per line**: `**`, `*`, `_`, backticks and `[...](...)`
-  never pair across a line break.
+- **GFM's strikethrough**: `~~text~~` is `<del>`, by the emphasis engine's
+  rules (flanking, nearest opener). Only two tildes: a single `~` and a run
+  of three or more are text, so a chat's "~5 minutes" stays as written.
+- **CommonMark's backslash escapes**: a backslash before ASCII punctuation
+  makes it literal (`\*not em\*`), in text, link destinations and a fence's
+  language; inside a code span or a fence it is a backslash.
+- **Inline markup is per line**: `**`, `*`, `_`, `~~`, backticks and
+  `[...](...)` never pair across a line break.
 - **A newline is a `<br>`** (`render`, `render_trusted`), or a space for
-  server-owned prose (`render_trusted_reflow`).
+  server-owned prose (`render_trusted_reflow`). A backslash ending a
+  paragraph's line (CommonMark's hard break) is dropped where every newline
+  breaks already, and is the `<br>` in reflow; on a paragraph's last line
+  it is text.
 - **Raw HTML is escaped**, except a same-origin `<img>` or `<video>`, which
   is rebuilt from its safe attributes alone.
 - A ```` ```quote ```` fence is a reply's quote, not code.
@@ -71,8 +80,9 @@ the divergences `judge/data/spec_diverge.txt` lists.
 
 - **The corpora:** adversarial and dialect shapes; `unit_cases`, every input
   of chat-markdown's Zig unit tests (where the dialect came from); CommonMark's
-  and GFM's examples (`spec_agree`), and GFM's table examples
-  (`spec_tables`; both CC BY-SA 4.0: `judge/data/SPEC-LICENSE`);
+  and GFM's examples (`spec_agree`), GFM's table and strikethrough
+  examples (`spec_tables`, `spec_strike`), and CommonMark's backslash
+  escapes (`spec_escapes`; all CC BY-SA 4.0: `judge/data/SPEC-LICENSE`);
   pinned departures from CommonMark; and the hostile shapes the judge
   generates itself.
 - **It prints counts and failing case ids, never a case's text**, so it can

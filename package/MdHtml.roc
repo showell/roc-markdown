@@ -143,6 +143,13 @@ MdHtml := [].{
 	strong_close : List(U8)
 	strong_close = Str.to_utf8("</strong>")
 
+	## GFM's strikethrough, `~~text~~` (MdEmphasis).
+	del_open : List(U8)
+	del_open = Str.to_utf8("<del>")
+
+	del_close : List(U8)
+	del_close = Str.to_utf8("</del>")
+
 	## A link's opening tag: its href escaped (an empty one where MdSafety
 	## dropped it), and a new tab, without the opener, when `NewTab`.
 	link_open : { href : List(U8), tab : [SameTab, NewTab] } -> List(U8)

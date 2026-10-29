@@ -1,6 +1,7 @@
 ## **THE EMPHASIS ENGINE** (chat-markdown markdown_inline.zig's delimiter
 ## runs and `processEmphasis`): which `*` and `_` runs become `<em>` and
-## `<strong>`. The hardest code in the package, and the most self-contained:
+## `<strong>`, and which `~~` runs become GFM's `<del>`. The hardest code
+## in the package, and the most self-contained:
 ## the inline pass (MdInline) hands it each run as it meets one, then the
 ## line's runs all at once, and writes each run back out by `run_onto`. It
 ## reads no other markup, so a link or a code span is invisible to it.
@@ -21,6 +22,12 @@
 ##   - A closer that finds no opener sets a floor (`floor_key`) so no later
 ##     closer that would fail the same way looks below it again: what keeps
 ##     the walk linear.
+##   - **GFM'S STRIKETHROUGH IS A THIRD CHARACTER ON THE SAME STACK**: a run
+##     of exactly two `~` opens when left-flanking and closes when
+##     right-flanking (as `*` does), matches only another `~~`, takes both
+##     whole, and is `<del>`; the rule of 3 is emphasis's, not its. A single
+##     `~` or a run of three or more is text (GFM's spec says two tildes; a
+##     chat's "~5 minutes" stays as written).
 ##
 ## A matched run is never cut up: it records the emphasis it opens and
 ## closes (`opens`, `closes`) and keeps its unused delimiters as text, so the
@@ -56,10 +63,12 @@ MdEmphasis := [].{
 		c = MdText.at(text, start)
 		n = end - start
 		flank = flanking(text, { start, end })
-		# An `_` run inside a word neither opens nor closes.
+		# An `_` run inside a word neither opens nor closes; a `~` run opens and
+		# closes only as `~~`.
 		is_star = c == '*'
-		can_open = flank.left and (is_star or !flank.right or flank.before_punct)
-		can_close = flank.right and (is_star or !flank.left or flank.after_punct)
+		is_strike = c == '~'
+		can_open = if is_strike flank.left and n == 2 else flank.left and (is_star or !flank.right or flank.before_punct)
+		can_close = if is_strike flank.right and n == 2 else flank.right and (is_star or !flank.left or flank.after_punct)
 		{
 			char: c,
 			count: n,
@@ -124,7 +133,7 @@ MdEmphasis := [].{
 					# another only when their lengths' sum is no multiple of 3,
 					# unless both are.
 					is_both = closer.can_open or opener.can_close
-					odd = is_both and closer.orig % 3 != 0 and (opener.orig + closer.orig) % 3 == 0
+					odd = closer.char != '~' and is_both and closer.orig % 3 != 0 and (opener.orig + closer.orig) % 3 == 0
 					if opener.can_open and opener.char == closer.char and !odd {
 						$found = Bool.True
 						break
@@ -209,7 +218,7 @@ MdEmphasis := [].{
 	run_onto = |out, run| {
 		var $o = out
 		for use in run.closes {
-			$o = List.concat($o, if use == 2 MdHtml.strong_close else MdHtml.em_close)
+			$o = List.concat($o, if run.char == '~' MdHtml.del_close else if use == 2 MdHtml.strong_close else MdHtml.em_close)
 		}
 		$o = List.concat($o, List.repeat(run.char, run.count))
 		var $n = List.len(run.opens)
@@ -217,7 +226,7 @@ MdEmphasis := [].{
 			$n = $n - 1
 			$o = List.concat(
 				$o,
-				if (List.get(run.opens, $n) ?? 0) == 2 MdHtml.strong_open else MdHtml.em_open,
+				if run.char == '~' MdHtml.del_open else if (List.get(run.opens, $n) ?? 0) == 2 MdHtml.strong_open else MdHtml.em_open,
 			)
 		}
 		$o
@@ -250,12 +259,14 @@ set_run = |runs, { at, delimiters }| List.set(
 floor_key : MdEmphasis.DelimiterRun -> U64
 floor_key = |closer| {
 	opens = if closer.can_open 3 else 0
-	(opens + closer.orig % 3) * 2 + (if closer.char == '*' 0 else 1)
+	character = if closer.char == '*' 0 else if closer.char == '_' 1 else 2
+	(opens + closer.orig % 3) * 3 + character
 }
 
-## The floor keys: two characters, by can_open, by length mod 3.
+## The floor keys: three characters (`*`, `_`, `~`), by can_open, by length
+## mod 3.
 floor_keys : U64
-floor_keys = 12
+floor_keys = 18
 
 ## markdown_inline `unlinkDelim`: run `k` off the stack; its place among the
 ## pieces, and its delimiters left, stay.

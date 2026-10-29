@@ -37,9 +37,12 @@ MdFence := [].{
 					if count < 3 or count > MdChat.max_fence_run or (f == '`' and List.contains(info, '`')) {
 						Err(NotAFence)
 					} else {
-						lang = List.take_first(
-							info,
-							Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 }),
+						# The language's backslash escapes are CommonMark's (`foo\+bar`).
+						lang = MdText.unescaped(
+							List.take_first(
+								info,
+								Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 }),
+							),
 						)
 						Ok({
 							char: f,
@@ -137,6 +140,7 @@ expect MdFence.open(Str.to_utf8("   ~~~ a b")) == Ok({
 	lang: Str.to_utf8("a"),
 })
 expect MdFence.open(Str.to_utf8("    ~~~")) == Err(NotAFence)
+expect MdFence.open(Str.to_utf8("``` foo\\+bar\\x")).map_ok(|o| o.lang) == Ok(Str.to_utf8("foo+bar\\x"))
 expect !MdFence.is_close(Str.to_utf8("~~~"), { char: '~', count: 4 })
 expect MdFence.is_close(Str.to_utf8("~~~~"), { char: '~', count: 4 })
 expect MdFence.is_close(Str.to_utf8("~~~~~"), { char: '~', count: 4 })

@@ -1,0 +1,2 @@
+{"id":"gfm/491","md":"~~Hi~~ Hello, world!\n","html":"<p><del>Hi</del> Hello, world!</p>\n","section":"Strikethrough (extension)"}
+{"id":"gfm/492","md":"This ~~has a\n\nnew paragraph~~.\n","html":"<p>This ~~has a</p>\n<p>new paragraph~~.</p>\n","section":"Strikethrough (extension)"}

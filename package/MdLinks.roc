@@ -25,7 +25,11 @@ MdLinks := [].{
 	## cost the line's length in all, not once a `[`. The destination's parens
 	## balance (CommonMark): it ends at the `)` that closes its `(`, from
 	## `closes`, the line's one paren pass, made at the first `](` and charged
-	## its length once. A `(` with no balancing `)` is no link.
+	## its length once. A `(` with no balancing `)` is no link. The
+	## destination's backslash escapes are taken out (CommonMark's
+	## `/bar\*` is `/bar*`) before MdSafety reads it, so `javascript\:` is
+	## as dangerous as `javascript:`; a `\)` still closes (the paren pass
+	## reads no escapes).
 	link_at : List(U8),
 	{
 		at : U64,
@@ -89,7 +93,7 @@ MdLinks := [].{
 				{
 					link: Ok({
 						label: { start: at + 1, end: close_bracket },
-						url: MdText.cut(text, { start: open_paren + 1, end: close_paren }),
+						url: MdText.unescaped(MdText.cut(text, { start: open_paren + 1, end: close_paren })),
 						end: close_paren + 1,
 					}),
 					rb: $rb,

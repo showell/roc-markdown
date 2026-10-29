@@ -6,6 +6,8 @@ unit_cases.jsonl
 # the spec's html less spec_diverge.txt.
 spec_agree.jsonl
 spec_tables.jsonl
+spec_strike.jsonl
+spec_escapes.jsonl
 # Pinned departures from CommonMark (each its own note).
 pinned.jsonl
 # The REPL's canned examples (judge/repl.zig: `:examples`), each
