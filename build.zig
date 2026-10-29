@@ -8,6 +8,7 @@ const std = @import("std");
 ///   zig build test                     roc test, then the judge
 ///   zig build judge -- --also <gold>   the judge, with a private corpus
 ///   zig build repl                     markdown at a prompt, or piped
+///   zig build playground               the web playground, zig-out/playground/
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});

@@ -134,6 +134,29 @@ holds. The program is `judge/repl.zig`.
   hostile shape through the REPL in each mode, and holds its output byte for
   byte to the frozen answers.
 
+## The playground
+
+A web page where you type markdown and see it rendered as you type, by the
+package itself compiled to WebAssembly: the work units, the hostility
+verdict and the mode switch under it, the canned examples in a menu (each
+loads into the editor, to change freely), and the HTML source behind a
+toggle. It is served at roc.lynrummy.com/markdown/ (for now).
+
+```
+zig build playground    # zig-out/playground/: the folder a web server serves
+```
+
+The folder is static and fetches nothing from elsewhere: `index.html`,
+`app.js`, `md_wasm.js` (the wasm's door), `style.css`, `md.wasm` and
+`examples.jsonl` (the judge's corpus, copied). The wasm is
+`playground/answer.roc` on `playground/platform/` (a wasm32 host, built by
+`build.zig`), linked by the pinned Roc with `--opt=dev`. **Its test**
+(`playground/check.zig`, in `zig build test`) runs the built wasm in node,
+through the page's own `md_wasm.js`, on every canned example, a table, a
+loose list, two fences and a hostile shape in each mode, held byte for byte
+to the judge's frozen answers; then runs the page on a stand-in DOM
+(`playground/page_check.mjs`).
+
 ## Layout
 
 - `package/main.roc`: the package and what it exposes.
@@ -161,6 +184,8 @@ holds. The program is `judge/repl.zig`.
 - `judge/`: the judge (`judge.zig`), its side of the Roc (`roc_host.zig`,
   `answers.roc`, `platform/`) and its data (`data/`: the corpora, their
   frozen answers, the ratchet).
+- `playground/`: the web playground: its Roc app and wasm32 platform, the
+  page, and its test.
 - `tools/verify.shale`: every check in one run, the planted faults too.
 
 The history before this repository is roc-webbox's (`chat/`); it was split
