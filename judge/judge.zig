@@ -28,6 +28,8 @@
 //!                             another.
 //!   zig build judge -- --raise           the ratchet rewritten to today's counts
 //!   zig build judge -- --time            each corpus's render time
+//!   zig build judge -- --data DIR        a copy of judge/data in its place
+//!                             (tools/verify.shale's planted faults)
 //!
 //! **ITS DATA IS FOUND FROM THE BUILD** (`judge_data`, judge/data/'s path),
 //! never from the working directory; an `--also` path is the caller's, and
@@ -701,7 +703,7 @@ fn writeRatchet(io: Io, dir: Io.Dir, a: std.mem.Allocator, results: []const Resu
 }
 
 fn usage() noreturn {
-    std.debug.print("arguments: --also PATH, --refreeze LABEL, --raise, --time\n", .{});
+    std.debug.print("arguments: --also PATH, --refreeze LABEL, --raise, --time, --data DIR\n", .{});
     std.process.exit(2);
 }
 
@@ -721,6 +723,9 @@ pub fn main(init: std.process.Init) !void {
     var refreezing: std.ArrayList([]const u8) = .empty;
     var raise = false;
     var timed = false;
+    // The data folder: the build's judge/data, or `--data DIR`, a copy of it
+    // (tools/verify.shale plants its faults in one, never in the tree).
+    var data_folder: []const u8 = data_path;
     const args = try init.minimal.args.toSlice(sa);
     var k: usize = 1;
     while (k < args.len) : (k += 1) {
@@ -732,6 +737,9 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.eql(u8, arg, "--also") and k + 1 < args.len) {
             k += 1;
             try also.append(sa, args[k]);
+        } else if (std.mem.eql(u8, arg, "--data") and k + 1 < args.len) {
+            k += 1;
+            data_folder = args[k];
         } else if (std.mem.eql(u8, arg, "--refreeze") and k + 1 < args.len) {
             k += 1;
             try refreezing.append(sa, args[k]);
@@ -741,8 +749,8 @@ pub fn main(init: std.process.Init) !void {
     roc.use(alloc);
     defer roc.deinit();
 
-    const data = Io.Dir.cwd().openDir(io, data_path, .{}) catch |e| {
-        std.debug.print("cannot open the judge's data {s}: {s}\n", .{ data_path, @errorName(e) });
+    const data = Io.Dir.cwd().openDir(io, data_folder, .{}) catch |e| {
+        std.debug.print("cannot open the judge's data {s}: {s}\n", .{ data_folder, @errorName(e) });
         return e;
     };
     defer data.close(io);
