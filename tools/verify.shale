@@ -28,6 +28,8 @@
 --   - the image shapes linear, and three more plants, each red: an image
 --     allowed from another origin, markup kept inside an alt, a
 --     `javascript:` src rendered (QUEUE 317);
+--   - a plant, red: a media src outside the uploads prefix accepted
+--     (QUEUE 318);
 --   - `zig fmt --check` and `roc fmt --check` clean;
 --   - roc-chat's `roc test` against this package (roc-chat main, cloned
 --     beside a copy of package/);
@@ -40,9 +42,9 @@
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
 -- Each corpus's case count, exactly.
-const want = {adversarial = 29, dialect = 7, unit_cases = 69, spec_agree = 269, spec_tables = 8, spec_strike = 2, spec_escapes = 13, spec_images = 22, pinned = 3, examples = 5, hostile = 1097}
+const want = {adversarial = 29, dialect = 12, unit_cases = 69, spec_agree = 269, spec_tables = 8, spec_strike = 2, spec_escapes = 13, spec_images = 22, pinned = 3, examples = 5, hostile = 1097}
 const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "spec_tables", "spec_strike", "spec_escapes", "spec_images", "pinned", "examples", "hostile"}
-const want_total = 1524
+const want_total = 1529
 const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
 const scratch_data = ".zig-cache/verify/data"
@@ -244,6 +246,9 @@ plant("one byte of a frozen strikethrough (spec_strike)", "spec_strike.answers.j
 plant("an image allowed from another origin", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"https://elsewhere.example/a.png\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">off</a>", new = "<img src=\\\"https://elsewhere.example/a.png\\\" alt=\\\"off\\\">"}, "FAILID\tdialect\t")
 plant("markup kept inside an alt", "dialect.answers.jsonl", "swap", {old = "alt=\\\"a b c d\\\"", new = "alt=\\\"a &lt;em&gt;b&lt;/em&gt; c d\\\""}, "FAILID\tdialect\t")
 plant("a javascript: src rendered", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"\\\">js</a>", new = "<img src=\\\"javascript:alert(1)\\\" alt=\\\"js\\\">"}, "FAILID\tdialect\t")
+-- QUEUE 318: a media src outside the uploads prefix accepted (an app
+-- route, a held stream, rebuilt as an image).
+plant("a media src outside the uploads prefix accepted", "dialect.answers.jsonl", "swap", {old = "&lt;img src=&quot;/conversations/1/stream&quot;&gt;", new = "<img src=\\\"/conversations/1/stream\\\">"}, "FAILID\tdialect\t")
 
 -- ── the formatters ──
 local zf = run({"zig", "fmt", "--check", "build.zig", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})

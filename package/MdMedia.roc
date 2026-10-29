@@ -202,32 +202,32 @@ video = |raw| match MdMedia.video_at(Str.to_utf8(raw), 0) {
 	Err(NotSafe) => ""
 }
 
-expect img("<img src=\"/u/cat.png\" alt=\"a cat\" width=\"200\" onerror=\"x()\" style=\"z\">") == "<img src=\"/u/cat.png\" alt=\"a cat\" width=\"200\">"
-expect img("<img src=\"/u/x.png\" width=\"320\" height=\"240\">") == "<img src=\"/u/x.png\" width=\"320\" height=\"240\">"
-expect img("<img src=\"/u/x.png\" width=\"100%\" height=\"auto\">") == "<img src=\"/u/x.png\">"
+expect img("<img src=\"/user_uploads/cat.png\" alt=\"a cat\" width=\"200\" onerror=\"x()\" style=\"z\">") == "<img src=\"/user_uploads/cat.png\" alt=\"a cat\" width=\"200\">"
+expect img("<img src=\"/user_uploads/x.png\" width=\"320\" height=\"240\">") == "<img src=\"/user_uploads/x.png\" width=\"320\" height=\"240\">"
+expect img("<img src=\"/user_uploads/x.png\" width=\"100%\" height=\"auto\">") == "<img src=\"/user_uploads/x.png\">"
 expect img("<img src=\"https://evil/x.png\">") == ""
 expect img("<img src=\"//evil/x.png\">") == ""
 expect img("<img src=\"/\\evil\">") == ""
 expect img("<img alt=\"no src\">") == ""
-expect video("<video src=\"/u/clip.mp4\" width=\"640\" onerror=\"x()\"></video>") == "<video controls preload=\"metadata\" src=\"/u/clip.mp4\" width=\"640\"></video>"
+expect video("<video src=\"/user_uploads/clip.mp4\" width=\"640\" onerror=\"x()\"></video>") == "<video controls preload=\"metadata\" src=\"/user_uploads/clip.mp4\" width=\"640\"></video>"
 expect video("<video src=\"https://evil/x.mp4\"></video>") == ""
-expect video("<video src=\"/u/x.mp4\">") == ""
+expect video("<video src=\"/user_uploads/x.mp4\">") == ""
 expect img("<img src=\"/\t/evil.example/x.png\">") == ""
 expect img("<img src=\"/\n/evil.example/x.png\">") == ""
 expect img("<img src=\"/\r\n/evil.example/x.png\">") == ""
-expect img("<img src=\"/u/\\\\evil.example/x.png\">") == ""
+expect img("<img src=\"/user_uploads/\\\\evil.example/x.png\">") == ""
 expect video("<video src=\"/\t/evil.example/x.mp4\"></video>") == ""
-expect img("<img src=\" /u/cat.png \">") == "<img src=\" /u/cat.png \">"
+expect img("<img src=\" /user_uploads/cat.png \">") == "<img src=\" /user_uploads/cat.png \">"
 # The Images feed's (SafeImg's, folded here): its plants, escaped values,
 # case-blind names, the last of a name winning, single quotes, a bare name.
 expect MdMedia.rebuild("<img src=x onerror=\"alert(1)\">") == Err(Unsafe)
-expect MdMedia.rebuild("<img src=\"/up/a.png\" width=\"40\" onload=\"alert(2)\">") == Ok("<img src=\"/up/a.png\" width=\"40\">")
-expect MdMedia.rebuild("<IMG SRC='/a.png' alt=\"x\" ALT=y&z hidden>") == Ok("<img src=\"/a.png\" alt=\"y&amp;z\">")
-expect MdMedia.rebuild("<img src=\"/a.png\" alt=\"<b>\">") == Ok("<img src=\"/a.png\" alt=\"&lt;b&gt;\">")
-expect MdMedia.rebuild("<img src=\"/a.png\"") == Err(Unsafe)
+expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\" width=\"40\" onload=\"alert(2)\">") == Ok("<img src=\"/user_uploads/a.png\" width=\"40\">")
+expect MdMedia.rebuild("<IMG SRC='/user_uploads/a.png' alt=\"x\" ALT=y&z hidden>") == Ok("<img src=\"/user_uploads/a.png\" alt=\"y&amp;z\">")
+expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\" alt=\"<b>\">") == Ok("<img src=\"/user_uploads/a.png\" alt=\"&lt;b&gt;\">")
+expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\"") == Err(Unsafe)
 expect MdMedia.rebuild("<img src=\"/a.png>") == Err(Unsafe)
 expect MdMedia.rebuild("<img src=") == Err(Unsafe)
-expect MdMedia.video_at(Str.to_utf8("x<VIDEO src=/v.mp4 >  </Video >y"), 1) == Ok({
-	html: Str.to_utf8("<video controls preload=\"metadata\" src=\"/v.mp4\"></video>"),
-	end: 31,
+expect MdMedia.video_at(Str.to_utf8("x<VIDEO src=/user_uploads/v.mp4 >  </Video >y"), 1) == Ok({
+	html: Str.to_utf8("<video controls preload=\"metadata\" src=\"/user_uploads/v.mp4\"></video>"),
+	end: 44,
 })

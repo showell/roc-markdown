@@ -141,14 +141,18 @@ fn playgroundSite(b: *std.Build, roc: []const u8) Site {
 
     const files = b.addWriteFiles();
     _ = files.addCopyFile(md_wasm, "md.wasm");
-    // sample.png is the `safety` example's same-origin image, served beside
-    // the page at /markdown/sample.png.
-    for ([_][]const u8{ "index.html", "app.js", "md_wasm.js", "style.css", "sample.png" }) |f|
+    for ([_][]const u8{ "index.html", "app.js", "md_wasm.js", "style.css" }) |f|
         _ = files.addCopyFile(b.path(b.fmt("playground/{s}", .{f})), f);
     // The canned examples are the judge's corpus, one home.
     _ = files.addCopyFile(b.path("judge/data/examples.jsonl"), "examples.jsonl");
     const folder = files.getDirectory();
     const install = b.addInstallDirectory(.{ .source_dir = folder, .install_dir = .prefix, .install_subdir = "playground" });
+    // **THE `safety` EXAMPLE'S IMAGE IS AN UPLOAD**: only a path under the
+    // uploads prefix (MdChat.uploads_prefix) is shown, so the sample sits
+    // in zig-out/user_uploads/, published at the site root's user_uploads/
+    // (the page itself at /markdown/).
+    const sample = b.addInstallFile(b.path("playground/sample.png"), "user_uploads/sample.png");
+    install.step.dependOn(&sample.step);
     return .{ .folder = folder, .step = &install.step };
 }
 

@@ -188,7 +188,7 @@ MdInline := [].{
 						}
 						match image {
 							Ok(found) =>
-								if MdSafety.is_local_url(found.dest.src) {
+								if MdSafety.is_upload_url(found.dest.src) {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.render_onto({
@@ -502,15 +502,16 @@ expect inline("~~a *b~~ c*") == "<del>a *b</del> c*"
 expect inline("\\*not em\\* and \\[not](a link) \\`not code\\`") == "*not em* and [not](a link) `not code`"
 expect inline("[a](/b\\*c)") == "<a href=\"/b*c\">a</a>"
 expect inline("[a](javascript\\:alert(1))") == "<a href=\"\">a</a>"
-expect inline("![a *cat*](/u/cat.png \"the cat\")") == "<img src=\"/u/cat.png\" alt=\"a cat\" title=\"the cat\">"
-expect inline("see ![](/u/x.png)!") == "see <img src=\"/u/x.png\" alt=\"\">!"
+expect inline("![a *cat*](/user_uploads/cat.png \"the cat\")") == "<img src=\"/user_uploads/cat.png\" alt=\"a cat\" title=\"the cat\">"
+expect inline("see ![](/user_uploads/x.png)!") == "see <img src=\"/user_uploads/x.png\" alt=\"\">!"
 expect inline("![off](https://evil.example/x.png)") == "<a href=\"https://evil.example/x.png\" target=\"_blank\" rel=\"noopener\">off</a>"
 expect inline("![js](javascript:alert(1))") == "<a href=\"\">js</a>"
 expect inline("![a](//evil/x.png)") == "<a href=\"//evil/x.png\">a</a>"
-expect inline("![a \"q\" & <b>](/x.png)") == "<img src=\"/x.png\" alt=\"a &quot;q&quot; &amp; &lt;b&gt;\">"
+expect inline("![a \"q\" & <b>](/user_uploads/x.png)") == "<img src=\"/user_uploads/x.png\" alt=\"a &quot;q&quot; &amp; &lt;b&gt;\">"
 expect inline("![a](/x.png bad)") == "!<a href=\"/x.png bad\">a</a>"
 expect inline("\\![a](/x.png)") == "!<a href=\"/x.png\">a</a>"
 expect inline("![no close") == "![no close"
+expect inline("![stream](/conversations/1/stream)") == "<a href=\"/conversations/1/stream\">stream</a>"
 expect inline("\\~~not struck~~") == "~~not struck~~"
 expect inline("a\\b \\\\ \\") == "a\\b \\ \\"
 expect inline("`\\*` stays") == "<code>\\*</code> stays"

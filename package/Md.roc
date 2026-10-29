@@ -690,7 +690,9 @@ md : Str -> Str
 md = |text| Str.from_utf8(Md.render(Str.to_utf8(text))) ?? "not text"
 
 # markdown.zig's own cases.
-expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p><video controls preload=\"metadata\" src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video></p>\n"
+expect md("<video src=\"/user_uploads/1_3/abc.mp4\"></video>") == "<p><video controls preload=\"metadata\" src=\"/user_uploads/1_3/abc.mp4\"></video></p>\n"
+# Media outside the uploads prefix is text, the old chat's upload paths too.
+expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p>&lt;video src=&quot;/chat/c/1_3/yo/uploads/abc.mp4&quot;&gt;&lt;/video&gt;</p>\n"
 expect md("hello\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("hello\\\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("hello\\\\\nworld") == "<p>hello\\<br>\nworld</p>\n"

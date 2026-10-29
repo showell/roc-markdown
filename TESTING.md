@@ -101,6 +101,11 @@ for byte to the frozen answers in all three modes. It then loads the page on
 a stand-in DOM (`playground/page_check.mjs`). It's served at
 roc.lynrummy.com/markdown/, through roc-apps' static site.
 
+**What the box publishes:** `zig-out/playground/*` at the site's `/markdown/`,
+and `zig-out/user_uploads/sample.png` at the site root's
+`/user_uploads/sample.png`: the `safety` example's image is an upload, as
+every image a message shows must be (`MdChat.uploads_prefix`).
+
 ## Layout
 
 | Path | What |

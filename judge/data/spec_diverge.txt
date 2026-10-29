@@ -35,7 +35,7 @@
 # spec_images.jsonl (QUEUE 317), CommonMark's images:
 #    14  [gap?] no link reference definitions
 #     2  [gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
-#     2  [dialect] an image's src is same-origin (`/…`) or the image is a link
+#     5  [dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
 
 cm/77	ATX headings	[dialect] no thematic break
 cm/121	Fenced code blocks	[dialect] per-line inline: a span crosses a line break
@@ -79,8 +79,8 @@ cm/574	Images	[gap?] link brackets pair the first `[` with the first `]`: no nes
 cm/575	Images	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
 cm/576	Images	[gap?] no link reference definitions
 cm/577	Images	[gap?] no link reference definitions
-cm/578	Images	[dialect] an image's src is same-origin (`/…`) or the image is a link
-cm/580	Images	[dialect] an image's src is same-origin (`/…`) or the image is a link
+cm/578	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
+cm/580	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
 cm/582	Images	[gap?] no link reference definitions
 cm/583	Images	[gap?] no link reference definitions
 cm/584	Images	[gap?] no link reference definitions
@@ -92,3 +92,6 @@ cm/589	Images	[gap?] no link reference definitions
 cm/591	Images	[gap?] no link reference definitions
 cm/592	Images	[gap?] no link reference definitions
 cm/593	Images	[gap?] no link reference definitions
+cm/572	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
+cm/579	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
+cm/581	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link

@@ -22,12 +22,12 @@ paragraphs, headings, lists, quotes, fenced code, pipe tables, `**bold**`,
 | A newline inside a paragraph | a line break (as in GitHub comments and Zulip) | a space, in documents |
 | `**bold` across a line break `**` | stays literal: inline markup pairs within a line | pairs |
 | Raw HTML | escaped, shown as text | a safe subset rendered |
-| `<img>`, `<video>` | only from the same site, rebuilt from safe attributes | sanitized |
+| `<img>`, `<video>` | only the chat's uploads (`/user_uploads/…`), rebuilt from safe attributes | sanitized |
 | A link to another site | opens in a new tab | same tab |
 | `MSG_plans_3` | a link to that chat message | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
 | `~~strike~~` | two tildes only: `~5 minutes` stays as written | one or two |
-| `![alt](src)` | an image only from the same site; another site's is a link | any image |
+| `![alt](src)` | an image only from the chat's uploads; any other src is a link | any image |
 | `\` at a line's end | dropped: every newline breaks already | a line break |
 
 Emoji and any script pass through untouched. There are no `:shortcodes:`
@@ -39,8 +39,10 @@ who reads it or what else is stored.
 - **Safe output, whatever the input.** Every byte a user wrote is escaped,
   except the markup the dialect itself writes. A `javascript:` link loses its
   href. A user's image or video tag is rebuilt from an allowlist of
-  attributes, and only when it points at the same site; a markdown image
-  `![alt](src)` follows the same rule, and is a link otherwise.
+  attributes, and only when it points at the chat's uploads
+  (`/user_uploads/`, set in `package/MdChat.roc`), never another of the
+  app's own routes; a markdown image `![alt](src)` follows the same rule,
+  and is a link otherwise.
 - **A bounded cost.** Rendering is linear in the message, and every step is
   charged to a work budget sized by its length. A message built to blow it up
   (thousands of nested brackets, a table thousands of columns wide) is

@@ -1,6 +1,6 @@
 ## **WHAT A MEMBER'S LINK OR MEDIA MAY BECOME** (chat-markdown
 ## markdown_inline.zig's `isDangerousUrl`, markdown_links.zig's
-## `isExternalHref`, markdown_media.zig's `isLocalUrl` and allowlist): the
+## `isExternalHref`, markdown_media.zig's allowlist): the
 ## one home of the renderer's URL and attribute rules, for an audit to read
 ## alone.
 ##   - **Links** (MdLinks finds them and asks here): one whose destination a
@@ -9,8 +9,9 @@
 ##     opener.
 ##   - **Media** (MdMedia scans a member's `<img>` or `<video>` and asks
 ##     here): the tag is rebuilt from an allowlist, and only when its src is
-##     same-origin and root-relative. Anything else (onerror=, onload=,
-##     style=, an off-site or protocol-relative src) is dropped.
+##     an upload, under the chat's uploads prefix (MdChat). Anything else
+##     (onerror=, onload=, style=, an off-site or protocol-relative src, any
+##     other path of the app's own) is dropped.
 ##   - **Markdown's images** (`![alt](src "title")`, MdInline and MdLinks)
 ##     follow the media's rule exactly: a same-origin src is the very
 ##     `<img src alt title>` a member's tag of that src and alt is rebuilt
@@ -25,6 +26,7 @@
 ## escaped (MdText). Pure.
 import Ascii
 import Bytes
+import MdChat
 import MdHtml
 import MdText
 
@@ -83,8 +85,8 @@ MdSafety := [].{
 
 	## markdown_media's allowlist: the attributes a member's `<img>` or
 	## `<video>` is rebuilt with, in order, `value_of` giving the tag's last
-	## value of a name; `NotSafe` when its src is no same-origin path
-	## (`is_local_url`). An image keeps its src, alt and title; a video its
+	## value of a name; `NotSafe` when its src is no upload
+	## (`is_upload_url`). An image keeps its src, alt and title; a video its
 	## src, and is a player: `controls` and `preload="metadata"`, never
 	## autoplay. Both keep width and height when all digits, which the page
 	## needs to hold the media's place while it loads.
@@ -97,7 +99,7 @@ MdSafety := [].{
 			Ok(v) => v
 			Err(Absent) => return Err(NotSafe)
 		}
-		if !MdSafety.is_local_url(Bytes.trim(src, Bytes.zig_spaces)) {
+		if !MdSafety.is_upload_url(Bytes.trim(src, Bytes.zig_spaces)) {
 			Err(NotSafe)
 		} else {
 			kept = |names, keep| List.join_map(
@@ -121,28 +123,69 @@ MdSafety := [].{
 		}
 	}
 
-	## markdown_media `isLocalUrl`: `/` then anything but `/` or `\`, and no
-	## control byte or backslash anywhere: a browser strips tabs and newlines
-	## inside a URL and reads `\` as `/`, so `/\t/evil` is `//evil` (metal-vmm
-	## QUEUE 172).
-	is_local_url : List(U8) -> Bool
-	is_local_url = |src|
-		match src {
-			[
-				'/',
-				second,
-				..,
-			] if second != '/' and second != '\\' => List.all(
-				src,
-				|c| c >= 0x20 and c != 0x7f and c != '\\',
-			)
-			_ => Bool.False
-		}
+	## **AN UPLOAD, AND ONLY AN UPLOAD**: a path under the chat's uploads
+	## prefix (`MdChat.uploads_prefix`, `/user_uploads/`), read as a browser
+	## reads it (metal-vmm QUEUE 172, 318):
+	##   - no control byte and no backslash anywhere: a browser strips tabs
+	##     and newlines inside a URL and reads `\` as `/`, so `/\t/evil` is
+	##     `//evil`;
+	##   - no `..` segment, however spelled: a browser resolves `..`, `.%2e`,
+	##     `%2e.` and `%2e%2e` (either case) alike before it asks, so
+	##     `/user_uploads/../login` is `/login`;
+	##   - no `%2f` or `%5c`: an encoded `/` or `\` a server may decode into
+	##     a separator. Every other escape stays: an upload's name may need one.
+	is_upload_url : List(U8) -> Bool
+	is_upload_url = |src|
+		List.starts_with(src, MdChat.uploads_prefix)
+			and List.all(src, |c| c >= 0x20 and c != 0x7f and c != '\\')
+				and !has_dot_dot_segment(src)
+					and !has_encoded_separator(src)
 
 	## The `://` that ends a URL's scheme: what makes a link external here,
 	## and where an autolink's host starts (MdLinks).
 	scheme_end : List(U8)
 	scheme_end = Str.to_utf8("://")
+}
+
+## `%2e` (either case) read as the `.` a browser takes it for.
+dots_decoded : List(U8) -> List(U8)
+dots_decoded = |src| {
+	len = List.len(src)
+	var $out = []
+	var $i = 0
+	while $i < len {
+		if is_escape_of(src, { at: $i, hex: ['2', 'e'] }) {
+			$out = List.append($out, '.')
+			$i = $i + 3
+		} else {
+			$out = List.append($out, MdText.at(src, $i))
+			$i = $i + 1
+		}
+	}
+	$out
+}
+
+## Whether `src` holds `%` and the two hex digits `hex` (lowercase) at `at`,
+## either case.
+is_escape_of : List(U8), { at : U64, hex : List(U8) } -> Bool
+is_escape_of = |src, { at, hex }|
+	List.get(src, at) == Ok('%')
+		and List.map(List.sublist(src, { start: at + 1, len: 2 }), Ascii.to_lowercase) == hex
+
+## A `..` path segment, its dots written or encoded.
+has_dot_dot_segment : List(U8) -> Bool
+has_dot_dot_segment = |src| List.any(List.split_on(dots_decoded(src), '/'), |segment| segment == ['.', '.'])
+
+## An encoded `/` or `\`.
+has_encoded_separator : List(U8) -> Bool
+has_encoded_separator = |src| {
+	var $i = 0
+	var $found = Bool.False
+	while $i < List.len(src) and !$found {
+		$found = is_escape_of(src, { at: $i, hex: ['2', 'f'] }) or is_escape_of(src, { at: $i, hex: ['5', 'c'] })
+		$i = $i + 1
+	}
+	$found
 }
 
 ## A video is a player the reader starts: never autoplay.
@@ -161,6 +204,19 @@ dangerous_schemes = [
 ]
 
 expect MdSafety.is_dangerous_url(Str.to_utf8("java\tscript:alert(1)"))
+expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a.png"))
+expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/1/caf%C3%A9 a.png"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/conversations/1/stream"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/login"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/../login"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%2e%2E/login"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/.%2e/login"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a/.."))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/..%2flogin"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%5c..%5clogin"))
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploadsX/a.png"))
+expect !MdSafety.is_upload_url(Str.to_utf8("//user_uploads/a.png"))
+expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a..b.png"))
 expect MdSafety.is_dangerous_url(Str.to_utf8("  JavaScript:x"))
 expect MdSafety.is_dangerous_url(Str.to_utf8("data:text/html,x"))
 expect !MdSafety.is_dangerous_url(Str.to_utf8("data:image/png;base64,x"))

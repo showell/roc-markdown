@@ -462,8 +462,8 @@ const shapes = [_]Shape{
     .{ .name = "code-spans", .unit = "`a` " },
     .{ .name = "code-runs", .unit = "``` " },
     .{ .name = "img-bait", .unit = "<img src=\"/a.png\"" },
-    .{ .name = "imgs", .unit = "<img src=\"/a.png\" alt=x>" },
-    .{ .name = "videos", .unit = "<video src=\"/v.mp4\"></video>" },
+    .{ .name = "imgs", .unit = "<img src=\"/user_uploads/a.png\" alt=x>" },
+    .{ .name = "videos", .unit = "<video src=\"/user_uploads/v.mp4\"></video>" },
     .{ .name = "links", .unit = "[t](http://x.com) " },
     .{ .name = "msg-bait", .unit = "MSG_" },
     .{ .name = "fences", .unit = "~~~\n" },
@@ -570,9 +570,9 @@ const deep_shapes = [_]Shape{
     // src is refused); an alt of markup to read back as text; images refused
     // (another site's), each a link; `![a]` with no destination.
     .{ .name = "rm-image-openers", .unit = "![" },
-    .{ .name = "rm-images", .unit = "![a](/u.png) " },
-    .{ .name = "rm-image-nest", .unit = "![", .middle = "a", .after = "](/u.png)" },
-    .{ .name = "rm-image-alt-markup", .unit = "![*a* `b` [c](/d) ~~e~~](/f.png) " },
+    .{ .name = "rm-images", .unit = "![a](/user_uploads/u.png) " },
+    .{ .name = "rm-image-nest", .unit = "![", .middle = "a", .after = "](/user_uploads/u.png)" },
+    .{ .name = "rm-image-alt-markup", .unit = "![*a* `b` [c](/d) ~~e~~](/user_uploads/f.png) " },
     .{ .name = "rm-images-refused", .unit = "![a](https://x.y/z.png) " },
     .{ .name = "rm-image-labels-alone", .unit = "![a]" },
 };
