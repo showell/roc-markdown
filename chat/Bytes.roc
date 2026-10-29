@@ -12,22 +12,13 @@ Bytes := [].{
 	## The bytes before and after the first `needle`.
 	cut_seq : List(U8), List(U8) -> Try((List(U8), List(U8)), [NotFound])
 	cut_seq = |s, needle| {
-		i = find(s, { needle, at: 0 })?
+		i = find(s, { needle: needle })?
 		Ok((List.take_first(s, i), List.drop_first(s, i + List.len(needle))))
 	}
 
-	find : List(U8), { needle : List(U8), at : U64 } -> Try(U64, [NotFound])
-	find = |s, { needle, at: i }|
-		if i + List.len(needle) > List.len(s) {
-			Err(NotFound)
-		} else if List.get(s, i) == List.first(needle) and List.sublist(
-			s,
-			{ start: i, len: List.len(needle) },
-		) == needle {
-			Ok(i)
-		} else {
-			find(s, { needle, at: i + 1 })
-		}
+	## Where `needle` first starts in `s` (std.mem.indexOf).
+	find : List(U8), { needle : List(U8) } -> Try(U64, [NotFound])
+	find = |s, { needle }| find_from(s, { needle, at: 0 })
 
 	## The bytes after `prefix`, when `l` starts with it: no length is
 	## written beside the literal it belongs to.
@@ -110,16 +101,8 @@ Bytes := [].{
 	}
 
 	## How many bytes from the end keep `keep`.
-	count_back : List(U8), { keep : (U8 -> Bool), kept : U64 } -> U64
-	count_back = |s, { keep, kept: n }|
-		if n >= List.len(s) {
-			n
-		} else {
-			match List.get(s, List.len(s) - 1 - n) {
-				Ok(c) if keep(c) => count_back(s, { keep, kept: n + 1 })
-				_ => n
-			}
-		}
+	count_back : List(U8), (U8 -> Bool) -> U64
+	count_back = |s, keep| count_back_from(s, { keep, kept: 0 })
 
 	## `std.mem.trim(u8, s, set)`: the bytes in `set` off both ends.
 	trim : List(U8), List(U8) -> List(U8)
@@ -131,7 +114,7 @@ Bytes := [].{
 		)
 		List.drop_last(
 			front,
-			count_back(front, { keep: in_set, kept: 0 }),
+			count_back(front, in_set),
 		)
 	}
 
@@ -139,7 +122,7 @@ Bytes := [].{
 	trim_end : List(U8), List(U8) -> List(U8)
 	trim_end = |s, set| List.drop_last(
 		s,
-		count_back(s, { keep: |c| List.contains(set, c), kept: 0 }),
+		count_back(s, |c| List.contains(set, c)),
 	)
 
 	## The four bytes the Zig's sidecar readers trim, `std.mem.trim(u8, s,
@@ -153,3 +136,27 @@ Bytes := [].{
 	]
 
 }
+
+find_from : List(U8), { needle : List(U8), at : U64 } -> Try(U64, [NotFound])
+find_from = |s, { needle, at: i }|
+	if i + List.len(needle) > List.len(s) {
+		Err(NotFound)
+	} else if List.get(s, i) == List.first(needle) and List.sublist(
+		s,
+		{ start: i, len: List.len(needle) },
+	) == needle {
+		Ok(i)
+	} else {
+		find_from(s, { needle, at: i + 1 })
+	}
+
+count_back_from : List(U8), { keep : (U8 -> Bool), kept : U64 } -> U64
+count_back_from = |s, { keep, kept: n }|
+	if n >= List.len(s) {
+		n
+	} else {
+		match List.get(s, List.len(s) - 1 - n) {
+			Ok(c) if keep(c) => count_back_from(s, { keep, kept: n + 1 })
+			_ => n
+		}
+	}
