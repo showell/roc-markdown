@@ -651,7 +651,9 @@ pub fn hostileCases(a: std.mem.Allocator) ![]Case {
 /// soft one (`\n`), and an external link's new-tab attributes gone.
 fn specNormal(a: std.mem.Allocator, html: []const u8) ![]const u8 {
     const soft = try std.mem.replaceOwned(u8, a, html, "<br>\n", "\n");
-    return std.mem.replaceOwned(u8, a, soft, " target=\"_blank\" rel=\"noopener\"", "");
+    // The spec writes `'` as itself; ours is `&#39;`, safe in any attribute.
+    const apos = try std.mem.replaceOwned(u8, a, soft, "&#39;", "'");
+    return std.mem.replaceOwned(u8, a, apos, " target=\"_blank\" rel=\"noopener\"", "");
 }
 
 /// The spec's html with its void tags written as ours are: `<img … />` is

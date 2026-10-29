@@ -234,6 +234,7 @@ entities = [
 	(Str.to_utf8("&lt;"), '<'),
 	(Str.to_utf8("&gt;"), '>'),
 	(Str.to_utf8("&quot;"), '"'),
+	(Str.to_utf8("&#39;"), '\''),
 ]
 
 heading_digit : U64 -> U8

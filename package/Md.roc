@@ -56,6 +56,12 @@ Md := [].{
 	render_trusted_reflow : List(U8) -> List(U8)
 	render_trusted_reflow = |md| rendered(md, { wrap: Reflow, budget: MdText.unlimited })
 
+	## Text made safe for HTML, an element's content or an attribute's value
+	## (either quote): `&`, `<`, `>`, `"` and `'` as entities, every other
+	## byte as it is. The renderer's own escape, for a host's pages to share.
+	escape : List(U8) -> List(U8)
+	escape = |text| MdText.escape_onto([], text)
+
 	## markdown `workUnits`: the work a render of `md` costs, unlimited, the
 	## measure the budget caps.
 	work_units : List(U8) -> U64
@@ -694,6 +700,7 @@ expect md("<video src=\"/user_uploads/1_3/abc.mp4\"></video>") == "<p><video con
 # Media outside the uploads prefix is text, the old chat's upload paths too.
 expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p>&lt;video src=&quot;/chat/c/1_3/yo/uploads/abc.mp4&quot;&gt;&lt;/video&gt;</p>\n"
 expect md("hello\nworld") == "<p>hello<br>\nworld</p>\n"
+expect Md.escape(Str.to_utf8("Bea <i>x</i> & \"co\" 'q'")) == Str.to_utf8("Bea &lt;i&gt;x&lt;/i&gt; &amp; &quot;co&quot; &#39;q&#39;")
 expect md("hello\\\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("hello\\\\\nworld") == "<p>hello\\<br>\nworld</p>\n"
 expect md("hello\\") == "<p>hello\\</p>\n"

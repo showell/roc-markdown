@@ -58,7 +58,7 @@ MdText := [].{
 	is_blown : Budget -> Bool
 	is_blown = |budget| budget.spent > budget.ceiling
 
-	## `text` onto `out`, its `&`, `<`, `>` and `"` as entities
+	## `text` onto `out`, its `&`, `<`, `>`, `"` and `'` as entities
 	## (markdown_text `escapeInto`): THE escape, which every byte of a
 	## member's text the renderer writes passes through.
 	escape_onto : List(U8), List(U8) -> List(U8)
@@ -70,6 +70,7 @@ MdText := [].{
 				'<' => List.concat($out, lt)
 				'>' => List.concat($out, gt)
 				'"' => List.concat($out, quot)
+				'\'' => List.concat($out, apos)
 				_ => List.append($out, c)
 			}
 		}
@@ -197,7 +198,12 @@ gt = Str.to_utf8("&gt;")
 quot : List(U8)
 quot = Str.to_utf8("&quot;")
 
-expect MdText.escape_onto([], Str.to_utf8("a<b>&\"c'")) == Str.to_utf8("a&lt;b&gt;&amp;&quot;c'")
+## `'` as roc-chat's pages have always written it: so an escaped value is
+## safe in a single-quoted attribute too.
+apos : List(U8)
+apos = Str.to_utf8("&#39;")
+
+expect MdText.escape_onto([], Str.to_utf8("a<b>&\"c'")) == Str.to_utf8("a&lt;b&gt;&amp;&quot;c&#39;")
 expect MdText.for_input(Str.to_utf8("abc")).ceiling == 304
 expect MdText.is_blown(MdText.charge({ spent: 0, ceiling: 3 }, 4))
 expect !MdText.is_blown(MdText.charge({ spent: 0, ceiling: 3 }, 3))

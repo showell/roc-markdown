@@ -1,5 +1,5 @@
 # The spec cases (spec_agree.jsonl, and spec_tables, spec_strike, spec_escapes and spec_images) the Roc's `render` does not match, after
-# normalising ours (`<br>\n` to `\n`, ` target="_blank" rel="noopener"` gone).
+# normalising ours (`<br>\n` to `\n`, `&#39;` to `'`, ` target="_blank" rel="noopener"` gone).
 # One line a case: id, section, reason, tab-separated. The judge
 # (judge/judge.zig, its spec check) fails a case that differs and
 # is not listed, and a listed one that matches, so this says what is true.
