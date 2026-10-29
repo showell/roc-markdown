@@ -29,8 +29,9 @@ beside it (`<name>.answers.jsonl`):
   HTML, less the deliberate divergences `spec_diverge.txt` lists. A check
   fails both ways: a listed case that now matches is stale and must come off
   the list.
-- **spec_tables:** GFM's table examples. The spec corpora are CC BY-SA 4.0
-  (`SPEC-LICENSE`).
+- **spec_tables**, **spec_strike**, **spec_escapes**, **spec_images:** GFM's
+  table and strikethrough examples, and CommonMark's backslash escapes and
+  images. The spec corpora are CC BY-SA 4.0 (`SPEC-LICENSE`).
 - **examples:** the playground's canned examples, frozen so a change that
   moves one fails loudly.
 - **hostile:** shapes the judge generates itself at sizes from 1 to 8,191

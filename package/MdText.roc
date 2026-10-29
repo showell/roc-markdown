@@ -135,6 +135,27 @@ MdText := [].{
 	trim_line : List(U8) -> List(U8)
 	trim_line = |line| Bytes.trim(line, line_space)
 
+	## CommonMark's backslash escapes taken out of `text`: a backslash before
+	## ASCII punctuation is dropped and the punctuation kept; any other is a
+	## backslash. For text no inline pass reads (a fence's info string).
+	unescaped : List(U8) -> List(U8)
+	unescaped = |text| {
+		len = List.len(text)
+		var $out = []
+		var $i = 0
+		while $i < len {
+			c = at(text, $i)
+			if c == '\\' and $i + 1 < len and Ascii.is_punctuation(at(text, $i + 1)) {
+				$out = List.append($out, at(text, $i + 1))
+				$i = $i + 2
+			} else {
+				$out = List.append($out, c)
+				$i = $i + 1
+			}
+		}
+		$out
+	}
+
 	## markdown.zig's `isBlank`: nothing but spaces, tabs and `\r`.
 	is_blank : List(U8) -> Bool
 	is_blank = |line| List.all(line, |c| c == ' ' or c == '\t' or c == '\r')

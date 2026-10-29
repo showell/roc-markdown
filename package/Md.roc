@@ -296,6 +296,13 @@ blocks_onto = |
 ## block that may interrupt one. In the hard-wrap dialect each line is
 ## rendered on its own and joined by `<br>`; in reflow the lines join with
 ## a space and render once.
+##
+## **A BACKSLASH AT A LINE'S END** (CommonMark's hard line break, `foo\`
+## then `bar`): in the hard-wrap dialect every line already breaks, so the
+## backslash asks for what is there and is dropped; in reflow it is the
+## `<br>` CommonMark makes, and the lines on either side render apart (so
+## emphasis does not span it). On a paragraph's last line it is text, as
+## CommonMark has it; an escaped one (`\\`) is a backslash, no break.
 paragraph_onto : List(U8),
 {
 	md : List(U8),
@@ -315,10 +322,7 @@ paragraph_onto = |
 	},
 | {
 	len = List.len(md)
-	var $out = if spacing == Tight out else List.concat(out, MdHtml.p_open)
-	var $budget = budget
-	var $reflow = []
-	var $first = Bool.True
+	var $lines = []
 	var $p = pos
 	while $p < len {
 		eol = MdText.line_end(md, $p)
@@ -334,23 +338,46 @@ paragraph_onto = |
 		} else {
 			{}
 		}
+		$lines = List.append($lines, line)
+		$p = MdText.next_line(md, eol)
+	}
+	last = List.len($lines) - 1
+	var $out = if spacing == Tight out else List.concat(out, MdHtml.p_open)
+	var $budget = budget
+	var $reflow = []
+	var $k = 0
+	for line in $lines {
+		breaks = $k < last and ends_in_hard_break(line)
+		text = MdText.trim_line(if breaks List.drop_last(line, 1) else line)
 		if wrap == Reflow {
 			$reflow = List.concat(
-				if $first $reflow else List.append($reflow, ' '),
-				MdText.trim_line(line),
+				if $reflow == [] $reflow else List.append($reflow, ' '),
+				text,
 			)
+			if breaks {
+				broke = MdInline.render_onto({
+					out: $out,
+					text: $reflow,
+					refs: Linked,
+					budget: $budget,
+				})?
+				$out = List.concat(broke.out, MdHtml.br)
+				$budget = broke.budget
+				$reflow = []
+			} else {
+				{}
+			}
 		} else {
 			wrapped = MdInline.render_onto({
-				out: if $first $out else List.concat($out, MdHtml.br),
-				text: MdText.trim_line(line),
+				out: if $k == 0 $out else List.concat($out, MdHtml.br),
+				text,
 				refs: Linked,
 				budget: $budget,
 			})?
 			$out = wrapped.out
 			$budget = wrapped.budget
 		}
-		$first = Bool.False
-		$p = MdText.next_line(md, eol)
+		$k = $k + 1
 	}
 	if wrap == Reflow {
 		joined = MdInline.render_onto({
@@ -370,6 +397,11 @@ paragraph_onto = |
 		after: $p,
 	})
 }
+
+## CommonMark's hard line break: the line, as written, ends in an odd run of
+## backslashes (an even one is escaped backslashes).
+ends_in_hard_break : List(U8) -> Bool
+ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
 
 ## markdown `tightSep`: inside a tight list item, a block after a bare
 ## paragraph starts on a line of its own.
@@ -660,6 +692,10 @@ md = |text| Str.from_utf8(Md.render(Str.to_utf8(text))) ?? "not text"
 # markdown.zig's own cases.
 expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p><video controls preload=\"metadata\" src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video></p>\n"
 expect md("hello\nworld") == "<p>hello<br>\nworld</p>\n"
+expect md("hello\\\nworld") == "<p>hello<br>\nworld</p>\n"
+expect md("hello\\\\\nworld") == "<p>hello\\<br>\nworld</p>\n"
+expect md("hello\\") == "<p>hello\\</p>\n"
+expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("*a\\\nb* c\nd"))) == Ok("<p>*a<br>\nb* c d</p>\n")
 expect md("# about MSG_plans_3") == "<h1>about <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></h1>\n"
 expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;b\n</code></pre>\n<p>after</p>\n"
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"

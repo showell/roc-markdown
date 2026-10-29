@@ -15,7 +15,8 @@ package, compiled to WebAssembly, as you type. It has dense examples to edit.
 
 If you know GitHub's or Zulip's markdown, most of it is what you expect:
 paragraphs, headings, lists, quotes, fenced code, pipe tables, `**bold**`,
-`*italic*`, `` `code` ``, links and bare URLs. Where it differs:
+`*italic*`, `~~strike~~`, `` `code` ``, backslash escapes, links, images and
+bare URLs. Where it differs:
 
 | | roc-markdown | GitHub |
 |---|---|---|
@@ -26,7 +27,8 @@ paragraphs, headings, lists, quotes, fenced code, pipe tables, `**bold**`,
 | A link to another site | opens in a new tab | same tab |
 | `MSG_plans_3` | a link to that chat message | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
-| `~~strike~~`, `\*` escapes, `![alt](src)` | coming | supported |
+| `![alt](src)` | an image only from the same site; any other becomes a link | an image from anywhere |
+| `~strike~` (one tilde) | text, so "~5 minutes" stays as written | strikethrough |
 
 Emoji and any script pass through untouched. There are no `:shortcodes:`
 and no `@mentions`: the HTML depends only on the message's bytes, never on
@@ -83,8 +85,6 @@ The package is meant to be forked, and the likely changes each have one home:
 - **In use:** it renders Gopher Chat's new Roc server (chat.lynrummy.com).
 - **Its history:** it began as a port of the chat's original renderer, in Zig,
   and has diverged from it on purpose since 2026-10-29.
-- **Coming next:** strikethrough, backslash escapes, and `![alt](src)`
-  images under the same-site rule.
 - **The Roc compiler is pinned** to a nightly, as Roc has no stable release
   yet. A newer nightly may need small changes.
 

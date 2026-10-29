@@ -1,0 +1,2 @@
+{"id":"gfm/491","md_hash":"74d99ef75f30bcca","html":"<p><del>Hi</del> Hello, world!</p>\n","work_units":50,"hostile":"","trusted":"<p><del>Hi</del> Hello, world!</p>\n","trusted_reflow":"<p><del>Hi</del> Hello, world!</p>\n"}
+{"id":"gfm/492","md_hash":"461da8ca04ab9d57","html":"<p>This ~~has a</p>\n<p>new paragraph~~.</p>\n","work_units":77,"hostile":"","trusted":"<p>This ~~has a</p>\n<p>new paragraph~~.</p>\n","trusted_reflow":"<p>This ~~has a</p>\n<p>new paragraph~~.</p>\n"}

@@ -1,10 +1,17 @@
 ## **THE INLINE PASS** (chat-markdown markdown_inline.zig): one line of inline content to
 ## HTML. The line is cut into pieces (text to escape; html made here, for a
-## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link
-## or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
-## `*`/`_` runs), the
-## runs are matched into `<em>` and `<strong>` (MdEmphasis), and the pieces
-## are written out. Pure.
+## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link,
+## a same-origin `![alt](src)` image or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
+## `*`/`_`/`~` runs), the
+## runs are matched into `<em>`, `<strong>` and `<del>` (MdEmphasis), and
+## the pieces are written out. Pure.
+##
+## **A BACKSLASH BEFORE ASCII PUNCTUATION MAKES IT TEXT** (CommonMark's
+## backslash escapes): the backslash goes, and the character after it is a
+## piece of text, so it opens no emphasis, link, code span or tag. Before
+## anything else a backslash is itself. A code span's content is read raw,
+## so a backslash inside one stays (the span is scanned from its backtick,
+## never through this pass); so is a fence's (Md).
 ##
 ## **LINEAR BY ITS CURSORS, AND CHARGED FOR EVERY STEP**: the walk holds
 ## MdLinks's cursors (the first `]` and `)` ahead, and the floor below which
@@ -13,6 +20,7 @@
 ## scan reads is charged to the budget, and the walk stops as hostile the
 ## moment it is blown: the Zig's charges, unit for unit, so a message the
 ## Zig refuses is a message this refuses.
+import Ascii
 import Bytes
 import MdChat
 import MdHtml
@@ -20,6 +28,7 @@ import MdText
 import MdMedia
 import MdEmphasis
 import MdLinks
+import MdSafety
 
 MdInline := [].{
 
@@ -73,7 +82,18 @@ MdInline := [].{
 					$run_start = ref.end
 				}
 				Err(NoRef) =>
-					if c == '<' {
+					if c == '\\' and is_escapable(text, $i + 1) {
+						$pieces = with_token(
+							$pieces,
+							{
+								run_start: $run_start,
+								at: $i,
+								token: Text($i + 1, $i + 2),
+							},
+						)
+						$i = $i + 2
+						$run_start = $i
+					} else if c == '<' {
 						match MdMedia.img_at(text, $i) {
 							Ok(tag) => {
 								$pieces = with_token(
@@ -143,6 +163,61 @@ MdInline := [].{
 								$i = $i + n
 							}
 						}
+					} else if c == '!' and List.get(text, $i + 1) == Ok('[') {
+						# `![alt](src)`: an image where its src is same-origin, else
+						# the `!` is dropped and the `[` read as a link (MdSafety).
+						linked = MdLinks.link_at(
+							text,
+							{
+								at: $i + 1,
+								rb: $rb,
+								closes: $closes,
+								budget: $budget,
+							},
+						)
+						$rb = linked.rb
+						$closes = linked.closes
+						$budget = linked.budget
+						image = match linked.link {
+							Ok(link) =>
+								match MdLinks.image_dest(link.url) {
+									Ok(dest) => Ok({ link, dest })
+									Err(NotAnImage) => Err(NotAnImage)
+								}
+							Err(NotALink) => Err(NotAnImage)
+						}
+						match image {
+							Ok(found) =>
+								if MdSafety.is_local_url(found.dest.src) {
+									# The alt is the label's inline content, its markup
+									# gone (MdHtml.plain_text).
+									alt = MdInline.render_onto({
+										out: [],
+										text: MdText.cut(text, found.link.label),
+										refs: InLabel,
+										budget: $budget,
+									})?
+									$budget = alt.budget
+									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title }) ?? []
+									$pieces = with_token(
+										$pieces,
+										{
+											run_start: $run_start,
+											at: $i,
+											token: Html(html),
+										},
+									)
+									$i = found.link.end
+									$run_start = found.link.end
+								} else {
+									$pieces = flushed($pieces, { run_start: $run_start, at: $i })
+									$i = $i + 1
+									$run_start = $i
+								}
+							Err(NotAnImage) => {
+								$i = $i + 1
+							}
+						}
 					} else if c == '[' {
 						linked = MdLinks.link_at(
 							text,
@@ -182,14 +257,22 @@ MdInline := [].{
 								$i = $i + 1
 							}
 						}
-					} else if c == '*' or c == '_' {
-						$pieces = flushed($pieces, { run_start: $run_start, at: $i })
+					} else if c == '*' or c == '_' or c == '~' {
 						n = run_length(text, { byte: c, at: $i })
 						$budget = MdText.charge($budget, n)
-						$pieces = List.append($pieces, Run(List.len($runs)))
-						$runs = List.append($runs, MdEmphasis.delimiter_run(text, { start: $i, end: $i + n }))
-						$i = $i + n
-						$run_start = $i
+						run = MdEmphasis.delimiter_run(text, { start: $i, end: $i + n })
+						# A `~` run that can neither open nor close (one `~`, three,
+						# `~~` between spaces) is text: on the stack it would only
+						# lengthen every look-back past it.
+						if c == '~' and !run.can_open and !run.can_close {
+							$i = $i + n
+						} else {
+							$pieces = flushed($pieces, { run_start: $run_start, at: $i })
+							$pieces = List.append($pieces, Run(List.len($runs)))
+							$runs = List.append($runs, run)
+							$i = $i + n
+							$run_start = $i
+						}
 					} else if MdLinks.is_autolink_boundary(text, $i) {
 						found = MdLinks.autolink_at(
 							text,
@@ -248,8 +331,17 @@ MdInline := [].{
 	}
 }
 
+## Whether the byte at `i` is ASCII punctuation, which a backslash before it
+## escapes.
+is_escapable : List(U8), U64 -> Bool
+is_escapable = |text, i|
+	match List.get(text, i) {
+		Ok(c) => Ascii.is_punctuation(c)
+		Err(OutOfBounds) => Bool.False
+	}
+
 ## A piece of the line: text (a span of it, escaped when written), html made
-## here, or a `*`/`_` run (by its index among the runs).
+## here, or a `*`/`_`/`~` run (by its index among the runs).
 Piece : [
 	Text(U64, U64),
 	Html(List(U8)),
@@ -400,3 +492,26 @@ expect inline("*a**b** c**") == "<em>a<strong>b</strong> c</em>*"
 expect inline("x **a*a*a*") == "x *<em>a<em>a</em>a</em>"
 # Keyed on the length alone, this one would move; on both, it does not.
 expect inline("x **a*a****") == "x <strong>a<em>a</em></strong>*"
+# GFM's strikethrough: two tildes, on one line, flanking as `*` does.
+expect inline("~~Hi~~ Hello, world!") == "<del>Hi</del> Hello, world!"
+expect inline("a ~~**b**~~ c") == "a <del><strong>b</strong></del> c"
+expect inline("~one~ and ~~~three~~~ stay") == "~one~ and ~~~three~~~ stay"
+expect inline("about ~~ 5 ~~ or ~5 minutes") == "about ~~ 5 ~~ or ~5 minutes"
+expect inline("~~a *b~~ c*") == "<del>a *b</del> c*"
+# Backslash escapes: before ASCII punctuation, the character is text.
+expect inline("\\*not em\\* and \\[not](a link) \\`not code\\`") == "*not em* and [not](a link) `not code`"
+expect inline("[a](/b\\*c)") == "<a href=\"/b*c\">a</a>"
+expect inline("[a](javascript\\:alert(1))") == "<a href=\"\">a</a>"
+expect inline("![a *cat*](/u/cat.png \"the cat\")") == "<img src=\"/u/cat.png\" alt=\"a cat\" title=\"the cat\">"
+expect inline("see ![](/u/x.png)!") == "see <img src=\"/u/x.png\" alt=\"\">!"
+expect inline("![off](https://evil.example/x.png)") == "<a href=\"https://evil.example/x.png\" target=\"_blank\" rel=\"noopener\">off</a>"
+expect inline("![js](javascript:alert(1))") == "<a href=\"\">js</a>"
+expect inline("![a](//evil/x.png)") == "<a href=\"//evil/x.png\">a</a>"
+expect inline("![a \"q\" & <b>](/x.png)") == "<img src=\"/x.png\" alt=\"a &quot;q&quot; &amp; &lt;b&gt;\">"
+expect inline("![a](/x.png bad)") == "!<a href=\"/x.png bad\">a</a>"
+expect inline("\\![a](/x.png)") == "!<a href=\"/x.png\">a</a>"
+expect inline("![no close") == "![no close"
+expect inline("\\~~not struck~~") == "~~not struck~~"
+expect inline("a\\b \\\\ \\") == "a\\b \\ \\"
+expect inline("`\\*` stays") == "<code>\\*</code> stays"
+expect inline("\\<b> and \\&amp;") == "&lt;b&gt; and &amp;amp;"

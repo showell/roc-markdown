@@ -143,6 +143,13 @@ MdHtml := [].{
 	strong_close : List(U8)
 	strong_close = Str.to_utf8("</strong>")
 
+	## GFM's strikethrough, `~~text~~` (MdEmphasis).
+	del_open : List(U8)
+	del_open = Str.to_utf8("<del>")
+
+	del_close : List(U8)
+	del_close = Str.to_utf8("</del>")
+
 	## A link's opening tag: its href escaped (an empty one where MdSafety
 	## dropped it), and a new tab, without the opener, when `NewTab`.
 	link_open : { href : List(U8), tab : [SameTab, NewTab] } -> List(U8)
@@ -181,10 +188,53 @@ MdHtml := [].{
 	img : List(Attr) -> List(U8)
 	img = |attrs| List.append(attrs_onto(Str.to_utf8("<img"), attrs), '>')
 
+	## The text of html this renderer wrote, its markup gone: every tag
+	## dropped and the escapes MdText writes read back, so the text can be
+	## escaped once more as an attribute's value. An image's alt is its
+	## label's inline content so read (CommonMark's "plain string content").
+	## Each `<` here opens a tag (a member's `<` is `&lt;`), and a tag ends
+	## at its first `>` (one inside a value is `&gt;`).
+	plain_text : List(U8) -> List(U8)
+	plain_text = |html| {
+		len = List.len(html)
+		var $out = []
+		var $i = 0
+		while $i < len {
+			c = MdText.at(html, $i)
+			if c == '<' {
+				$i = MdText.find_or_end(html, { byte: '>', at: $i }) + 1
+			} else if c == '&' {
+				match List.find_first(entities, |e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 })) {
+					Ok((written, byte)) => {
+						$out = List.append($out, byte)
+						$i = $i + List.len(written)
+					}
+					Err(NotFound) => {
+						$out = List.append($out, c)
+						$i = $i + 1
+					}
+				}
+			} else {
+				$out = List.append($out, c)
+				$i = $i + 1
+			}
+		}
+		$out
+	}
+
 	## A member's `<video>`, rebuilt as a player with no fallback content.
 	video : List(Attr) -> List(U8)
 	video = |attrs| List.concat(attrs_onto(Str.to_utf8("<video"), attrs), Str.to_utf8("></video>"))
 }
+
+## The escapes MdText writes, and the byte each stands for.
+entities : List((List(U8), U8))
+entities = [
+	(Str.to_utf8("&amp;"), '&'),
+	(Str.to_utf8("&lt;"), '<'),
+	(Str.to_utf8("&gt;"), '>'),
+	(Str.to_utf8("&quot;"), '"'),
+]
 
 heading_digit : U64 -> U8
 heading_digit = |level| '0' + level.to_u8_wrap()
@@ -203,6 +253,8 @@ attrs_onto = |out, attrs| {
 }
 
 expect MdHtml.heading_open(3) == Str.to_utf8("<h3>")
+expect MdHtml.plain_text(Str.to_utf8("foo <em>bar</em> &amp; <code>a&lt;b</code> &quot;q&quot;")) == Str.to_utf8("foo bar & a<b \"q\"")
+expect MdHtml.plain_text(Str.to_utf8("<a href=\"/u?a&amp;b\" target=\"_blank\">x</a>")) == Str.to_utf8("x")
 expect MdHtml.ol_open(4) == Str.to_utf8("<ol start=\"4\">\n")
 expect MdHtml.link_open({ href: Str.to_utf8("/a?b&c"), tab: SameTab }) == Str.to_utf8("<a href=\"/a?b&amp;c\">")
 expect MdHtml.video([{ name: Str.to_utf8("controls"), value: Bare }, { name: Str.to_utf8("src"), value: Is(Str.to_utf8("/v\".mp4")) }]) == Str.to_utf8("<video controls src=\"/v&quot;.mp4\"></video>")

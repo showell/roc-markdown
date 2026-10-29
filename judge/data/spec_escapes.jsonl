@@ -1,0 +1,13 @@
+{"id":"cm/12","md":"\\!\\\"\\#\\$\\%\\&\\'\\(\\)\\*\\+\\,\\-\\.\\/\\:\\;\\<\\=\\>\\?\\@\\[\\\\\\]\\^\\_\\`\\{\\|\\}\\~\n","html":"<p>!&quot;#$%&amp;'()*+,-./:;&lt;=&gt;?@[\\]^_`{|}~</p>\n","section":"Backslash escapes"}
+{"id":"cm/13","md":"\\\t\\A\\a\\ \\3\\φ\\«\n","html":"<p>\\\t\\A\\a\\ \\3\\φ\\«</p>\n","section":"Backslash escapes"}
+{"id":"cm/14","md":"\\*not emphasized*\n\\<br/> not a tag\n\\[not a link](/foo)\n\\`not code`\n1\\. not a list\n\\* not a list\n\\# not a heading\n\\[foo]: /url \"not a reference\"\n\\&ouml; not a character entity\n","html":"<p>*not emphasized*\n&lt;br/&gt; not a tag\n[not a link](/foo)\n`not code`\n1. not a list\n* not a list\n# not a heading\n[foo]: /url &quot;not a reference&quot;\n&amp;ouml; not a character entity</p>\n","section":"Backslash escapes"}
+{"id":"cm/15","md":"\\\\*emphasis*\n","html":"<p>\\<em>emphasis</em></p>\n","section":"Backslash escapes"}
+{"id":"cm/16","md":"foo\\\nbar\n","html":"<p>foo<br />\nbar</p>\n","section":"Backslash escapes"}
+{"id":"cm/17","md":"`` \\[\\` ``\n","html":"<p><code>\\[\\`</code></p>\n","section":"Backslash escapes"}
+{"id":"cm/18","md":"    \\[\\]\n","html":"<pre><code>\\[\\]\n</code></pre>\n","section":"Backslash escapes"}
+{"id":"cm/19","md":"~~~\n\\[\\]\n~~~\n","html":"<pre><code>\\[\\]\n</code></pre>\n","section":"Backslash escapes"}
+{"id":"cm/20","md":"<https://example.com?find=\\*>\n","html":"<p><a href=\"https://example.com?find=%5C*\">https://example.com?find=\\*</a></p>\n","section":"Backslash escapes"}
+{"id":"cm/21","md":"<a href=\"/bar\\/)\">\n","html":"<a href=\"/bar\\/)\">\n","section":"Backslash escapes"}
+{"id":"cm/22","md":"[foo](/bar\\* \"ti\\*tle\")\n","html":"<p><a href=\"/bar*\" title=\"ti*tle\">foo</a></p>\n","section":"Backslash escapes"}
+{"id":"cm/23","md":"[foo]\n\n[foo]: /bar\\* \"ti\\*tle\"\n","html":"<p><a href=\"/bar*\" title=\"ti*tle\">foo</a></p>\n","section":"Backslash escapes"}
+{"id":"cm/24","md":"``` foo\\+bar\nfoo\n```\n","html":"<pre><code class=\"language-foo+bar\">foo\n</code></pre>\n","section":"Backslash escapes"}

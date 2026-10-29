@@ -11,6 +11,15 @@
 ##     here): the tag is rebuilt from an allowlist, and only when its src is
 ##     same-origin and root-relative. Anything else (onerror=, onload=,
 ##     style=, an off-site or protocol-relative src) is dropped.
+##   - **Markdown's images** (`![alt](src "title")`, MdInline and MdLinks)
+##     follow the media's rule exactly: a same-origin src is the very
+##     `<img src alt title>` a member's tag of that src and alt is rebuilt
+##     as. **ANY OTHER SRC IS A LINK, THE `!` DROPPED**: the label its text,
+##     under the link rules above (a `javascript:` src keeps no href, another
+##     site's opens a new tab). Not the text as written, because the link
+##     still says where the image is and lets a reader choose to open it,
+##     while the page fetches nothing from another site (no tracking pixel,
+##     no hotlink); and the markup as written would be noise.
 ##
 ## The other safety rule has its own home: every byte a member wrote is
 ## escaped (MdText). Pure.

@@ -1,4 +1,4 @@
-# The spec cases (spec_agree.jsonl) the Roc's `render` does not match, after
+# The spec cases (spec_agree.jsonl, and spec_tables, spec_strike, spec_escapes and spec_images) the Roc's `render` does not match, after
 # normalising ours (`<br>\n` to `\n`, ` target="_blank" rel="noopener"` gone).
 # One line a case: id, section, reason, tab-separated. The judge
 # (judge/judge.zig, its spec check) fails a case that differs and
@@ -24,6 +24,18 @@
 #     1  [dialect] no ftp:// autolink
 #     1  [gap?] an email autolink ending in `-` or `_` is trimmed; GFM refuses the whole address
 #     1  [gap?] a blank line inside a fence makes its list loose
+#
+# spec_escapes.jsonl (QUEUE 316), the backslash-escape cases:
+#     2  [dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
+#     1  [dialect] every newline is a `<br>`, so a backslash's hard break adds none
+#     1  [dialect] no indented code
+#     1  [gap?] a link's title is not read: it stays in the destination
+#     1  [gap?] no link reference definitions
+#
+# spec_images.jsonl (QUEUE 317), CommonMark's images:
+#    14  [gap?] no link reference definitions
+#     2  [gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+#     2  [dialect] an image's src is same-origin (`/…`) or the image is a link
 
 cm/77	ATX headings	[dialect] no thematic break
 cm/121	Fenced code blocks	[dialect] per-line inline: a span crosses a line break
@@ -56,3 +68,27 @@ cm/519	Links	[gap?] link brackets pair the first `[` with the first `]`: no nest
 cm/525	Links	[gap?] a link's brackets bind before a code span
 gfm/628	Autolinks (extension)	[dialect] no ftp:// autolink
 gfm/631	Autolinks (extension)	[gap?] an email autolink ending in `-` or `_` is trimmed; GFM refuses the whole address
+cm/16	Backslash escapes	[dialect] every newline is a `<br>`, so a backslash's hard break adds none
+cm/18	Backslash escapes	[dialect] no indented code
+cm/20	Backslash escapes	[dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
+cm/21	Backslash escapes	[dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
+cm/22	Backslash escapes	[gap?] a link's title is not read: it stays in the destination
+cm/23	Backslash escapes	[gap?] no link reference definitions
+cm/573	Images	[gap?] no link reference definitions
+cm/574	Images	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+cm/575	Images	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+cm/576	Images	[gap?] no link reference definitions
+cm/577	Images	[gap?] no link reference definitions
+cm/578	Images	[dialect] an image's src is same-origin (`/…`) or the image is a link
+cm/580	Images	[dialect] an image's src is same-origin (`/…`) or the image is a link
+cm/582	Images	[gap?] no link reference definitions
+cm/583	Images	[gap?] no link reference definitions
+cm/584	Images	[gap?] no link reference definitions
+cm/585	Images	[gap?] no link reference definitions
+cm/586	Images	[gap?] no link reference definitions
+cm/587	Images	[gap?] no link reference definitions
+cm/588	Images	[gap?] no link reference definitions
+cm/589	Images	[gap?] no link reference definitions
+cm/591	Images	[gap?] no link reference definitions
+cm/592	Images	[gap?] no link reference definitions
+cm/593	Images	[gap?] no link reference definitions

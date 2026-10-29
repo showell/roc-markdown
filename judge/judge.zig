@@ -58,9 +58,11 @@ const data_path = @import("judge_paths").data;
 const corpora_list = "corpora.txt";
 const ratchet_path = "ratchet.txt";
 const hostile_answers_path = "hostile.answers.jsonl";
-/// The spec's corpora: CommonMark's and GFM's examples, and GFM's table
-/// examples (QUEUE 311), checked as one against spec_diverge.txt.
-const spec_labels = [_][]const u8{ "spec_agree", "spec_tables" };
+/// The spec's corpora: CommonMark's and GFM's examples, GFM's table
+/// examples (QUEUE 311), and GFM's strikethrough and CommonMark's backslash
+/// escapes (QUEUE 316), and CommonMark's images (QUEUE 317), checked as one
+/// against spec_diverge.txt.
+const spec_labels = [_][]const u8{ "spec_agree", "spec_tables", "spec_strike", "spec_escapes", "spec_images" };
 const spec_diverge_path = "spec_diverge.txt";
 
 const Part = roc.Part;
@@ -551,6 +553,28 @@ const deep_shapes = [_]Shape{
     .{ .name = "lb-unclosed-autolinks", .unit = "<http:a" },
     .{ .name = "lb-entity-prefixes", .unit = "&#", .after = "&a" },
     .{ .name = "lb-hard-breaks", .unit = "a  \n", .after = "b\\\n" },
+    // GFM's strikethrough and CommonMark's backslash escapes (QUEUE 316):
+    // one `~` run n long (after a word, so no fence); `~~` openers nested
+    // over as many closers, and never closed; `~~` among `*` and `_`, nested
+    // and alternating; `~~` openers each escaped; and lines each ending in a
+    // hard break's backslash.
+    .{ .name = "rm-tilde-run", .head = "a ", .unit = "~" },
+    .{ .name = "rm-strike-nest", .unit = "~~a ", .after = " a~~" },
+    .{ .name = "rm-strike-unclosed", .unit = "~~a " },
+    .{ .name = "rm-strike-mixed", .unit = "~~*_", .middle = "x", .after = "_*~~" },
+    .{ .name = "rm-strike-star-alternate", .unit = "~~a* " },
+    .{ .name = "rm-escaped-strikes", .unit = "\\~~a " },
+    .{ .name = "rm-backslash-breaks", .unit = "*a\\\n" },
+    // Markdown's images (QUEUE 317): `![` openers never closed; images one
+    // after another; images nested in labels, same-origin (lb-nested-images'
+    // src is refused); an alt of markup to read back as text; images refused
+    // (another site's), each a link; `![a]` with no destination.
+    .{ .name = "rm-image-openers", .unit = "![" },
+    .{ .name = "rm-images", .unit = "![a](/u.png) " },
+    .{ .name = "rm-image-nest", .unit = "![", .middle = "a", .after = "](/u.png)" },
+    .{ .name = "rm-image-alt-markup", .unit = "![*a* `b` [c](/d) ~~e~~](/f.png) " },
+    .{ .name = "rm-images-refused", .unit = "![a](https://x.y/z.png) " },
+    .{ .name = "rm-image-labels-alone", .unit = "![a]" },
 };
 
 const deep_sizes = [_]usize{ 1, 10, 100, 1000, 8191 };
@@ -630,6 +654,12 @@ fn specNormal(a: std.mem.Allocator, html: []const u8) ![]const u8 {
     return std.mem.replaceOwned(u8, a, soft, " target=\"_blank\" rel=\"noopener\"", "");
 }
 
+/// The spec's html with its void tags written as ours are: `<img … />` is
+/// `<img …>` (QUEUE 317).
+fn specVoid(a: std.mem.Allocator, html: []const u8) ![]const u8 {
+    return std.mem.replaceOwned(u8, a, html, " />", ">");
+}
+
 /// spec_diverge.txt's ids: a line a case, its id before the first tab;
 /// `#` lines and blank ones are its commentary.
 fn readDiverge(io: Io, dir: Io.Dir, a: std.mem.Allocator) !std.StringHashMapUnmanaged(void) {
@@ -675,7 +705,7 @@ fn specCheck(io: Io, dir: Io.Dir, arena: *std.heap.ArenaAllocator, sa: std.mem.A
                 continue;
             },
         };
-        const same = std.mem.eql(u8, try specNormal(a, ours), spec);
+        const same = std.mem.eql(u8, try specNormal(a, ours), try specVoid(a, spec));
         if (same) agree += 1;
         if (same and listed.contains(c.id)) {
             fails += 1;
@@ -858,7 +888,11 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("==> {d}/{d} hold to their answers ({d} fail; {d} hostile)\n", .{ total.pass, total.pass + total.fail, total.fail, total.hostile });
     if (fell) std.debug.print("a corpus fell below its ratchet ({s})\n", .{ratchet_path});
     if (unrecorded) std.debug.print("a corpus has no answers\n", .{});
-    if (!spec_checked) std.debug.print("the spec check wants corpora labelled {s} and {s}: {d} of them are here\n", .{ spec_labels[0], spec_labels[1], spec_found });
+    if (!spec_checked) {
+        std.debug.print("the spec check wants {d} corpora, labelled", .{spec_labels.len});
+        for (spec_labels) |l| std.debug.print(" {s}", .{l});
+        std.debug.print(": {d} of them are here\n", .{spec_found});
+    }
     if (spec_fails > 0) std.debug.print("the spec check failed: {s} is not what the package does today\n", .{spec_diverge_path});
     if (fell or unrecorded or total.fail > 0 or !spec_checked or spec_fails > 0) std.process.exit(1);
     if (raise) {
