@@ -13,9 +13,9 @@
 ## (`nested`, at one level deeper, in this render's wrap) and the block
 ## starts it asks about (`is_block_start`), rather than each importing Md,
 ## a cycle. Each block's grammar (where a fence or a table opens) is its own
-## module's (MdFence, MdTable). A new block kind is a branch of `blocks_onto`, and
-## a line of `is_block_start` (and of `paragraph_onto`'s stop) when it
-## interrupts a paragraph.
+## module's (MdFence, MdTable). A new block kind is a branch of
+## `blocks_onto`, and a line of `is_block_start` (and of `paragraph_onto`'s
+## stop) when it interrupts a paragraph.
 ##
 ## **THE PARSER IS THE JUDGE OF HOSTILITY**: a render charges its work to a
 ## budget (MdText), checked at each block line and each inline step, and a
