@@ -54,11 +54,31 @@ roc fmt --check package
 
 ## Its judge
 
-angry-gopher's `zig-server/src/markdown_twin_test.zig` holds every case of
-its corpora (and the private gold corpus) to the answers recorded for it:
-each render's html, the work units and the hostility verdict. A case's
-answers change only by an explicit re-freeze, which names the cases that
-moved.
+The judge (`judge/judge.zig`, a Zig program calling the package through
+`judge/answers.roc` on `judge/platform/`) holds every case of its corpora
+(`judge/data/`) to the answers frozen for it: each render's html, the work
+units, the hostility verdict, and both trusted renders. A case's answers
+change only by an explicit re-freeze (`--refreeze LABEL`), which names the
+cases that moved. Each corpus's pass count is held to
+`judge/data/ratchet.txt`, and the spec's examples to CommonMark's html less
+the divergences `judge/data/spec_diverge.txt` lists.
+
+- **The corpora:** adversarial and dialect shapes; `unit_cases`, every input
+  of chat-markdown's Zig unit tests (where the dialect came from); CommonMark's
+  and GFM's examples (`spec_agree`, CC BY-SA 4.0: `judge/data/SPEC-LICENSE`);
+  pinned departures from CommonMark; and the hostile shapes the judge
+  generates itself.
+- **It prints counts and failing case ids, never a case's text**, so it can
+  judge a private corpus of real messages.
+
+```
+zig build test                         # roc test package/main.roc, then the judge
+zig build judge -- --also <gold.jsonl> # the judge, with a private corpus too
+shale tools/verify.shale               # every check, the planted faults, a checklist
+```
+
+The Roc is pinned (`roc-version`): `roc` on the PATH, or `-Droc=<path>`
+(showell/roc-apps release `toolchain-2026-10-27` carries it).
 
 ## Layout
 
@@ -70,8 +90,10 @@ moved.
 - `package/MdMedia.roc`: images and video.
 - `package/Ascii.roc`, `package/Bytes.roc`: the byte checks and scans
   (Zig's `std.ascii` and `std.mem`) the rest share.
+- `judge/`: the judge (`judge.zig`), its side of the Roc (`roc_host.zig`,
+  `answers.roc`, `platform/`) and its data (`data/`: the corpora, their
+  frozen answers, the ratchet).
+- `tools/verify.shale`: every check in one run, the planted faults too.
 
 The history before this repository is roc-webbox's (`chat/`); it was split
 out with `git filter-branch`, so `git log --follow` reaches back through it.
-
-No LICENSE yet.
