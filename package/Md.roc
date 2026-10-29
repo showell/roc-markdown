@@ -9,8 +9,8 @@
 ## budget (MdText), checked at each block line and each inline step, and a
 ## message that blows it renders as `malformed_html` and is refused at
 ## POST (`hostility`). There is no second model of "too much" to drift from
-## the parser. angry-gopher's markdown_twin_test.zig holds every corpus case
-## to its frozen html and `work_units`.
+## the parser. The judge (judge/judge.zig) holds every corpus case to its
+## frozen html and `work_units`.
 ##
 ## A block nested past `max_block_depth` renders as one flat paragraph, so
 ## no message recurses deeper than that; every walk along a line is a loop.

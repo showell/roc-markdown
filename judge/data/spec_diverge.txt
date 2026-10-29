@@ -1,7 +1,7 @@
 # The spec cases (spec_agree.jsonl) the Roc's `render` does not match, after
 # normalising ours (`<br>\n` to `\n`, ` target="_blank" rel="noopener"` gone).
 # One line a case: id, section, reason, tab-separated. The judge
-# (src/markdown_twin_test.zig, its spec check) fails a case that differs and
+# (judge/judge.zig, its spec check) fails a case that differs and
 # is not listed, and a listed one that matches, so this says what is true.
 # [dialect]: a departure the dialect means (roc-markdown's README);
 # [gap?]: one it does not name, a candidate bug for Steve to rule on.
