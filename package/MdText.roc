@@ -26,6 +26,23 @@ MdText := [].{
 		budget : Budget,
 	}
 
+	## What a block's renderer made, and where the source after it starts.
+	Block : {
+		out : List(U8),
+		budget : Budget,
+		after : U64,
+	}
+
+	## A container's content (a list item's, a quote's), handed back to Md's
+	## dispatcher to render as blocks one level deeper (MdList, MdQuote).
+	## `Tight` is a tight list item's: its paragraphs have no `<p>`.
+	Nested : {
+		out : List(U8),
+		md : List(U8),
+		spacing : [Tight, Loose],
+		budget : Budget,
+	}
+
 	## A member's message's budget: 16 units a byte, and 256 over. The
 	## densest linear text costs about 4.5 a byte.
 	for_input : List(U8) -> Budget

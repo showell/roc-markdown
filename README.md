@@ -90,7 +90,11 @@ The Roc is pinned (`roc-version`): `roc` on the PATH, or `-Droc=<path>`
 ## Layout
 
 - `package/main.roc`: the package and what it exposes.
-- `package/Md.roc`: the blocks and the render.
+- `package/Md.roc`: the render, its modes, the block dispatch and the leaf
+  blocks.
+- `package/MdList.roc`, `package/MdQuote.roc`: the container blocks, lists
+  and quotes, handed the dispatch by `Md`.
+- `package/MdTable.roc`: a table row's cells and alignments.
 - `package/MdInline.roc`: a line's inline markup and links.
 - `package/MdText.roc`: lines, escaping and the work budget.
 - `package/MdFence.roc`: code fences.

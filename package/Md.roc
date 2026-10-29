@@ -1,10 +1,19 @@
 ## **THE CHAT'S MARKDOWN** (ported from chat-markdown markdown.zig, metal-vmm
 ## QUEUE 305; this is the dialect's definition now): a member's message to
 ## HTML. GFM-style paragraphs with hard wraps, ATX headings, fenced code
-## (with the `quote` fence of a reply), lists, blockquotes, GFM's pipe
-## tables (MdTable), and the raw HTML block, which is escaped but for a
-## same-origin `<img>` or `<video>` (MdMedia); each line's inline content
-## is MdInline's. Pure.
+## (with the `quote` fence of a reply), lists (MdList), blockquotes
+## (MdQuote), GFM's pipe tables (MdTable), and the raw HTML block, which is
+## escaped but for a same-origin `<img>` or `<video>` (MdMedia); each
+## line's inline content is MdInline's. Pure.
+##
+## **THIS MODULE IS THE API, THE MODES AND THE DISPATCH**, and the leaf
+## blocks. The containers, lists and quotes, are modules of their own; their
+## content is blocks again, so `blocks_onto` hands each the recursion
+## (`nested`, at one level deeper, in this render's wrap) and the block
+## starts it asks about (`is_block_start`, `is_table_at`), rather than each
+## importing Md, a cycle. A new block kind is a branch of `blocks_onto`, and
+## a line of `is_block_start` (and of `paragraph_onto`'s stop) when it
+## interrupts a paragraph.
 ##
 ## **THE PARSER IS THE JUDGE OF HOSTILITY**: a render charges its work to a
 ## budget (MdText), checked at each block line and each inline step, and a
@@ -20,7 +29,9 @@ import Bytes
 import MdText
 import MdFence
 import MdInline
+import MdList
 import MdMedia
+import MdQuote
 import MdTable
 
 Md := [].{
@@ -133,6 +144,17 @@ blocks_onto = |
 		Ok({ out: List.concat(flat.out, p_close), budget: flat.budget })
 	} else {
 		len = List.len(md)
+		# A container's content is blocks one level deeper, in this render's
+		# wrap: the recursion MdList and MdQuote are handed, so they need no
+		# import of Md (a cycle) and the depth stays this module's.
+		nested = |inner| blocks_onto({
+			out: inner.out,
+			md: inner.md,
+			spacing: inner.spacing,
+			depth: depth + 1,
+			wrap,
+			budget: inner.budget,
+		})
 		var $out = out
 		var $budget = budget
 		var $pos = 0
@@ -198,17 +220,18 @@ blocks_onto = |
 								$pos = next
 							}
 							Err(NotAHeading) =>
-								match list_marker_at(md, $pos) {
+								match MdList.list_marker_at(md, $pos) {
 									Ok(marker) => {
-										listed = list_onto(
+										listed = MdList.list_onto(
 											tight_sep($out, spacing),
 											{
 												md,
 												pos: $pos,
 												first: marker,
-												depth,
-												wrap,
 												budget: $budget,
+												nested,
+												is_block_start,
+												is_table_at,
 											},
 										)?
 										$out = listed.out
@@ -216,15 +239,16 @@ blocks_onto = |
 										$pos = listed.after
 									}
 									Err(NotAMarker) =>
-										if is_quote_line(line) {
-											quoted = quote_onto(
+										if MdQuote.is_quote_line(line) {
+											quoted = MdQuote.quote_onto(
 												tight_sep($out, spacing),
 												{
 													md,
 													pos: $pos,
-													depth,
-													wrap,
 													budget: $budget,
+													nested,
+													is_block_start,
+													is_table_at,
 												},
 											)?
 											$out = quoted.out
@@ -285,13 +309,6 @@ blocks_onto = |
 		Ok({ out: $out, budget: $budget })
 	}
 
-## What a block's renderer made, and where the source after it starts.
-Block : {
-	out : List(U8),
-	budget : MdText.Budget,
-	after : U64,
-}
-
 ## A paragraph: the longest run of lines that are not blank and start no
 ## block that may interrupt one. In the hard-wrap dialect each line is
 ## rendered on its own and joined by `<br>`; in reflow the lines join with
@@ -303,7 +320,7 @@ paragraph_onto : List(U8),
 	spacing : [Tight, Loose],
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
-} -> Try(Block, [Hostile])
+} -> Try(MdText.Block, [Hostile])
 paragraph_onto = |
 	out,
 	{
@@ -326,10 +343,10 @@ paragraph_onto = |
 		if MdText.is_blank(line) or fence_open_at(
 			md,
 			$p,
-		).is_ok() or atx_heading(line).is_ok() or is_list_interrupting(
+		).is_ok() or atx_heading(line).is_ok() or MdList.is_list_interrupting(
 			md,
 			$p,
-		) or is_quote_line(line) or ($p > pos and is_table_at(md, $p)) {
+		) or MdQuote.is_quote_line(line) or ($p > pos and is_table_at(md, $p)) {
 			break
 		} else {
 			{}
@@ -397,7 +414,7 @@ fence_onto : List(U8),
 	md : List(U8),
 	open : { open : MdFence.Open, body_start : U64 },
 	budget : MdText.Budget,
-} -> Block
+} -> MdText.Block
 fence_onto = |
 	out,
 	{
@@ -495,244 +512,7 @@ atx_heading = |line| {
 	}
 }
 
-# ── lists ──
-
-## A list item's marker: its kind, the spaces before it, the column its
-## content starts at (the item's indent), and where its content starts in
-## the source.
-Marker : {
-	kind : [Bullet(U8), Ordered({ start : U64, delim : U8 })],
-	content_col : U64,
-	content_start : U64,
-}
-
-## markdown `listMarkerAt`: up to three spaces, then `-`, `+`, `*`, or up to
-## nine digits and `.` or `)`, then a space, a tab or the line's end. One
-## to four spaces after are the content's indent; more is one, the rest the
-## content's.
-list_marker_at : List(U8), U64 -> Try(Marker, [NotAMarker])
-list_marker_at = |md, pos| {
-	eol = MdText.line_end(md, pos)
-	line = MdText.cut(md, { start: pos, end: eol })
-	n = List.len(line)
-	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
-	if indent >= 4 or indent >= n {
-		Err(NotAMarker)
-	} else {
-		c = MdText.at(line, indent)
-		found =
-			if c == '-' or c == '+' or c == '*' {
-				Ok({ kind: Bullet(c), marker_end: indent + 1 })
-			} else if Ascii.is_digit(c) {
-				digits_end = U64.min(
-					Bytes.count_while(line, { keep: Ascii.is_digit, at: indent }),
-					indent + 9,
-				)
-				match List.get(line, digits_end) {
-					Ok(delim) if delim == '.' or delim == ')' => {
-						start = List.fold(
-							MdText.cut(line, { start: indent, end: digits_end }),
-							0,
-							|acc, d| acc * 10 + (d - '0').to_u64(),
-						)
-						Ok({ kind: Ordered({ start, delim }), marker_end: digits_end + 1 })
-					}
-					_ => Err(NotAMarker)
-				}
-			} else {
-				Err(NotAMarker)
-			}
-		{ kind, marker_end } = found?
-		after = List.get(line, marker_end)
-		if after != Err(OutOfBounds) and after != Ok(' ') and after != Ok('\t') {
-			Err(NotAMarker)
-		} else {
-			spaces = Bytes.count_while(line, { keep: |s| s == ' ', at: marker_end }) - marker_end
-			if marker_end >= n {
-				Ok({
-					kind,
-					content_col: marker_end + 1,
-					content_start: eol,
-				})
-			} else if spaces == 0 or spaces > 4 {
-				Ok({
-					kind,
-					content_col: marker_end + 1,
-					content_start: pos + marker_end + (if spaces == 0 0 else 1),
-				})
-			} else {
-				Ok({
-					kind,
-					content_col: marker_end + spaces,
-					content_start: pos + marker_end + spaces,
-				})
-			}
-		}
-	}
-}
-
-## markdown `sameListType`: the same bullet, or the same ordered delimiter.
-is_same_list : Marker, Marker -> Bool
-is_same_list = |a, b| match (a.kind, b.kind) {
-	(Bullet(x), Bullet(y)) => x == y
-	(Ordered(x), Ordered(y)) => x.delim == y.delim
-	_ => Bool.False
-}
-
-## markdown `listInterruptsAt`: a list may interrupt a paragraph when its
-## first item is not empty, and an ordered one only when it starts at 1.
-is_list_interrupting : List(U8), U64 -> Bool
-is_list_interrupting = |md, pos| match list_marker_at(md, pos) {
-	Ok(m) =>
-		m.content_start < MdText.line_end(md, pos) and match m.kind {
-			Ordered(o) => o.start == 1
-			Bullet(_) => Bool.True
-		}
-	Err(NotAMarker) => Bool.False
-}
-
-## markdown `renderList`: the whole list from `pos`, its first marker
-## `first`. Each item's content is gathered dedented, its inner blank lines
-## kept, and rendered as blocks one level deeper; a blank line between
-## items, or inside one, makes the list loose, whose paragraphs keep their
-## `<p>`.
-list_onto : List(U8),
-{
-	md : List(U8),
-	pos : U64,
-	first : Marker,
-	depth : U64,
-	wrap : [HardWrap, Reflow],
-	budget : MdText.Budget,
-} -> Try(Block, [Hostile])
-list_onto = |
-	out,
-	{
-		md,
-		pos,
-		first,
-		depth,
-		wrap,
-		budget,
-	},
-| {
-	len = List.len(md)
-	var $items = []
-	var $loose = Bool.False
-	var $cur = []
-	var $have_item = Bool.False
-	var $cur_col = first.content_col
-	var $blanks = 0
-	var $p = pos
-	while $p < len {
-		eol = MdText.line_end(md, $p)
-		line = MdText.cut(md, { start: $p, end: eol })
-		next = MdText.next_line(md, eol)
-		if MdText.is_blank(line) {
-			$blanks = $blanks + 1
-			$p = next
-		} else {
-			indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 })
-			marker = list_marker_at(md, $p)
-			match marker {
-				Ok(m) if indent < $cur_col => {
-					if !is_same_list(m, first) {
-						break
-					} else {
-						{}
-					}
-					if $have_item {
-						$items = List.append($items, $cur)
-						$loose = $loose or $blanks > 0
-					} else {
-						{}
-					}
-					$have_item = Bool.True
-					$cur_col = m.content_col
-					$blanks = 0
-					$cur = List.append(MdText.cut(md, { start: m.content_start, end: eol }), '\n')
-				}
-				_ =>
-					if indent >= $cur_col and $have_item {
-						# An indented line: the item's own, its nested blocks.
-						# The blank lines before it are the item's too: they
-						# part its paragraphs and stay in its fences.
-						$loose = $loose or $blanks > 0
-						$cur = List.concat($cur, List.repeat('\n', $blanks))
-						$blanks = 0
-						$cur = List.append(List.concat($cur, List.drop_first(line, $cur_col)), '\n')
-					} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
-						# A lazy continuation of the item's paragraph.
-						$cur = List.append(List.concat($cur, line), '\n')
-					} else {
-						break
-					}
-			}
-			$p = next
-		}
-	}
-	items = if $have_item List.append($items, $cur) else $items
-	open = match first.kind {
-		Ordered(o) if o.start == 1 => Str.to_utf8("<ol>\n")
-		Ordered(o) => Str.to_utf8("<ol start=\"${o.start.to_str()}\">\n")
-		Bullet(_) => Str.to_utf8("<ul>\n")
-	}
-	var $out = List.concat(out, open)
-	var $budget = budget
-	for item in items {
-		# Each item renders into a buffer of its own, so its tight
-		# separator sees only its content, not the <li>.
-		lead = if $loose or is_first_child_block(item) ['\n'] else []
-		inner = blocks_onto({
-			out: lead,
-			md: item,
-			spacing: if $loose Loose else Tight,
-			depth: depth + 1,
-			wrap,
-			budget: $budget,
-		})?
-		# Appended in place, `$out` unique and first: a List.join of it
-		# copies every byte so far, once an item.
-		$out = List.concat($out, Str.to_utf8("<li>"))
-		$out = List.concat($out, inner.out)
-		$out = List.concat($out, Str.to_utf8("</li>\n"))
-		$budget = inner.budget
-	}
-	close = match first.kind {
-		Ordered(_) => Str.to_utf8("</ol>\n")
-		Bullet(_) => Str.to_utf8("</ul>\n")
-	}
-	Ok({
-		out: List.concat($out, close),
-		budget: $budget,
-		after: $p,
-	})
-}
-
-## markdown `firstItemChildIsBlock`: a tight item starts on a line of its
-## own when its first child is a list, a quote, a fence, a heading or a
-## table, not a paragraph.
-is_first_child_block : List(U8) -> Bool
-is_first_child_block = |item| {
-	len = List.len(item)
-	var $pos = 0
-	while $pos < len {
-		eol = MdText.line_end(item, $pos)
-		line = MdText.cut(item, { start: $pos, end: eol })
-		if !MdText.is_blank(line) {
-			return list_marker_at(
-				item,
-				$pos,
-			).is_ok() or is_quote_line(line) or fence_open_at(
-				item,
-				$pos,
-			).is_ok() or atx_heading(line).is_ok() or is_table_at(item, $pos)
-		} else {
-			$pos = MdText.next_line(item, eol)
-		}
-	}
-	Bool.False
-}
+# ── block starts ──
 
 ## markdown `lineStartsBlock`: the line at `pos` starts a block a lazy
 ## continuation may not take in (a blank line, a list item, a quote, a
@@ -740,10 +520,10 @@ is_first_child_block = |item| {
 is_block_start : List(U8), U64 -> Bool
 is_block_start = |md, pos| {
 	line = MdText.cut(md, { start: pos, end: MdText.line_end(md, pos) })
-	MdText.is_blank(line) or list_marker_at(
+	MdText.is_blank(line) or MdList.list_marker_at(
 		md,
 		pos,
-	).is_ok() or is_quote_line(line) or fence_open_at(md, pos).is_ok() or atx_heading(line).is_ok()
+	).is_ok() or MdQuote.is_quote_line(line) or fence_open_at(md, pos).is_ok() or atx_heading(line).is_ok()
 }
 
 # ── tables ──
@@ -791,7 +571,7 @@ table_onto : List(U8),
 	md : List(U8),
 	pos : U64,
 	budget : MdText.Budget,
-} -> Try(Block, [Hostile])
+} -> Try(MdText.Block, [Hostile])
 table_onto = |out, { md, pos, budget }| match table_at(md, pos) {
 	Err(NotATable) => crash "Md.table_onto: no table where the dispatcher found one"
 	Ok(table) => {
@@ -872,97 +652,6 @@ cell_open = |tag, align| {
 		Right => " align=\"right\""
 	}
 	List.append(List.concat(Str.to_utf8(name), Str.to_utf8(attr)), '>')
-}
-
-# ── blockquotes ──
-
-## markdown `quoteMarkerLen`: the prefix a quote's line drops: up to three
-## spaces, a `>`, and one space after it.
-quote_marker_len : List(U8) -> Try(U64, [NotAQuote])
-quote_marker_len = |line| {
-	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
-	if indent >= 4 or List.get(line, indent) != Ok('>') {
-		Err(NotAQuote)
-	} else if List.get(line, indent + 1) == Ok(' ') {
-		Ok(indent + 2)
-	} else {
-		Ok(indent + 1)
-	}
-}
-
-is_quote_line : List(U8) -> Bool
-is_quote_line = |line| quote_marker_len(line).is_ok()
-
-## markdown `renderQuote`: the quote from `pos`, its `>` lines (and a
-## paragraph's lazy lines, up to a blank one) stripped and rendered as
-## blocks one level deeper.
-quote_onto : List(U8),
-{
-	md : List(U8),
-	pos : U64,
-	depth : U64,
-	wrap : [HardWrap, Reflow],
-	budget : MdText.Budget,
-} -> Try(Block, [Hostile])
-quote_onto = |
-	out,
-	{
-		md,
-		pos,
-		depth,
-		wrap,
-		budget,
-	},
-| {
-	len = List.len(md)
-	var $inner = []
-	var $last_was_text = Bool.False
-	# A table's rows are no paragraph's, so no line is lazy after them:
-	# the table is open from its delimiter row to a blank line or a block.
-	var $in_table = Bool.False
-	var $prev_start = 0
-	var $p = pos
-	while $p < len {
-		eol = MdText.line_end(md, $p)
-		line = MdText.cut(md, { start: $p, end: eol })
-		if MdText.is_blank(line) {
-			break
-		} else {
-			{}
-		}
-		match quote_marker_len(line) {
-			Ok(strip) => {
-				stripped = List.drop_first(line, strip)
-				start = List.len($inner)
-				$inner = List.append(List.concat($inner, stripped), '\n')
-				ends_text = MdText.is_blank(stripped) or is_block_start(md, $p + strip)
-				$in_table = !ends_text and ($in_table or ($last_was_text and is_table_at($inner, $prev_start)))
-				$last_was_text = !ends_text and !$in_table
-				$prev_start = start
-			}
-			Err(NotAQuote) =>
-				if $last_was_text and !is_block_start(md, $p) {
-					$prev_start = List.len($inner)
-					$inner = List.append(List.concat($inner, line), '\n')
-				} else {
-					break
-				}
-		}
-		$p = MdText.next_line(md, eol)
-	}
-	quoted = blocks_onto({
-		out: List.concat(out, Str.to_utf8("<blockquote>\n")),
-		md: $inner,
-		spacing: Loose,
-		depth: depth + 1,
-		wrap,
-		budget,
-	})?
-	Ok({
-		out: List.concat(quoted.out, Str.to_utf8("</blockquote>\n")),
-		budget: quoted.budget,
-		after: $p,
-	})
 }
 
 # ── raw HTML ──
