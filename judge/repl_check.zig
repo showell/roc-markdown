@@ -110,7 +110,7 @@ pub fn main(init: std.process.Init) !void {
     const exs = try repl.examples(a);
     for (exs) |e| try cases.append(a, try findCase(io, data, a, "examples", e.id));
     for (exs) |e| check(e.caption.len > 0, "{s}\tan example with no caption", .{e.id});
-    check(exs.len >= 4, "examples\tonly {d} canned examples", .{exs.len});
+    check(exs.len >= 5, "examples\tonly {d} canned examples", .{exs.len});
 
     // The hostile shape, generated as the judge generates it.
     const hostile = for (try judge.hostileCases(a)) |c| {

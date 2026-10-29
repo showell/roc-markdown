@@ -8,5 +8,5 @@ spec_strike 2
 spec_escapes 13
 spec_images 22
 pinned 3
-examples 4
+examples 5
 hostile 1097

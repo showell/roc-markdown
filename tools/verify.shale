@@ -12,7 +12,9 @@
 --
 -- The checks:
 --   - `zig build test`: the package's expects, the judge, and the REPL
---     piped against the frozen answers (judge/repl_check.zig); the judge's count
+--     piped against the frozen answers (judge/repl_check.zig), the
+--     playground's wasm in node against them too and its page on a stand-in
+--     DOM (playground/check.zig); the judge's count
 --     a corpus must be exactly what `want` says: a different number is a
 --     FAIL, never a pass;
 --   - the paren and table shapes linear in their work units, and a ragged
@@ -38,9 +40,9 @@
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
 -- Each corpus's case count, exactly.
-const want = {adversarial = 29, dialect = 7, unit_cases = 69, spec_agree = 269, spec_tables = 8, spec_strike = 2, spec_escapes = 13, spec_images = 22, pinned = 3, examples = 4, hostile = 1097}
+const want = {adversarial = 29, dialect = 7, unit_cases = 69, spec_agree = 269, spec_tables = 8, spec_strike = 2, spec_escapes = 13, spec_images = 22, pinned = 3, examples = 5, hostile = 1097}
 const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "spec_tables", "spec_strike", "spec_escapes", "spec_images", "pinned", "examples", "hostile"}
-const want_total = 1523
+const want_total = 1524
 const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
 const scratch_data = ".zig-cache/verify/data"
@@ -101,6 +103,12 @@ say(total == want_total, "cases in all: " .. total .. " (want " .. want_total ..
 -- The REPL, piped, against the frozen answers (judge/repl_check.zig).
 local rl = re_find(t.out, "== repl: [^\n]*")
 say(rl ~= nil and re_find(rl.text, " 0 fail$") ~= nil, "the REPL: " .. (rl ~= nil and sub(rl.text, 9) or "no `== repl` line"))
+-- The playground's wasm in node against the frozen answers, and its page
+-- (playground/check.zig).
+local pl = re_find(t.out, "== playground: [^\n]*")
+say(pl ~= nil and re_find(pl.text, " 0 fail;") ~= nil, "the playground: " .. (pl ~= nil and sub(pl.text, 15) or "no `== playground` line"))
+local pg = re_find(t.out, "== page: [^\n]*")
+say(pg ~= nil, "the playground's page: " .. (pg ~= nil and sub(pg.text, 10) or "no `== page` line"))
 
 -- ── the paren and table shapes stay linear (QUEUE 311) ──
 -- Each shape's work units at 8,191 against its units at 1,000: linear is
@@ -238,10 +246,10 @@ plant("markup kept inside an alt", "dialect.answers.jsonl", "swap", {old = "alt=
 plant("a javascript: src rendered", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"\\\">js</a>", new = "<img src=\\\"javascript:alert(1)\\\" alt=\\\"js\\\">"}, "FAILID\tdialect\t")
 
 -- ── the formatters ──
-local zf = run({"zig", "fmt", "--check", "build.zig", "judge"}, {cwd = ".", timeout_ms = 60000, tail = 20})
-say(zf.code == 0, "zig fmt --check build.zig judge" .. (zf.code == 0 and "" or (": " .. trim(zf.out))))
-local rf = run({"roc", "fmt", "--check", "package", "judge"}, {cwd = ".", timeout_ms = 60000, tail = 20})
-say(rf.code == 0, "roc fmt --check package judge")
+local zf = run({"zig", "fmt", "--check", "build.zig", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
+say(zf.code == 0, "zig fmt --check build.zig judge playground" .. (zf.code == 0 and "" or (": " .. trim(zf.out))))
+local rf = run({"roc", "fmt", "--check", "package", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
+say(rf.code == 0, "roc fmt --check package judge playground")
 
 -- ── roc-chat against this package ──
 -- roc-chat's app names `../../roc-markdown/package/main.roc`: a copy of

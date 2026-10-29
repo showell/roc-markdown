@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>roc-markdown playground</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header>
+  <h1>roc-markdown</h1>
+  <a class="source-link" href="https://github.com/showell/roc-markdown" target="_blank" rel="noopener">source on GitHub</a>
+  <label>example <select id="example"></select></label>
+  <fieldset id="modes">
+    <legend>mode</legend>
+    <label title="Md.render: the chat's, with its work budget"><input type="radio" name="mode" value="chat" checked> chat</label>
+    <label title="Md.render_trusted: docs, no budget"><input type="radio" name="mode" value="trusted"> trusted</label>
+    <label title="Md.render_trusted_reflow: docs, newlines as spaces"><input type="radio" name="mode" value="reflow"> reflow</label>
+  </fieldset>
+  <label><input type="checkbox" id="show-source"> HTML source</label>
+</header>
+<p id="caption"></p>
+<main>
+  <textarea id="source" spellcheck="false" autocomplete="off" aria-label="markdown"></textarea>
+  <div id="output">
+    <div id="preview" class="md"></div>
+    <pre id="html" hidden></pre>
+  </div>
+</main>
+<footer>
+  <dl id="answers">
+    <dt>work units</dt><dd id="units"></dd>
+    <dt>hostility</dt><dd id="hostility"></dd>
+  </dl>
+  <p id="error" hidden></p>
+  <p class="legend">chat: <code>Md.render</code>, budgeted; a newline is <code>&lt;br&gt;</code>. trusted: <code>Md.render_trusted</code>, no budget. reflow: <code>Md.render_trusted_reflow</code>, a newline is a space. The renderer is the package itself, compiled to WebAssembly.</p>
+</footer>
+</body>
+</html>
