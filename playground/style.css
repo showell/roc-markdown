@@ -39,6 +39,15 @@ header {
   border-bottom: 1px solid var(--line);
 }
 header h1 { font-size: 17px; margin: 0; }
+/* The way to the code, beside the title, where a reader looks first. */
+.source-link {
+  font-weight: 600;
+  padding: 2px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  text-decoration: none;
+}
+.source-link:hover { background: var(--panel); }
 fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 10px; }
 legend { float: left; margin-right: 6px; color: var(--muted); padding: 0; }
 select { font: inherit; }

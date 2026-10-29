@@ -34,9 +34,9 @@
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
 -- Each corpus's case count, exactly.
-const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, spec_tables = 8, pinned = 3, examples = 4, hostile = 1032}
+const want = {adversarial = 29, dialect = 3, unit_cases = 69, spec_agree = 269, spec_tables = 8, pinned = 3, examples = 5, hostile = 1032}
 const want_order = {"adversarial", "dialect", "unit_cases", "spec_agree", "spec_tables", "pinned", "examples", "hostile"}
-const want_total = 1417
+const want_total = 1418
 const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
 const scratch_data = ".zig-cache/verify/data"

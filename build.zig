@@ -141,7 +141,9 @@ fn playgroundSite(b: *std.Build, roc: []const u8) Site {
 
     const files = b.addWriteFiles();
     _ = files.addCopyFile(md_wasm, "md.wasm");
-    for ([_][]const u8{ "index.html", "app.js", "md_wasm.js", "style.css" }) |f|
+    // sample.png is the `safety` example's same-origin image, served beside
+    // the page at /markdown/sample.png.
+    for ([_][]const u8{ "index.html", "app.js", "md_wasm.js", "style.css", "sample.png" }) |f|
         _ = files.addCopyFile(b.path(b.fmt("playground/{s}", .{f})), f);
     // The canned examples are the judge's corpus, one home.
     _ = files.addCopyFile(b.path("judge/data/examples.jsonl"), "examples.jsonl");

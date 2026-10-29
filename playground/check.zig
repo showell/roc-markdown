@@ -93,7 +93,7 @@ pub fn main(init: std.process.Init) !void {
     // The cases: every canned example, the picks, the hostile shape.
     var cases: std.ArrayList(Case) = .empty;
     const exs = try judge.readCorpus(io, data, a, "examples.jsonl");
-    check(exs.len >= 4, "examples\tonly {d} canned examples", .{exs.len});
+    check(exs.len >= 5, "examples\tonly {d} canned examples", .{exs.len});
     for (exs) |e| try cases.append(a, try findCase(io, data, a, "examples", e.id));
     for (picks) |p| try cases.append(a, try findCase(io, data, a, p.corpus, p.id));
     const hostile = for (try judge.hostileCases(a)) |c| {

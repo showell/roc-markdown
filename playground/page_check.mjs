@@ -28,7 +28,9 @@ const named = [...page.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
 for (const n of named) {
   if (/^https?:/.test(n)) {
     // A link a reader follows is fine; a script, a style or an image is not.
-    check(page.includes(`<a href="${n}"`), `the page loads ${n} from elsewhere`);
+    // An <a> element's href, wherever the attribute sits in its tag.
+    const asLink = new RegExp(`<a\\s[^>]*href="${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`);
+    check(asLink.test(page), `the page loads ${n} from elsewhere`);
   } else {
     check(existsSync(`${dir}/${n}`), `the page names ${n}, which is not in the folder`);
   }
@@ -117,7 +119,7 @@ const shows = (src, mode, what) => {
 };
 
 const examples = readFileSync(`${dir}/examples.jsonl`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-check(examples.length >= 4, `only ${examples.length} examples`);
+check(examples.length >= 5, `only ${examples.length} examples`);
 check($("example").children.filter((o) => o.value !== "").map((o) => o.value).join() === examples.map((e) => e.id).join(), "the menu is not the examples");
 
 // It starts on the first example.
