@@ -1,10 +1,11 @@
 ## **THE CHAT'S MARKDOWN** (ported from chat-markdown markdown.zig, metal-vmm
 ## QUEUE 305; this is the dialect's definition now): a member's message to
 ## HTML. GFM-style paragraphs with hard wraps, ATX headings, fenced code
-## (with the `quote` fence of a reply), lists (MdList), blockquotes
-## (MdQuote), GFM's pipe tables (MdTable), and the raw HTML block, which is
-## escaped but for a same-origin `<img>` or `<video>` (MdMedia); each
-## line's inline content is MdInline's. Pure.
+## (with the chat's `quote` fence of a reply, MdChat), lists (MdList),
+## blockquotes (MdQuote), GFM's pipe tables (MdTable), and the raw HTML
+## block, which is escaped but for a same-origin `<img>` or `<video>`
+## (MdMedia); each line's inline content is MdInline's. Every tag is
+## MdHtml's. Pure.
 ##
 ## **THIS MODULE IS THE API, THE MODES AND THE DISPATCH**, and the leaf
 ## blocks. The containers, lists and quotes, are modules of their own; their
@@ -27,6 +28,7 @@
 import Ascii
 import Bytes
 import MdText
+import MdChat
 import MdFence
 import MdHtml
 import MdInline
@@ -423,7 +425,7 @@ fence_onto = |
 		}
 	}
 	content = MdText.cut(md, { start: body_start, end: $content_end })
-	is_quote = open.lang == Str.to_utf8("quote")
+	is_quote = MdChat.is_quote_fence(open.lang)
 	(head, tail) = if is_quote (MdHtml.chat_quote_open, MdHtml.chat_quote_close) else (MdHtml.code_block_open(open.lang), MdHtml.code_block_close)
 	code = code_lines_onto(List.concat(out, head), { content, indent: open.indent })
 	{

@@ -96,10 +96,6 @@ MdText := [].{
 	is_word_char : U8 -> Bool
 	is_word_char = |c| Ascii.is_alphanumeric(c) or c == '_'
 
-	## markdown_text `isSlugChar`: a `MSG_` reference's slug.
-	is_slug_char : U8 -> Bool
-	is_slug_char = |c| Ascii.is_alphanumeric(c) or c == '-'
-
 	## markdown_text `isAttrNameChar`: an HTML attribute's name.
 	is_attr_name_char : U8 -> Bool
 	is_attr_name_char = |c| Ascii.is_alphanumeric(c) or c == '-' or c == '_' or c == ':'

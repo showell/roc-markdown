@@ -4,6 +4,7 @@
 ## Recent's excerpt's (Feeds, Recent, metal-vmm QUEUE 300) are this one
 ## grammar. Pure.
 import Bytes
+import MdChat
 
 MdFence := [].{
 
@@ -17,7 +18,8 @@ MdFence := [].{
 	}
 
 	## markdown_fence `parseOpen`: up to three spaces, 3 to 10 of '`' or '~'
-	## (a longer run is past the nesting cap, ordinary text), and an info
+	## (a longer run is past the quote-reply's nesting cap, MdChat's, and
+	## ordinary text), and an info
 	## string whose first word is the language; a backtick fence's info
 	## string holds no backtick.
 	open : List(U8) -> Try(Open, [NotAFence])
@@ -31,7 +33,7 @@ MdFence := [].{
 				} else {
 					count = Bytes.count_while(line, { keep: |c| c == f, at: indent }) - indent
 					info = Bytes.trim(List.drop_first(line, indent + count), info_space)
-					if count < 3 or count > max_run or (f == '`' and List.contains(info, '`')) {
+					if count < 3 or count > MdChat.max_fence_run or (f == '`' and List.contains(info, '`')) {
 						Err(NotAFence)
 					} else {
 						lang = List.take_first(
@@ -86,11 +88,6 @@ MdFence := [].{
 		$j
 	}
 }
-
-## markdown_fence `max_nest_levels` (8) plus 2: a level-8 quote-reply opens
-## with 10 characters, and a longer run is no fence.
-max_run : U64
-max_run = 10
 
 info_space : List(U8)
 info_space = [

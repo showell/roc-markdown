@@ -1,8 +1,8 @@
-## **THE INLINE PASS** (chat-markdown markdown_inline.zig, with the
-## `MSG_` references of markdown_links.zig): one line of inline content to
+## **THE INLINE PASS** (chat-markdown markdown_inline.zig): one line of inline content to
 ## HTML. The line is cut into pieces (text to escape; html made here, for a
 ## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link
-## or an autolink (MdLinks), or a `MSG_` reference; and `*`/`_` runs), the
+## or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
+## `*`/`_` runs), the
 ## runs are matched into `<em>` and `<strong>` (MdEmphasis), and the pieces
 ## are written out. Pure.
 ##
@@ -13,8 +13,8 @@
 ## scan reads is charged to the budget, and the walk stops as hostile the
 ## moment it is blown: the Zig's charges, unit for unit, so a message the
 ## Zig refuses is a message this refuses.
-import Ascii
 import Bytes
+import MdChat
 import MdHtml
 import MdText
 import MdMedia
@@ -24,7 +24,7 @@ import MdLinks
 MdInline := [].{
 
 	## markdown_inline `renderInline`: `text` rendered onto `out`. `Linked`
-	## turns a `MSG_` reference into its link; `InLabel` leaves it text, as a
+	## turns the chat's `MSG_` reference (MdChat) into its link; `InLabel` leaves it text, as a
 	## link's label must be, being inside an `<a>` already.
 	render_onto : {
 		out : List(U8),
@@ -57,21 +57,20 @@ MdInline := [].{
 				{}
 			}
 			c = MdText.at(text, $i)
-			# A MSG_ reference is read first, whole: its `_`s would otherwise
-			# be read as emphasis and split it.
-			ref_end = if refs == Linked and c == 'M' msg_ref_end(text, $i) else Err(NoRef)
-			match ref_end {
-				Ok(end) => {
+			# The chat's reference (MdChat) is read first, whole.
+			reference = if refs == Linked MdChat.reference_at(text, $i) else Err(NoRef)
+			match reference {
+				Ok(ref) => {
 					$pieces = with_token(
 						$pieces,
 						{
 							run_start: $run_start,
 							at: $i,
-							token: Html(MdHtml.msg_ref({ slug: MdText.cut(text, { start: $i + 4, end }), label: MdText.cut(text, { start: $i, end }) })),
+							token: Html(ref.html),
 						},
 					)
-					$i = end
-					$run_start = end
+					$i = ref.end
+					$run_start = ref.end
 				}
 				Err(NoRef) =>
 					if c == '<' {
@@ -310,35 +309,6 @@ emit = |
 	$out
 }
 
-# ── MSG_ references (markdown_links) ──
-
-## markdown_links `msgRefEnd`: `\bMSG_([A-Za-z0-9-]+_[0-9]+)\b` at `i`, and
-## the index past it.
-msg_ref_end : List(U8), U64 -> Try(U64, [NoRef])
-msg_ref_end = |text, i| {
-	len = List.len(text)
-	if i + 4 > len or MdText.cut(text, { start: i, end: i + 4 }) != msg_prefix {
-		Err(NoRef)
-	} else if i > 0 and MdText.is_word_char(MdText.at(text, i - 1)) {
-		Err(NoRef)
-	} else {
-		slug_end = Bytes.count_while(text, { keep: MdText.is_slug_char, at: i + 4 })
-		if slug_end == i + 4 or slug_end >= len or MdText.at(text, slug_end) != '_' {
-			Err(NoRef)
-		} else {
-			end = Bytes.count_while(text, { keep: Ascii.is_digit, at: slug_end + 1 })
-			if end == slug_end + 1 or (
-				end < len and MdText.is_word_char(
-					MdText.at(
-						text,
-						end,
-					),
-				)
-			) Err(NoRef) else Ok(end)
-		}
-	}
-}
-
 # ── code spans ──
 
 ## markdown_inline `codeSpanAt`: the backtick run at `at` closed by a run of
@@ -402,9 +372,6 @@ code_span_content = |content| {
 		content
 	}
 }
-
-msg_prefix : List(U8)
-msg_prefix = Str.to_utf8("MSG_")
 
 inline : Str -> Str
 inline = |text| match MdInline.render_onto({
