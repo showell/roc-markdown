@@ -1,6 +1,6 @@
-## **THE CHAT'S MARKDOWN** (chat-markdown markdown.zig, the definition of
-## the dialect, ported faithfully; metal-vmm QUEUE 305): a member's message
-## to HTML. GFM-style paragraphs with hard wraps, ATX headings, fenced code
+## **THE CHAT'S MARKDOWN** (ported from chat-markdown markdown.zig, metal-vmm
+## QUEUE 305; this is the dialect's definition now): a member's message to
+## HTML. GFM-style paragraphs with hard wraps, ATX headings, fenced code
 ## (with the `quote` fence of a reply), lists, blockquotes, and the raw
 ## HTML block, which is escaped but for a same-origin `<img>` or `<video>`
 ## (MdMedia); each line's inline content is MdInline's. Pure.
@@ -9,9 +9,8 @@
 ## budget (MdText), checked at each block line and each inline step, and a
 ## message that blows it renders as `malformed_html` and is refused at
 ## POST (`hostility`). There is no second model of "too much" to drift from
-## the parser. The work, unit for unit, is the Zig's: angry-gopher's
-## markdown_twin_test.zig holds every corpus case to equal html and equal
-## `work_units`.
+## the parser. angry-gopher's markdown_twin_test.zig holds every corpus case
+## to its frozen html and `work_units`.
 ##
 ## A block nested past `max_block_depth` renders as one flat paragraph, so
 ## no message recurses deeper than that; every walk along a line is a loop.

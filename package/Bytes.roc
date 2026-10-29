@@ -1,91 +1,14 @@
 ## BYTES AS ZIG'S std.mem HANDLES THEM: the searches, scans and trims the
-## chat's modules share, each in one place (`std.mem.indexOf`,
-## `indexOfScalar`, `trim`, `trimRight`, `order`), on bytes, never Str; the
-## splits and prefixes are List's own (`split_on`, `split_on_list`,
-## `starts_with`), and a byte's class is Ascii's. Pure.
+## markdown's modules share, each in one place (`std.mem.indexOf`,
+## `indexOfScalar`, `trim`), on bytes, never Str; a byte's class is Ascii's.
+## Pure. The package's own: roc-webbox's chat has a Bytes of its own, and the
+## two are free to differ.
 
 Bytes := [].{
-
-	join_lines : List(List(U8)) -> List(U8)
-	join_lines = |lines| List.join(List.intersperse(lines, ['\n']))
-
-	## The bytes before and after the first `needle`.
-	cut_seq : List(U8), List(U8) -> Try((List(U8), List(U8)), [NotFound])
-	cut_seq = |s, needle| {
-		i = find(s, { needle: needle })?
-		Ok((List.take_first(s, i), List.drop_first(s, i + List.len(needle))))
-	}
 
 	## Where `needle` first starts in `s` (std.mem.indexOf).
 	find : List(U8), { needle : List(U8) } -> Try(U64, [NotFound])
 	find = |s, { needle }| find_from(s, { needle, at: 0 })
-
-	## The bytes after `prefix`, when `l` starts with it: no length is
-	## written beside the literal it belongs to.
-	strip_prefix : List(U8), List(U8) -> Try(List(U8), [NoMatch])
-	strip_prefix = |l, prefix| if List.starts_with(l, prefix) Ok(
-		List.drop_first(
-			l,
-			List.len(prefix),
-		),
-	) else Err(NoMatch)
-
-	## std.mem.order of bytes: byte by byte, a prefix first.
-	compare : List(U8),
-	List(U8) -> [
-		Before,
-		Same,
-		After,
-	]
-	compare = |a, b| match (a, b) {
-		([x, .. as ra], [y, .. as rb]) => if x < y Before else if x > y After else compare(ra, rb)
-		([], []) => Same
-		([], _) => Before
-		_ => After
-	}
-
-	## **A BYTE'S NEXT PLACE, REMEMBERED** (metal-vmm QUEUE 268): what one
-	## search found (`At`), or that there is none (`Never`), answers every
-	## later search from a place at or before it, so a scan that searches
-	## from each of many openers (`<img ` after `<img `, `![` after `![`)
-	## costs one pass of a message, not one per opener. `from` must not go
-	## back between calls that share one. Opaque (`::`): a scan starts at
-	## `unknown`, and `find_seen` is the only way on, so no caller can claim
-	## a place no search found.
-	Seen :: [
-		Unknown,
-		At(U64),
-		Never,
-	].{
-
-		## No search made yet: where every scan starts.
-		unknown : Seen
-		unknown = Seen.(Unknown)
-	}
-
-	find_seen : List(U8),
-	{
-		byte : U8,
-		from : U64,
-		seen : Seen,
-	} -> (Try(U64, [NotFound]), Seen)
-	find_seen = |
-		s,
-		{
-			byte: b,
-			from,
-			seen: Seen.(state),
-		},
-	|
-		match state {
-			At(k) if k >= from => (Ok(k), Seen.(state))
-			Never => (Err(NotFound), Seen.(Never))
-			_ =>
-				match find_byte(s, { byte: b, at: from }) {
-					Ok(k) => (Ok(k), Seen.(At(k)))
-					Err(NotFound) => (Err(NotFound), Seen.(Never))
-				}
-		}
 
 	find_byte : List(U8), { byte : U8, at : U64 } -> Try(U64, [NotFound])
 	find_byte = |s, { byte: b, at: i }| match List.get(s, i) {
@@ -118,15 +41,8 @@ Bytes := [].{
 		)
 	}
 
-	## `std.mem.trimRight(u8, s, set)`: the bytes in `set` off the end.
-	trim_end : List(U8), List(U8) -> List(U8)
-	trim_end = |s, set| List.drop_last(
-		s,
-		count_back(s, |c| List.contains(set, c)),
-	)
-
-	## The four bytes the Zig's sidecar readers trim, `std.mem.trim(u8, s,
-	## " \t\r\n")`: not `Ascii.is_whitespace`, which has VT and FF too.
+	## The four bytes Zig's `std.mem.trim(u8, s, " \t\r\n")` trims: not
+	## `Ascii.is_whitespace`, which has VT and FF too.
 	zig_spaces : List(U8)
 	zig_spaces = [
 		' ',
