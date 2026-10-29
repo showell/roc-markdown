@@ -391,9 +391,9 @@ emphasis = |{ runs, budget }| {
 		},
 	)
 	var $budget = budget
-	# The lowest opener a closer may look back to, by its count mod 3 and
-	# its character (`*` then `_`): an edge is the stack's bottom.
-	var $bottoms = List.repeat(Edge, 6)
+	# The lowest opener a closer may look back to, by its floor key: an
+	# edge is the stack's bottom.
+	var $bottoms = List.repeat(Edge, floor_keys)
 	var $closer = if n == 0 Edge else At(0)
 	while $closer != Edge {
 		ci = index_of($closer)
@@ -407,7 +407,7 @@ emphasis = |{ runs, budget }| {
 		if !closer.can_close {
 			$closer = closer.above
 		} else {
-			slot = (closer.count % 3) * 2 + (if closer.char == '*' 0 else 1)
+			slot = floor_key(closer)
 			bottom = List.get($bottoms, slot) ?? Edge
 			var $opener = closer.below
 			var $found = Bool.False
@@ -480,7 +480,7 @@ emphasis = |{ runs, budget }| {
 					$bottoms,
 					slot,
 					closer.below,
-				) ?? crash "MdInline: a bottom's slot past six"
+				) ?? crash "MdInline: a bottom's slot past the floor keys"
 				if !closer.can_open {
 					$runs = unlinked($runs, ci)
 				} else {
@@ -491,6 +491,23 @@ emphasis = |{ runs, budget }| {
 	}
 	Ok({ runs: $runs, budget: $budget })
 }
+
+## **THE FLOOR'S KEY, COMMONMARK'S** (commonmark.js's `openers_bottom`,
+## markdown-it's): a closer's character, whether it may also open, and its
+## run's length as written, mod 3. A closer that failed sets the floor only
+## for closers that would fail the same way: the rule of 3 reads both of
+## these, so a key without them lets one closer's failure stop another that
+## would have matched (`*a**b** c**`'s last `**`). The Zig keys on what is
+## left of the run and its character alone.
+floor_key : DelimiterRun -> U64
+floor_key = |closer| {
+	opens = if closer.can_open 3 else 0
+	(opens + closer.orig % 3) * 2 + (if closer.char == '*' 0 else 1)
+}
+
+## The floor keys: two characters, by can_open, by length mod 3.
+floor_keys : U64
+floor_keys = 12
 
 ## markdown_inline `unlinkDelim`: run `k` off the stack; its place among the
 ## pieces, and its delimiters left, stay.
@@ -1037,3 +1054,9 @@ expect inline("`a<b`") == "<code>a&lt;b</code>"
 expect inline("go to www.a.com, now") == "go to <a href=\"http://www.a.com\" target=\"_blank\" rel=\"noopener\">www.a.com</a>, now"
 expect inline("mail a.b@c.d.") == "mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a>."
 expect inline("http://localhost:9100/x.md") == "http://localhost:9100/x.md"
+# The floor keys on a closer's can_open and its run's length as written
+# (CommonMark's, commonmark.js's and markdown-it's).
+expect inline("*a**b** c**") == "<em>a<strong>b</strong> c</em>*"
+expect inline("x **a*a*a*") == "x *<em>a<em>a</em>a</em>"
+# Keyed on the length alone, this one would move; on both, it does not.
+expect inline("x **a*a****") == "x <strong>a<em>a</em></strong>*"
