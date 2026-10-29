@@ -94,15 +94,21 @@ The Roc is pinned (`roc-version`): `roc` on the PATH, or `-Droc=<path>`
   blocks.
 - `package/MdList.roc`, `package/MdQuote.roc`: the container blocks, lists
   and quotes, handed the dispatch by `Md`.
-- `package/MdTable.roc`: a table row's cells and alignments.
-- `package/MdInline.roc`: the inline pass: a line's pieces, code spans and
-  `MSG_` references.
+- `package/MdTable.roc`: where a table opens, a row's cells and alignments.
+- `package/MdFence.roc`: where a code fence opens and closes.
+- `package/MdInline.roc`: the inline pass: a line's pieces and code spans.
 - `package/MdEmphasis.roc`: the emphasis engine, CommonMark's delimiter stack.
 - `package/MdLinks.roc`: `[t](u)` links and autolinks.
-- `package/MdSafety.roc`: which hrefs are dangerous and which are external.
+- `package/MdMedia.roc`: a member's `<img>` and `<video>`, scanned and
+  rebuilt.
+- `package/MdHtml.roc`: every tag and attribute the renderer writes; a skin
+  edits this alone.
+- `package/MdChat.roc`: the chat's own extensions (`MSG_` references, the
+  `quote` fence, the fence's nesting cap); a fork without a chat, or with
+  another, starts here.
+- `package/MdSafety.roc`: the URL and attribute rules: dangerous and
+  external hrefs, the media's same-origin rule and attribute allowlist.
 - `package/MdText.roc`: lines, escaping and the work budget.
-- `package/MdFence.roc`: code fences.
-- `package/MdMedia.roc`: images and video.
 - `package/Ascii.roc`, `package/Bytes.roc`: the byte checks and scans
   (Zig's `std.ascii` and `std.mem`) the rest share.
 - `judge/`: the judge (`judge.zig`), its side of the Roc (`roc_host.zig`,
