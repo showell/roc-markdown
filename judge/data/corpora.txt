@@ -8,6 +8,7 @@ spec_agree.jsonl
 spec_tables.jsonl
 spec_strike.jsonl
 spec_escapes.jsonl
+spec_images.jsonl
 # Pinned departures from CommonMark (each its own note).
 pinned.jsonl
 # The REPL's canned examples (judge/repl.zig: `:examples`), each

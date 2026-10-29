@@ -60,8 +60,9 @@ const ratchet_path = "ratchet.txt";
 const hostile_answers_path = "hostile.answers.jsonl";
 /// The spec's corpora: CommonMark's and GFM's examples, GFM's table
 /// examples (QUEUE 311), and GFM's strikethrough and CommonMark's backslash
-/// escapes (QUEUE 316), checked as one against spec_diverge.txt.
-const spec_labels = [_][]const u8{ "spec_agree", "spec_tables", "spec_strike", "spec_escapes" };
+/// escapes (QUEUE 316), and CommonMark's images (QUEUE 317), checked as one
+/// against spec_diverge.txt.
+const spec_labels = [_][]const u8{ "spec_agree", "spec_tables", "spec_strike", "spec_escapes", "spec_images" };
 const spec_diverge_path = "spec_diverge.txt";
 
 const Part = roc.Part;
@@ -564,6 +565,16 @@ const deep_shapes = [_]Shape{
     .{ .name = "rm-strike-star-alternate", .unit = "~~a* " },
     .{ .name = "rm-escaped-strikes", .unit = "\\~~a " },
     .{ .name = "rm-backslash-breaks", .unit = "*a\\\n" },
+    // Markdown's images (QUEUE 317): `![` openers never closed; images one
+    // after another; images nested in labels, same-origin (lb-nested-images'
+    // src is refused); an alt of markup to read back as text; images refused
+    // (another site's), each a link; `![a]` with no destination.
+    .{ .name = "rm-image-openers", .unit = "![" },
+    .{ .name = "rm-images", .unit = "![a](/u.png) " },
+    .{ .name = "rm-image-nest", .unit = "![", .middle = "a", .after = "](/u.png)" },
+    .{ .name = "rm-image-alt-markup", .unit = "![*a* `b` [c](/d) ~~e~~](/f.png) " },
+    .{ .name = "rm-images-refused", .unit = "![a](https://x.y/z.png) " },
+    .{ .name = "rm-image-labels-alone", .unit = "![a]" },
 };
 
 const deep_sizes = [_]usize{ 1, 10, 100, 1000, 8191 };
@@ -643,6 +654,12 @@ fn specNormal(a: std.mem.Allocator, html: []const u8) ![]const u8 {
     return std.mem.replaceOwned(u8, a, soft, " target=\"_blank\" rel=\"noopener\"", "");
 }
 
+/// The spec's html with its void tags written as ours are: `<img … />` is
+/// `<img …>` (QUEUE 317).
+fn specVoid(a: std.mem.Allocator, html: []const u8) ![]const u8 {
+    return std.mem.replaceOwned(u8, a, html, " />", ">");
+}
+
 /// spec_diverge.txt's ids: a line a case, its id before the first tab;
 /// `#` lines and blank ones are its commentary.
 fn readDiverge(io: Io, dir: Io.Dir, a: std.mem.Allocator) !std.StringHashMapUnmanaged(void) {
@@ -688,7 +705,7 @@ fn specCheck(io: Io, dir: Io.Dir, arena: *std.heap.ArenaAllocator, sa: std.mem.A
                 continue;
             },
         };
-        const same = std.mem.eql(u8, try specNormal(a, ours), spec);
+        const same = std.mem.eql(u8, try specNormal(a, ours), try specVoid(a, spec));
         if (same) agree += 1;
         if (same and listed.contains(c.id)) {
             fails += 1;

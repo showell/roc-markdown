@@ -33,6 +33,10 @@ Zig is no longer its judge. Its judge is a set of frozen answers (below).
   it is text.
 - **Raw HTML is escaped**, except a same-origin `<img>` or `<video>`, which
   is rebuilt from its safe attributes alone.
+- **Markdown's images**, `![alt](src "title")`, under the same rule: a
+  same-origin src (`/…`) is the `<img>` a tag of that src and alt is
+  rebuilt as, its alt the label's text with no markup; any other src is a
+  link, the `!` dropped (MdSafety says why).
 - A ```` ```quote ```` fence is a reply's quote, not code.
 - `MSG_<slug>` is a link to that message (`#msg-<slug>`).
 - A link to another site, written or bare (`http://`, `www.`), opens in a new
@@ -82,7 +86,8 @@ the divergences `judge/data/spec_diverge.txt` lists.
   of chat-markdown's Zig unit tests (where the dialect came from); CommonMark's
   and GFM's examples (`spec_agree`), GFM's table and strikethrough
   examples (`spec_tables`, `spec_strike`), and CommonMark's backslash
-  escapes (`spec_escapes`; all CC BY-SA 4.0: `judge/data/SPEC-LICENSE`);
+  escapes and images (`spec_escapes`, `spec_images`; all CC BY-SA 4.0:
+  `judge/data/SPEC-LICENSE`);
   pinned departures from CommonMark; and the hostile shapes the judge
   generates itself.
 - **It prints counts and failing case ids, never a case's text**, so it can

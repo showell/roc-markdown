@@ -2,3 +2,6 @@
 {"id":"xline/code","md":"`foo\nbar`","html":"<p>`foo<br>\nbar`</p>\n"}
 {"id":"xline/link","md":"[foo\nbar](/u)","html":"<p>[foo<br>\nbar](/u)</p>\n"}
 {"id":"xline/strike","md":"~~foo\nbar~~","html":"<p>~~foo<br>\nbar~~</p>\n"}
+{"id":"image/off-site","md":"![off](https://elsewhere.example/a.png)","html":"<p><a href=\"https://elsewhere.example/a.png\" target=\"_blank\" rel=\"noopener\">off</a></p>\n"}
+{"id":"image/alt-markup","md":"![a *b* `c` ~~d~~](/x.png)","html":"<p><img src=\"/x.png\" alt=\"a b c d\"></p>\n"}
+{"id":"image/javascript","md":"![js](javascript:alert(1))","html":"<p><a href=\"\">js</a></p>\n"}

@@ -1,7 +1,7 @@
 ## **THE INLINE PASS** (chat-markdown markdown_inline.zig): one line of inline content to
 ## HTML. The line is cut into pieces (text to escape; html made here, for a
-## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link
-## or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
+## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link,
+## a same-origin `![alt](src)` image or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
 ## `*`/`_`/`~` runs), the
 ## runs are matched into `<em>`, `<strong>` and `<del>` (MdEmphasis), and
 ## the pieces are written out. Pure.
@@ -28,6 +28,7 @@ import MdText
 import MdMedia
 import MdEmphasis
 import MdLinks
+import MdSafety
 
 MdInline := [].{
 
@@ -160,6 +161,61 @@ MdInline := [].{
 								n = run_length(text, { byte: '`', at: $i })
 								$budget = MdText.charge($budget, n)
 								$i = $i + n
+							}
+						}
+					} else if c == '!' and List.get(text, $i + 1) == Ok('[') {
+						# `![alt](src)`: an image where its src is same-origin, else
+						# the `!` is dropped and the `[` read as a link (MdSafety).
+						linked = MdLinks.link_at(
+							text,
+							{
+								at: $i + 1,
+								rb: $rb,
+								closes: $closes,
+								budget: $budget,
+							},
+						)
+						$rb = linked.rb
+						$closes = linked.closes
+						$budget = linked.budget
+						image = match linked.link {
+							Ok(link) =>
+								match MdLinks.image_dest(link.url) {
+									Ok(dest) => Ok({ link, dest })
+									Err(NotAnImage) => Err(NotAnImage)
+								}
+							Err(NotALink) => Err(NotAnImage)
+						}
+						match image {
+							Ok(found) =>
+								if MdSafety.is_local_url(found.dest.src) {
+									# The alt is the label's inline content, its markup
+									# gone (MdHtml.plain_text).
+									alt = MdInline.render_onto({
+										out: [],
+										text: MdText.cut(text, found.link.label),
+										refs: InLabel,
+										budget: $budget,
+									})?
+									$budget = alt.budget
+									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title }) ?? []
+									$pieces = with_token(
+										$pieces,
+										{
+											run_start: $run_start,
+											at: $i,
+											token: Html(html),
+										},
+									)
+									$i = found.link.end
+									$run_start = found.link.end
+								} else {
+									$pieces = flushed($pieces, { run_start: $run_start, at: $i })
+									$i = $i + 1
+									$run_start = $i
+								}
+							Err(NotAnImage) => {
+								$i = $i + 1
 							}
 						}
 					} else if c == '[' {
@@ -446,6 +502,15 @@ expect inline("~~a *b~~ c*") == "<del>a *b</del> c*"
 expect inline("\\*not em\\* and \\[not](a link) \\`not code\\`") == "*not em* and [not](a link) `not code`"
 expect inline("[a](/b\\*c)") == "<a href=\"/b*c\">a</a>"
 expect inline("[a](javascript\\:alert(1))") == "<a href=\"\">a</a>"
+expect inline("![a *cat*](/u/cat.png \"the cat\")") == "<img src=\"/u/cat.png\" alt=\"a cat\" title=\"the cat\">"
+expect inline("see ![](/u/x.png)!") == "see <img src=\"/u/x.png\" alt=\"\">!"
+expect inline("![off](https://evil.example/x.png)") == "<a href=\"https://evil.example/x.png\" target=\"_blank\" rel=\"noopener\">off</a>"
+expect inline("![js](javascript:alert(1))") == "<a href=\"\">js</a>"
+expect inline("![a](//evil/x.png)") == "<a href=\"//evil/x.png\">a</a>"
+expect inline("![a \"q\" & <b>](/x.png)") == "<img src=\"/x.png\" alt=\"a &quot;q&quot; &amp; &lt;b&gt;\">"
+expect inline("![a](/x.png bad)") == "!<a href=\"/x.png bad\">a</a>"
+expect inline("\\![a](/x.png)") == "!<a href=\"/x.png\">a</a>"
+expect inline("![no close") == "![no close"
 expect inline("\\~~not struck~~") == "~~not struck~~"
 expect inline("a\\b \\\\ \\") == "a\\b \\ \\"
 expect inline("`\\*` stays") == "<code>\\*</code> stays"

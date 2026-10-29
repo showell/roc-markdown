@@ -110,6 +110,55 @@ MdLinks := [].{
 	## `[a](((…` costs its length once, not once a `](`.
 	Closes : [Unscanned, Scanned(List(U64))]
 
+	## An image's destination, `src` or `src "title"` (CommonMark's link
+	## destination and title, the title in `"…"`, `'…'` or `(…)`), its ends'
+	## spaces dropped. Anything after the src that is no title is no image.
+	## (A link's title is not read: it stays in the destination.)
+	image_dest : List(U8) -> Try({ src : List(U8), title : [None, Some(List(U8))] }, [NotAnImage])
+	image_dest = |url| {
+		dest = MdText.trim_line(url)
+		src_len = Bytes.count_while(dest, { keep: |c| c != ' ' and c != '\t', at: 0 })
+		src = List.take_first(dest, src_len)
+		rest = MdText.trim_line(List.drop_first(dest, src_len))
+		n = List.len(rest)
+		if n == 0 {
+			Ok({ src, title: None })
+		} else {
+			first = MdText.at(rest, 0)
+			last = MdText.at(rest, n - 1)
+			quoted = (first == '"' and last == '"') or (first == '\'' and last == '\'') or (first == '(' and last == ')')
+			if n >= 2 and quoted {
+				Ok({ src, title: Some(MdText.cut(rest, { start: 1, end: n - 1 })) })
+			} else {
+				Err(NotAnImage)
+			}
+		}
+	}
+
+	## `![alt](src "title")`'s tag: the one a member's `<img src alt title>`
+	## is rebuilt as (MdSafety's allowlist), or `NotSafe` where its src is no
+	## same-origin path (`MdSafety.is_local_url`, the rule `<img>` follows).
+	image : { src : List(U8), alt : List(U8), title : [None, Some(List(U8))] } -> Try(List(U8), [NotSafe])
+	image = |{ src, alt, title }| {
+		attrs = MdSafety.media_attrs({
+			kind: Img,
+			value_of: |name|
+				if name == Str.to_utf8("src") {
+					Ok(src)
+				} else if name == Str.to_utf8("alt") {
+					Ok(alt)
+				} else if name == Str.to_utf8("title") {
+					match title {
+						Some(t) => Ok(t)
+						None => Err(Absent)
+					}
+				} else {
+					Err(Absent)
+				},
+		})?
+		Ok(MdHtml.img(attrs))
+	}
+
 	## A `[label](url)` link's opening tag: its href dropped when dangerous,
 	## and a new tab when external (MdSafety's rules both).
 	link_open : List(U8) -> List(U8)
