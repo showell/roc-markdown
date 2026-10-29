@@ -185,7 +185,11 @@ attr = |name, val| {
 			_ => List.append(out, c)
 		},
 	)
-	List.concat(List.concat(Str.to_utf8(" ${name}=\""), esc), ['"'])
+	List.join([
+		Str.to_utf8(" ${name}=\""),
+		esc,
+		['"'],
+	])
 }
 
 # markdown_media's cases, each as its test has it.
