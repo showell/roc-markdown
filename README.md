@@ -15,7 +15,8 @@ package, compiled to WebAssembly, as you type. It has dense examples to edit.
 
 If you know GitHub's or Zulip's markdown, most of it is what you expect:
 paragraphs, headings, lists, quotes, fenced code, pipe tables, `**bold**`,
-`*italic*`, `` `code` ``, links and bare URLs. Where it differs:
+`*italic*`, `~~strike~~`, `` `code` ``, backslash escapes, links, images and
+bare URLs. Where it differs:
 
 | | roc-markdown | GitHub |
 |---|---|---|
@@ -26,9 +27,8 @@ paragraphs, headings, lists, quotes, fenced code, pipe tables, `**bold**`,
 | A link to another site | opens in a new tab | same tab |
 | `MSG_plans_3` | a link to that chat message | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
-| `~~strike~~` | two tildes only: `~5 minutes` stays as written | one or two |
-| `![alt](src)` | an image only from the chat's uploads; any other src is a link | any image |
-| `\` at a line's end | dropped: every newline breaks already | a line break |
+| `![alt](src)` | an image only from the chat's uploads; any other src becomes a link | an image from anywhere |
+| `~strike~` (one tilde) | text, so "~5 minutes" stays as written | strikethrough |
 
 Emoji and any script pass through untouched. There are no `:shortcodes:`
 and no `@mentions`: the HTML depends only on the message's bytes, never on
@@ -38,11 +38,10 @@ who reads it or what else is stored.
 
 - **Safe output, whatever the input.** Every byte a user wrote is escaped,
   except the markup the dialect itself writes. A `javascript:` link loses its
-  href. A user's image or video tag is rebuilt from an allowlist of
-  attributes, and only when it points at the chat's uploads
-  (`/user_uploads/`, set in `package/MdChat.roc`), never another of the
-  app's own routes; a markdown image `![alt](src)` follows the same rule,
-  and is a link otherwise.
+  href. A user's image or video tag, or a markdown `![alt](src)`, is
+  rebuilt from an allowlist of attributes, and only when it points at the
+  chat's uploads (`/user_uploads/`, set in `package/MdChat.roc`), never at
+  another of the app's own routes.
 - **A bounded cost.** Rendering is linear in the message, and every step is
   charged to a work budget sized by its length. A message built to blow it up
   (thousands of nested brackets, a table thousands of columns wide) is
