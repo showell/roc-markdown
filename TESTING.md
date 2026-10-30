@@ -49,7 +49,8 @@ gold (`--also`). The hostile shapes take `user-uploads`.
   images, every example of their sections. The spec corpora are CC BY-SA 4.0 (`SPEC-LICENSE`).
 - **examples:** the canned examples of the playground and the REPL
   (`:examples`), one file for both, frozen so a change that
-  moves one fails loudly.
+  moves one fails loudly. One, `hostile`, is a message the chat refuses
+  whole (`TooMuchFormatting`), which the playground shows as refused.
 - **hostile:** about a thousand cases (1,097), shapes the judge generates
   itself at sizes from 1 to 8,191
   (deep nesting, long delimiter runs, wide tables). Their answers are hashed

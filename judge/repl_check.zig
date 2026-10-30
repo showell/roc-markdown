@@ -128,8 +128,11 @@ pub fn main(init: std.process.Init) !void {
         check(apart, "modes\tno case tells {t} from {t}", .{ m1, m2 });
     };
 
-    // The examples: renderable.
-    for (exs, cases.items[picks.len..]) |e, c| check(c.frozen.hostile.len == 0, "{s}\ta canned example is hostile", .{e.id});
+    // The examples: renderable, but for `hostile`, the one the chat refuses.
+    for (exs, cases.items[picks.len..]) |e, c| {
+        const refused = std.mem.eql(u8, e.id, "hostile");
+        check((c.frozen.hostile.len > 0) == refused, "{s}\ta canned example is {s}", .{ e.id, if (refused) "renderable" else "hostile" });
+    }
 
     var runs: usize = 0;
     for (modes) |mode| {

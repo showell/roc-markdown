@@ -24,6 +24,7 @@
 <main>
   <textarea id="source" spellcheck="false" autocomplete="off" aria-label="markdown"></textarea>
   <div id="output">
+    <p id="refusal" hidden></p>
     <div id="preview" class="md"></div>
     <pre id="html" hidden></pre>
   </div>
@@ -34,7 +35,7 @@
     <dt>hostility</dt><dd id="hostility"></dd>
   </dl>
   <p id="error" hidden></p>
-  <p class="legend">chat: <code>Md.render</code>, budgeted; a newline is <code>&lt;br&gt;</code>. trusted: <code>Md.render_trusted</code>, no budget. reflow: <code>Md.render_trusted_reflow</code>, a newline is a space. The renderer is the package itself, compiled to WebAssembly.</p>
+  <p class="legend">chat: <code>Md.render</code>, budgeted; a newline is <code>&lt;br&gt;</code>. trusted: <code>Md.render_trusted</code>, no budget. reflow: <code>Md.render_trusted_reflow</code>, a newline is a space. The renderer is the package itself, compiled to WebAssembly. A message over the budget is refused in chat mode, as the chat refuses to post it; the trusted modes, which have no budget, still render it, their caller being the one to decide.</p>
 </footer>
 </body>
 </html>

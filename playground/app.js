@@ -5,7 +5,7 @@
 //
 // **ONLY THE RENDERER'S HTML IS INSERTED AS HTML**, into #preview: it is what
 // the chat would show. Everything else the page writes (captions, the html
-// source, the answers, an error) is text.
+// source, the answers, a refusal, an error) is text.
 
 import { load } from "./md_wasm.js";
 
@@ -35,7 +35,7 @@ async function main() {
 
   const source = $("source"), preview = $("preview"), html = $("html");
   const menu = $("example"), caption = $("caption"), showSource = $("show-source");
-  const units = $("units"), hostility = $("hostility"), error = $("error");
+  const units = $("units"), hostility = $("hostility"), error = $("error"), refusal = $("refusal");
   const modes = [...document.querySelectorAll('input[name="mode"]')];
 
   for (const ex of examples) {
@@ -59,13 +59,20 @@ async function main() {
       preview.innerHTML = "";
       html.textContent = "";
       units.textContent = hostility.textContent = "";
+      refusal.hidden = true;
       error.textContent = `the renderer failed: ${e && e.message || e}`;
       error.hidden = false;
       return;
     }
     error.hidden = true;
-    preview.innerHTML = got.html;
-    html.textContent = got.html;
+    // The chat refuses a hostile message whole (a 400 with these words), so
+    // in chat mode the page shows the refusal, not a render. The trusted
+    // modes have no budget: their caller decides for itself.
+    const refused = mode() === "chat" && got.hostile !== "";
+    refusal.hidden = !refused;
+    refusal.textContent = refused ? `Refused: the chat posts none of this message ("${got.hostile}").` : "";
+    preview.innerHTML = refused ? "" : got.html;
+    html.textContent = refused ? "" : got.html;
     units.textContent = String(got.workUnits);
     hostility.textContent = got.hostile === "" ? "Renderable" : `TooMuchFormatting: the chat says "${got.hostile}"`;
     hostility.className = got.hostile === "" ? "" : "hostile";

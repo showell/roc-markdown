@@ -88,6 +88,7 @@ footer { padding: 4px 16px 10px; border-top: 1px solid var(--line); }
 #answers dt::after { content: ":"; }
 #answers dd { margin: 0 14px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
 #hostility.hostile, #error { color: var(--bad); }
+#refusal { color: var(--bad); border: 1px solid var(--bad); border-radius: 4px; padding: 8px 12px; margin: 0 0 10px; }
 .legend { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
 a { color: var(--accent); }
 @media (max-width: 760px) {
