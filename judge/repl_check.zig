@@ -193,7 +193,7 @@ pub fn main(init: std.process.Init) !void {
 
 /// A case of `corpus` and its frozen answers, by id.
 fn findCase(io: Io, data: Io.Dir, a: std.mem.Allocator, corpus: []const u8, id: []const u8) !Case {
-    const cs = try judge.readCorpus(io, data, a, try std.fmt.allocPrint(a, "{s}.jsonl", .{corpus}));
+    const cs = try judge.readCorpus(io, data, a, try std.fmt.allocPrint(a, "{s}.jsonl", .{corpus}), "user-uploads");
     const book = (try judge.readAnswers(io, data, a, try std.fmt.allocPrint(a, "{s}.answers.jsonl", .{corpus}))) orelse return error.NoAnswers;
     for (cs) |c| if (std.mem.eql(u8, c.id, id)) {
         const f = book.get(id) orelse return error.NoAnswers;

@@ -107,7 +107,7 @@ const Repl = struct {
     fn render(r: *Repl, md: []const u8) !void {
         var arena = std.heap.ArenaAllocator.init(r.a);
         defer arena.deinit();
-        const got = try roc.answers(arena.allocator(), md);
+        const got = try roc.answers(arena.allocator(), md, "user-uploads");
         if (got.len != std.enums.values(roc.Part).len) std.debug.panic("the package gave {d} answers", .{got.len});
         try writeBlock(r.out, got[@backingInt(r.mode.part())], got[@backingInt(roc.Part.work_units)], got[@backingInt(roc.Part.hostile_reason)]);
     }

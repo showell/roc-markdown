@@ -1,0 +1,4 @@
+{"id":"same-origin/inside","md":"<img src=\"/anything/a.png\"> and ![b](/anything/b.png)"}
+{"id":"same-origin/dot-dot","md":"<img src=\"/anything/../login\"> and ![x](/anything/%2e%2E/login)"}
+{"id":"same-origin/other-site","md":"<img src=\"//evil.example/x.png\"> and ![y](https://evil.example/y.png)"}
+{"id":"same-origin/encoded-separator","md":"<video src=\"/anything/..%2flogin\"></video>"}

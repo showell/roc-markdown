@@ -148,7 +148,7 @@ fn playgroundSite(b: *std.Build, roc: []const u8) Site {
     const folder = files.getDirectory();
     const install = b.addInstallDirectory(.{ .source_dir = folder, .install_dir = .prefix, .install_subdir = "playground" });
     // **THE `safety` EXAMPLE'S IMAGE IS AN UPLOAD**: only a path under the
-    // uploads prefix (MdChat.uploads_prefix) is shown, so the sample sits
+    // playground's uploads (playground/answer.roc's rule) is shown, so the sample sits
     // in zig-out/user_uploads/, published at the site root's user_uploads/
     // (the page itself at /markdown/).
     const sample = b.addInstallFile(b.path("playground/sample.png"), "user_uploads/sample.png");

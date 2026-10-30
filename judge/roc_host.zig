@@ -50,7 +50,7 @@ const RocBytesList = extern struct {
 /// The five answers, in judge/answers.roc's order.
 pub const Part = enum { render, work_units, hostile_reason, trusted, trusted_reflow };
 
-extern fn roc_judge_answers(md: RocBytes) callconv(.c) RocBytesList;
+extern fn roc_judge_answers(md: RocBytes, uploads: RocBytes) callconv(.c) RocBytesList;
 
 var arena: ?std.heap.ArenaAllocator = null;
 
@@ -65,10 +65,12 @@ pub fn deinit() void {
 }
 
 /// The package's answers for `md`, each copied into `alloc`, the call's
-/// memory dropped.
-pub fn answers(alloc: std.mem.Allocator, md: []const u8) ![][]u8 {
+/// memory dropped. `uploads` names the host's rule for which paths are its
+/// uploads (judge/answers.roc's `uploads_of`: `user-uploads`, `same-origin`
+/// or `old-chat`).
+pub fn answers(alloc: std.mem.Allocator, md: []const u8, uploads: []const u8) ![][]u8 {
     defer _ = arena.?.reset(.retain_capacity);
-    const got = roc_judge_answers(.from(md));
+    const got = roc_judge_answers(.from(md), .from(uploads));
     const items = got.slice();
     const out = try alloc.alloc([]u8, items.len);
     for (items, 0..) |*it, k| out[k] = try alloc.dupe(u8, it.slice());

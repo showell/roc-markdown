@@ -13,16 +13,21 @@ import md.Md
 answer : List(U8), U8 -> List(List(U8))
 answer = |text, mode| [
 	match mode_of(mode) {
-		Chat => Md.render(text)
-		Trusted => Md.render_trusted(text)
-		Reflow => Md.render_trusted_reflow(text)
+		Chat => Md.render(text, options)
+		Trusted => Md.render_trusted(text, options)
+		Reflow => Md.render_trusted_reflow(text, options)
 	},
-	Str.to_utf8(U64.to_str(Md.work_units(text))),
-	match Md.hostility(text) {
+	Str.to_utf8(U64.to_str(Md.work_units(text, options))),
+	match Md.hostility(text, options) {
 		Renderable => []
 		TooMuchFormatting => Str.to_utf8(Md.too_much_formatting)
 	},
 ]
+
+## **THE PLAYGROUND IS A HOST WHOSE UPLOADS ARE `/user_uploads/`**, where
+## `zig build playground` puts its sample image, as roc-chat's are.
+options : Md.Options
+options = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")) }
 
 ## **A MODE THE PAGE CANNOT NAME IS A CRASH**, never a render in some other
 ## mode.

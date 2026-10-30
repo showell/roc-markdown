@@ -137,10 +137,11 @@ MdLinks := [].{
 	## `![alt](src "title")`'s tag: the one a member's `<img src alt title>`
 	## is rebuilt as (MdSafety's allowlist), or `NotSafe` where its src is no
 	## upload (`MdSafety.is_upload_url`, the rule `<img>` follows).
-	image : { src : List(U8), alt : List(U8), title : [None, Some(List(U8))] } -> Try(List(U8), [NotSafe])
-	image = |{ src, alt, title }| {
+	image : { src : List(U8), alt : List(U8), title : [None, Some(List(U8))], uploads : MdSafety.Uploads } -> Try(List(U8), [NotSafe])
+	image = |{ src, alt, title, uploads }| {
 		attrs = MdSafety.media_attrs({
 			kind: Img,
+			uploads,
 			value_of: |name|
 				if name == Str.to_utf8("src") {
 					Ok(src)

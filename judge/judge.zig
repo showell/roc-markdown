@@ -69,8 +69,9 @@ const part_count = std.enums.values(Part).len;
 const Answers = [part_count][]const u8;
 
 /// A case; `html`, where a corpus has it, is another renderer's answer (the
-/// spec's, for the spec check), never the frozen one.
-pub const Case = struct { id: []const u8, md: []const u8, html: ?[]const u8 = null };
+/// spec's, for the spec check), never the frozen one. `uploads` is the
+/// uploads rule its corpus names (judge/answers.roc), set as it is read.
+pub const Case = struct { id: []const u8, md: []const u8, html: ?[]const u8 = null, uploads: []const u8 = "" };
 
 /// A case's answers as its corpus's answers file records them: each html
 /// as its text, or (a generated corpus's) as its hash, never both.
@@ -114,8 +115,8 @@ const Verdict = union(enum) {
 /// The package's five answers for `md`, in `a`, or how many it gave.
 const RocResult = union(enum) { answers: Answers, answered: usize };
 
-fn rocAnswers(a: std.mem.Allocator, md: []const u8) !RocResult {
-    const got = try roc.answers(a, md);
+fn rocAnswers(a: std.mem.Allocator, c: Case) !RocResult {
+    const got = try roc.answers(a, c.md, c.uploads);
     if (got.len != part_count) return .{ .answered = got.len };
     var out: Answers = undefined;
     for (got, 0..) |r, k| out[k] = r;
@@ -136,10 +137,10 @@ fn compare(a: std.mem.Allocator, want: Wants, got: Answers) !Verdict {
 }
 
 /// The package against the case's recorded answers.
-fn judgeFrozen(a: std.mem.Allocator, md: []const u8, frozen: ?Frozen) !Verdict {
+fn judgeFrozen(a: std.mem.Allocator, c: Case, frozen: ?Frozen) !Verdict {
     const f = frozen orelse return .unfrozen;
-    if (!std.mem.eql(u8, f.md_hash, try textHash(a, md))) return .text_changed;
-    const got = switch (try rocAnswers(a, md)) {
+    if (!std.mem.eql(u8, f.md_hash, try textHash(a, c.md))) return .text_changed;
+    const got = switch (try rocAnswers(a, c)) {
         .answers => |g| g,
         .answered => |n| return .{ .roc_answered = n },
     };
@@ -212,7 +213,7 @@ fn judgeFrozenCases(arena: *std.heap.ArenaAllocator, label: []const u8, cases: [
         if (frozen) |f| {
             if (f.hostile.len > 0) t.hostile += 1;
         }
-        const v = try judgeFrozen(arena.allocator(), c.md, frozen);
+        const v = try judgeFrozen(arena.allocator(), c, frozen);
         if (v == .same) {
             t.pass += 1;
         } else {
@@ -229,9 +230,10 @@ fn judgeFrozenCases(arena: *std.heap.ArenaAllocator, label: []const u8, cases: [
     return t;
 }
 
-/// The cases of a jsonl corpus, `path` in `dir`, in `a`. An id twice is
-/// refused: an answer is found by its case's id.
-pub fn readCorpus(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) ![]Case {
+/// The cases of a jsonl corpus, `path` in `dir`, in `a`, each to render
+/// under the uploads rule `uploads`. An id twice is refused: an answer is
+/// found by its case's id.
+pub fn readCorpus(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8, uploads: []const u8) ![]Case {
     const data = dir.readFileAlloc(io, path, a, .unlimited) catch |e| {
         std.debug.print("cannot read the corpus {s}: {s}\n", .{ path, @errorName(e) });
         return e;
@@ -243,10 +245,11 @@ pub fn readCorpus(io: Io, dir: Io.Dir, a: std.mem.Allocator, path: []const u8) !
     while (lines.next()) |line| {
         n += 1;
         if (line.len == 0) continue;
-        const c = std.json.parseFromSliceLeaky(Case, a, line, .{ .ignore_unknown_fields = true }) catch |e| {
+        var c = std.json.parseFromSliceLeaky(Case, a, line, .{ .ignore_unknown_fields = true }) catch |e| {
             std.debug.print("{s}:{d}: not a case: {s}\n", .{ path, n, @errorName(e) });
             return e;
         };
+        c.uploads = uploads;
         if ((try ids.fetchPut(a, c.id, {})) != null) {
             std.debug.print("{s}:{d}: the id {s} again\n", .{ path, n, c.id });
             return error.CaseIdTwice;
@@ -316,7 +319,7 @@ fn refreeze(io: Io, arena: *std.heap.ArenaAllocator, label: []const u8, cases: [
         _ = arena.reset(.retain_capacity);
         const a = arena.allocator();
         try seen.put(alloc, c.id, {});
-        const got = switch (try rocAnswers(a, c.md)) {
+        const got = switch (try rocAnswers(a, c)) {
             .answers => |g| g,
             .answered => |n| {
                 printFailure(label, c.id, .{ .roc_answered = n });
@@ -641,6 +644,8 @@ pub fn hostileCases(a: std.mem.Allocator) ![]Case {
             try cases.append(a, .{ .id = try std.fmt.allocPrint(a, "hostile/edge/{d}/{d}", .{ ci, n }), .md = md.items });
         }
     }
+    // The shapes' media is under roc-chat's uploads.
+    for (cases.items) |*c| c.uploads = "user-uploads";
     return cases.items;
 }
 
@@ -698,7 +703,7 @@ fn specCheck(io: Io, dir: Io.Dir, arena: *std.heap.ArenaAllocator, sa: std.mem.A
             std.debug.print("SPECFAIL\t{s}\tthe case has no html, the spec's\n", .{c.id});
             continue;
         };
-        const ours = switch (try rocAnswers(a, c.md)) {
+        const ours = switch (try rocAnswers(a, c)) {
             .answers => |g| g[@backingInt(Part.render)],
             .answered => {
                 fails += 1;
@@ -824,10 +829,19 @@ pub fn main(init: std.process.Init) !void {
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
         if (line.len == 0 or line[0] == '#') continue;
-        try corpora.append(sa, .{ .label = labelOf(line), .cases = try readCorpus(io, data, sa, line), .ratcheted = true, .dir = data, .answers = try answersPathOf(sa, line), .keep = .whole });
+        // `<corpus> <uploads rule>`: the rule its cases were written for.
+        var words = std.mem.tokenizeScalar(u8, line, ' ');
+        const file = words.next().?;
+        const rule = words.next() orelse {
+            std.debug.print("{s}: {s} names no uploads rule\n", .{ corpora_list, file });
+            std.process.exit(2);
+        };
+        try corpora.append(sa, .{ .label = labelOf(file), .cases = try readCorpus(io, data, sa, file, rule), .ratcheted = true, .dir = data, .answers = try answersPathOf(sa, file), .keep = .whole });
     }
     try corpora.append(sa, .{ .label = "hostile", .cases = try hostileCases(sa), .ratcheted = true, .dir = data, .answers = hostile_answers_path, .keep = .hashed });
-    for (also.items) |path| try corpora.append(sa, .{ .label = labelOf(path), .cases = try readCorpus(io, cwd, sa, path), .ratcheted = false, .dir = cwd, .answers = try answersPathOf(sa, path), .keep = .whole });
+    // A private corpus is the old chat's real messages: its rule is the old
+    // chat's.
+    for (also.items) |path| try corpora.append(sa, .{ .label = labelOf(path), .cases = try readCorpus(io, cwd, sa, path, "old-chat"), .ratcheted = false, .dir = cwd, .answers = try answersPathOf(sa, path), .keep = .whole });
     for (corpora.items, 0..) |c, i| {
         for (corpora.items[0..i]) |d| if (std.mem.eql(u8, c.label, d.label)) {
             std.debug.print("two corpora are labelled {s}: a re-freeze would not know which\n", .{c.label});
@@ -908,7 +922,7 @@ fn timeCorpus(arena: *std.heap.ArenaAllocator, cases: []const Case) !void {
     for (cases) |c| {
         _ = arena.reset(.retain_capacity);
         const t0 = cpuMs();
-        _ = try roc.answers(arena.allocator(), c.md);
+        _ = try roc.answers(arena.allocator(), c.md, c.uploads);
         ms += cpuMs() - t0;
     }
     std.debug.print("   time: {d:.1} ms (all five answers each)\n", .{ms});

@@ -6,7 +6,8 @@
 ##     opener.
 ##   - **Media** (MdMedia scans a member's `<img>` or `<video>` and asks
 ##     here): the tag is rebuilt from an allowlist, and only when its src is
-##     an upload, under the chat's uploads prefix (MdChat). Anything else
+##     a same-origin URL that the host's rule calls one of its uploads (the
+##     render's options, `Uploads`). Anything else
 ##     (onerror=, onload=, style=, an off-site or protocol-relative src, any
 ##     other path of the app's own) is dropped.
 ##   - **Markdown's images** (`![alt](src "title")`, MdInline and MdLinks)
@@ -23,7 +24,6 @@
 ## escaped (MdText). Pure.
 import Ascii
 import Bytes
-import MdChat
 import MdHtml
 import MdText
 
@@ -89,13 +89,14 @@ MdSafety := [].{
 	media_attrs : {
 		kind : [Img, Video],
 		value_of : List(U8) -> Try(List(U8), [Absent]),
+		uploads : MdSafety.Uploads,
 	} -> Try(List(MdHtml.Attr), [NotSafe])
-	media_attrs = |{ kind, value_of }| {
+	media_attrs = |{ kind, value_of, uploads }| {
 		src = match value_of(Str.to_utf8("src")) {
 			Ok(v) => v
 			Err(Absent) => return Err(NotSafe)
 		}
-		if !MdSafety.is_upload_url(Bytes.trim(src, Bytes.zig_spaces)) {
+		if !MdSafety.is_upload_url(Bytes.trim(src, Bytes.zig_spaces), uploads) {
 			Err(NotSafe)
 		} else {
 			kept = |names, keep| List.join_map(
@@ -119,9 +120,16 @@ MdSafety := [].{
 		}
 	}
 
-	## **AN UPLOAD, AND ONLY AN UPLOAD**: a path under the chat's uploads
-	## prefix (`MdChat.uploads_prefix`, `/user_uploads/`), read as a browser
-	## reads it:
+	## **WHICH SAME-ORIGIN PATHS ARE THE HOST'S UPLOADS**: the host's rule,
+	## asked of a path this module has already judged safe as a URL. Where a
+	## host keeps its files is the host's to say, never the renderer's; a
+	## rule that says no to every path (`Md.no_uploads`) renders no media.
+	Uploads : List(U8) -> Bool
+
+	## **AN UPLOAD, AND ONLY AN UPLOAD**: a path the host's rule calls one
+	## of its uploads (`uploads`), and a same-origin URL as a browser reads
+	## it:
+	##   - a path from this site's root: one `/`, never `//` (another site);
 	##   - no control byte and no backslash anywhere: a browser strips tabs
 	##     and newlines inside a URL and reads `\` as `/`, so `/\t/evil` is
 	##     `//evil`;
@@ -130,12 +138,22 @@ MdSafety := [].{
 	##     `/user_uploads/../login` is `/login`;
 	##   - no `%2f` or `%5c`: an encoded `/` or `\` a server may decode into
 	##     a separator. Every other escape stays: an upload's name may need one.
-	is_upload_url : List(U8) -> Bool
-	is_upload_url = |src|
-		List.starts_with(src, MdChat.uploads_prefix)
-			and List.all(src, |c| c >= 0x20 and c != 0x7f and c != '\\')
-				and !has_dot_dot_segment(src)
-					and !has_encoded_separator(src)
+	##
+	## The rule is asked last, so no rule a host writes can let through a
+	## path the URL's own checks refuse.
+	is_upload_url : List(U8), MdSafety.Uploads -> Bool
+	is_upload_url = |src, uploads|
+		List.starts_with(src, ['/'])
+			and !List.starts_with(src, ['/', '/'])
+				and List.all(src, |c| c >= 0x20 and c != 0x7f and c != '\\')
+					and !has_dot_dot_segment(src)
+						and !has_encoded_separator(src)
+							and uploads(src)
+
+	## **THE RULE OF ONE UPLOADS FOLDER**: a path under `prefix`
+	## (`/user_uploads/`), the shape most hosts need.
+	under : List(U8) -> MdSafety.Uploads
+	under = |prefix| |path| List.starts_with(path, prefix)
 
 	## The `://` that ends a URL's scheme: what makes a link external here,
 	## and where an autolink's host starts (MdLinks).
@@ -200,19 +218,19 @@ dangerous_schemes = [
 ]
 
 expect MdSafety.is_dangerous_url(Str.to_utf8("java\tscript:alert(1)"))
-expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a.png"))
-expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/1/caf%C3%A9 a.png"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/conversations/1/stream"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/login"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/../login"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%2e%2E/login"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/.%2e/login"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a/.."))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/..%2flogin"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%5c..%5clogin"))
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploadsX/a.png"))
-expect !MdSafety.is_upload_url(Str.to_utf8("//user_uploads/a.png"))
-expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a..b.png"))
+expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a.png"), user_uploads)
+expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/1/caf%C3%A9 a.png"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/conversations/1/stream"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/login"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/../login"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%2e%2E/login"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/.%2e/login"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a/.."), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/..%2flogin"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%5c..%5clogin"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploadsX/a.png"), user_uploads)
+expect !MdSafety.is_upload_url(Str.to_utf8("//user_uploads/a.png"), user_uploads)
+expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a..b.png"), user_uploads)
 expect MdSafety.is_dangerous_url(Str.to_utf8("  JavaScript:x"))
 expect MdSafety.is_dangerous_url(Str.to_utf8("data:text/html,x"))
 expect !MdSafety.is_dangerous_url(Str.to_utf8("data:image/png;base64,x"))
@@ -220,3 +238,19 @@ expect !MdSafety.is_dangerous_url(Str.to_utf8("https://example.org"))
 expect MdSafety.is_external_href(Str.to_utf8("https://example.org"))
 expect !MdSafety.is_external_href(Str.to_utf8("#msg-plans_3"))
 expect !MdSafety.is_external_href(Str.to_utf8("mailto:a@b.c"))
+
+user_uploads : MdSafety.Uploads
+user_uploads = MdSafety.under(Str.to_utf8("/user_uploads/"))
+
+# The host's rule is asked only of a path the URL's checks let through: a
+# rule that takes every path still refuses another site and a `..`.
+anything : MdSafety.Uploads
+anything = |_| Bool.True
+
+expect MdSafety.is_upload_url(Str.to_utf8("/u/cat.png"), anything)
+expect !MdSafety.is_upload_url(Str.to_utf8("//evil/x.png"), anything)
+expect !MdSafety.is_upload_url(Str.to_utf8("/\\evil"), anything)
+expect !MdSafety.is_upload_url(Str.to_utf8("https://evil/x.png"), anything)
+expect !MdSafety.is_upload_url(Str.to_utf8("/u/../login"), anything)
+expect !MdSafety.is_upload_url(Str.to_utf8("x.png"), anything)
+expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a.png"), |_| Bool.False)

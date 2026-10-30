@@ -28,11 +28,13 @@
 --   - the image shapes linear, and three more plants, each red: an image
 --     allowed from another origin, markup kept inside an alt, a
 --     `javascript:` src rendered;
---   - plants, each red: a media src outside the uploads prefix accepted,
---     a `'` left unescaped, one byte of a split function's answer;
+--   - plants, each red: a media src outside the host's uploads accepted,
+--     a `'` left unescaped, one byte of a split function's answer, a
+--     host's uploads rule ignored, a `..` path let through by the most
+--     permissive rule;
 --   - `zig fmt --check` and `roc fmt --check` clean;
---   - roc-chat's `roc test` against this package (roc-chat main, cloned
---     beside a copy of package/);
+--   - roc-chat's `roc test` against this package (roc-chat's `chat=`
+--     branch, default main, cloned beside a copy of package/);
 --   - gold (`gold=`, default repos:gopher-gold/gold.jsonl, the box's): every
 --     one of its 10,103 cases agrees. **ONLY COUNTS ARE PRINTED, NEVER A
 --     MESSAGE'S TEXT.** Where it is absent, `SKIP gold`, the one SKIP there
@@ -256,14 +258,20 @@ plant("one byte of a frozen strikethrough (spec_strike)", "spec_strike.answers.j
 plant("an image allowed from another origin", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"https://elsewhere.example/a.png\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">off</a>", new = "<img src=\\\"https://elsewhere.example/a.png\\\" alt=\\\"off\\\">"}, "FAILID\tdialect\t")
 plant("markup kept inside an alt", "dialect.answers.jsonl", "swap", {old = "alt=\\\"a b c d\\\"", new = "alt=\\\"a &lt;em&gt;b&lt;/em&gt; c d\\\""}, "FAILID\tdialect\t")
 plant("a javascript: src rendered", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"\\\">js</a>", new = "<img src=\\\"javascript:alert(1)\\\" alt=\\\"js\\\">"}, "FAILID\tdialect\t")
--- A media src outside the uploads prefix accepted (an app
+-- A media src outside the host's uploads accepted (an app
 -- route, a held stream, rebuilt as an image).
-plant("a media src outside the uploads prefix accepted", "dialect.answers.jsonl", "swap", {old = "&lt;img src=&quot;/conversations/1/stream&quot;&gt;", new = "<img src=\\\"/conversations/1/stream\\\">"}, "FAILID\tdialect\t")
+plant("a media src outside the host's uploads accepted", "dialect.answers.jsonl", "swap", {old = "&lt;img src=&quot;/conversations/1/stream&quot;&gt;", new = "<img src=\\\"/conversations/1/stream\\\">"}, "FAILID\tdialect\t")
 -- A `'` left unescaped (CommonMark's cm/12, its punctuation).
 plant("a ' left unescaped", "spec_escapes.answers.jsonl", "swap", {old = "&#39;", new = "'"}, "FAILID\tspec_escapes\t")
 -- One byte of the split dispatcher's answer: `blocks`' heading, which
 -- Md.block_at's heading_onto writes.
 plant("one byte of a split function's answer (a heading)", "examples.answers.jsonl", "one_byte", "<h1>", "FAILID\texamples\t")
+-- A host's uploads rule ignored: a same-origin src roc-chat's rule refuses
+-- (`/files/`), rendered as media without asking it.
+plant("a host's uploads rule ignored (media rendered without asking it)", "dialect.answers.jsonl", "swap", {old = "&lt;img src=&quot;/files/b.png&quot;&gt;", new = "<img src=\\\"/files/b.png\\\">"}, "FAILID\tdialect\t")
+-- A `..` path let through by a rule that takes every same-origin path: the
+-- package's own URL checks come first, whatever the rule.
+plant("a `..` path passed by a permissive rule", "same_origin.answers.jsonl", "swap", {old = "&lt;img src=&quot;/anything/../login&quot;&gt;", new = "<img src=\\\"/anything/../login\\\">"}, "FAILID\tsame_origin\t")
 
 -- ── the formatters ──
 local zf = run({"zig", "fmt", "--check", "build.zig", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
@@ -277,7 +285,8 @@ say(rf.code == 0, "roc fmt --check package judge playground")
 local beside = scratch_dir .. "/roc-markdown/package"
 mkdir(beside)
 for name in ls("package") do replace(beside .. "/" .. name, read("package/" .. name)) end
-local clone = run({"git", "clone", "-q", "--depth", "1", "https://github.com/showell/roc-chat", real(scratch_dir) .. "/roc-chat"}, {cwd = ".", timeout_ms = 300000, tail = 10})
+local chat_branch = arg("chat", "main")
+local clone = run({"git", "clone", "-q", "--depth", "1", "--branch", chat_branch, "https://github.com/showell/roc-chat", real(scratch_dir) .. "/roc-chat"}, {cwd = ".", timeout_ms = 300000, tail = 10})
 if clone.code ~= 0 then
   say(false, "roc-chat cloned (exit " .. clone.code .. ": " .. trim(clone.out) .. ")")
 else

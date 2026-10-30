@@ -8,13 +8,11 @@
 ##   - the fence's renderer (Md), for a fence that is a quote-reply
 ##     (`is_quote_fence`);
 ##   - the fence's grammar (MdFence), for the longest run that opens one
-##     (`max_fence_run`);
-##   - the media rule (MdSafety), for the folder the chat serves its uploads
-##     from, the one place an `<img>`, a `<video>` or an `![alt](src)` may
-##     point (`uploads_prefix`).
+##     (`max_fence_run`).
 ##
-## Their markup is MdHtml's (`msg_ref`, `chat_quote_open`); what else a
-## media src must be (no `..`, no control byte) is MdSafety's. Pure.
+## Where a chat keeps its uploads is no part of the dialect: the host names
+## them in each render's options (Md.Options). Their markup is MdHtml's
+## (`msg_ref`, `chat_quote_open`). Pure.
 import Ascii
 import Bytes
 import MdHtml
@@ -50,13 +48,6 @@ MdChat := [].{
 	## opens with 10 characters, and a longer run is no fence (MdFence).
 	max_fence_run : U64
 	max_fence_run = 10
-
-	## Where the chat serves its members' uploads, and so the only path a
-	## member's media may load: never one of the app's own routes (a held
-	## `/conversations/1/stream`, `/login`), which an image would make every
-	## reader's browser fetch.
-	uploads_prefix : List(U8)
-	uploads_prefix = Str.to_utf8("/user_uploads/")
 }
 
 msg_ref_end : List(U8), U64 -> Try(U64, [NoRef])

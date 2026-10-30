@@ -39,6 +39,7 @@ MdInline := [].{
 		text : List(U8),
 		refs : [Linked, InLabel],
 		budget : MdText.Budget,
+		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
 	render_onto = |
 		{
@@ -46,6 +47,7 @@ MdInline := [].{
 			text,
 			refs,
 			budget,
+			uploads,
 		},
 	| {
 		len = List.len(text)
@@ -75,7 +77,7 @@ MdInline := [].{
 					if c == '\\' and is_escapable(text, $i + 1) {
 						Token(Text($i + 1, $i + 2), $i + 2)
 					} else if c == '<' {
-						match media_at(text, $i) {
+						match media_at(text, $i, uploads) {
 							Ok(media) => Token(Html(media.html), media.end)
 							Err(NotMedia) => Skip($i + 1)
 						}
@@ -119,7 +121,7 @@ MdInline := [].{
 						}
 						match image {
 							Ok(found) =>
-								if MdSafety.is_upload_url(found.dest.src) {
+								if MdSafety.is_upload_url(found.dest.src, uploads) {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.render_onto({
@@ -127,9 +129,10 @@ MdInline := [].{
 										text: MdText.cut(text, found.link.label),
 										refs: InLabel,
 										budget: $budget,
+										uploads,
 									})?
 									$budget = alt.budget
-									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title }) ?? []
+									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title, uploads }) ?? []
 									Token(Html(html), found.link.end)
 								} else {
 									Cut($i + 1)
@@ -158,6 +161,7 @@ MdInline := [].{
 									text: MdText.cut(text, link.label),
 									refs: InLabel,
 									budget: $budget,
+									uploads,
 								})?
 								$budget = label.budget
 								Token(Html(List.concat(label.out, MdHtml.link_close)), link.end)
@@ -287,12 +291,12 @@ Step : [
 ]
 
 ## A same-origin `<img>` or `<video>` at `at`, rebuilt (MdMedia).
-media_at : List(U8), U64 -> Try(MdMedia.Rebuilt, [NotMedia])
-media_at = |text, at|
-	match MdMedia.img_at(text, at) {
+media_at : List(U8), U64, MdSafety.Uploads -> Try(MdMedia.Rebuilt, [NotMedia])
+media_at = |text, at, uploads|
+	match MdMedia.img_at(text, at, uploads) {
 		Ok(tag) => Ok(tag)
 		Err(NotSafe) =>
-			match MdMedia.video_at(text, at) {
+			match MdMedia.video_at(text, at, uploads) {
 				Ok(tag) => Ok(tag)
 				Err(NotSafe) => Err(NotMedia)
 			}
@@ -407,6 +411,7 @@ inline = |text| match MdInline.render_onto({
 	text: Str.to_utf8(text),
 	refs: Linked,
 	budget: MdText.unlimited,
+	uploads: MdSafety.under(Str.to_utf8("/user_uploads/")),
 }) {
 	Ok(r) => Str.from_utf8(r.out) ?? "not text"
 	Err(Hostile) => "hostile"

@@ -10,3 +10,4 @@
 {"id":"uploads/login","md":"![x](/login)","html":"<p><a href=\"/login\">x</a></p>\n"}
 {"id":"uploads/dot-dot","md":"<img src=\"/user_uploads/../login\">","html":"&lt;img src=&quot;/user_uploads/../login&quot;&gt;\n"}
 {"id":"uploads/encoded-dot-dot","md":"<video src=\"/user_uploads/%2e%2E/login\"></video>","html":"<p>&lt;video src=&quot;/user_uploads/%2e%2E/login&quot;&gt;&lt;/video&gt;</p>\n"}
+{"id":"uploads/rule-asked","md":"![a file](/files/a.png) and <img src=\"/files/b.png\">"}

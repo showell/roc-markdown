@@ -1,7 +1,8 @@
 # The judge's pass counts (judge/judge.zig): each may only rise.
 adversarial 29
-dialect 12
+dialect 13
 unit_cases 69
+same_origin 4
 spec_agree 269
 spec_tables 8
 spec_strike 2

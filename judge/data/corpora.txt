@@ -1,17 +1,21 @@
-# The judge's corpora (judge/judge.zig), one jsonl a line, in judge/data.
-adversarial.jsonl
-dialect.jsonl
-unit_cases.jsonl
+# The judge's corpora (judge/judge.zig), one jsonl a line, in judge/data, each
+# with the uploads rule its cases were written for (judge/answers.roc): the
+# Zig renderer's own tests any same-origin path, the dialect's roc-chat's.
+adversarial.jsonl user-uploads
+dialect.jsonl user-uploads
+unit_cases.jsonl same-origin
+# The package's URL checks under the most permissive rule a host can pass.
+same_origin.jsonl same-origin
 # CommonMark's and GFM's examples (CC BY-SA 4.0: SPEC-LICENSE), also held to
 # the spec's html less spec_diverge.txt.
-spec_agree.jsonl
-spec_tables.jsonl
-spec_strike.jsonl
-spec_escapes.jsonl
-spec_images.jsonl
+spec_agree.jsonl user-uploads
+spec_tables.jsonl user-uploads
+spec_strike.jsonl user-uploads
+spec_escapes.jsonl user-uploads
+spec_images.jsonl user-uploads
 # Pinned departures from CommonMark (each its own note).
-pinned.jsonl
+pinned.jsonl user-uploads
 # The canned examples of the REPL (judge/repl.zig: `:examples`) and the
 # playground, each
 # {"id", "caption", "md"}, dense with the dialect's features.
-examples.jsonl
+examples.jsonl user-uploads

@@ -35,25 +35,42 @@ import MdInline
 import MdList
 import MdMedia
 import MdQuote
+import MdSafety
 import MdTable
 
 Md := [].{
 
+	## **WHAT THE HOST TELLS A RENDER**: which same-origin paths are its
+	## uploads, the only places a member's `<img>`, `<video>` or
+	## `![alt](src)` may load from (MdSafety.is_upload_url). Where a host
+	## keeps its files is the host's to say: the renderer judges a src as a
+	## URL, and asks this rule of one that passes. There is no default; a
+	## host with no uploads passes `no_uploads`.
+	Options : { uploads : MdSafety.Uploads }
+
+	## The rule of one uploads folder: every path under `prefix`.
+	uploads_under : List(U8) -> MdSafety.Uploads
+	uploads_under = |prefix| MdSafety.under(prefix)
+
+	## The rule of a host with no uploads: every member's media is text.
+	no_uploads : MdSafety.Uploads
+	no_uploads = |_| Bool.False
+
 	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
-	render : List(U8) -> List(U8)
-	render = |md| rendered(md, { wrap: HardWrap, budget: MdText.for_input(md) })
+	render : List(U8), Md.Options -> List(U8)
+	render = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads })
 
 	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
-	render_trusted : List(U8) -> List(U8)
-	render_trusted = |md| rendered(md, { wrap: HardWrap, budget: MdText.unlimited })
+	render_trusted : List(U8), Md.Options -> List(U8)
+	render_trusted = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.unlimited, uploads })
 
 	## Server-owned prose, whose source line
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
-	render_trusted_reflow : List(U8) -> List(U8)
-	render_trusted_reflow = |md| rendered(md, { wrap: Reflow, budget: MdText.unlimited })
+	render_trusted_reflow : List(U8), Md.Options -> List(U8)
+	render_trusted_reflow = |md, { uploads }| rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads })
 
 	## Text made safe for HTML, an element's content or an attribute's value
 	## (either quote): `&`, `<`, `>`, `"` and `'` as entities, every other
@@ -63,16 +80,16 @@ Md := [].{
 
 	## The work a render of `md` costs, unlimited, the
 	## measure the budget caps.
-	work_units : List(U8) -> U64
-	work_units = |md| match run(md, { wrap: HardWrap, budget: MdText.unlimited }) {
+	work_units : List(U8), Md.Options -> U64
+	work_units = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.unlimited, uploads }) {
 		Ok(done) => done.budget.spent
 		Err(Hostile) => crash "Md.work_units: an unlimited budget blown"
 	}
 
 	## Whether `md` would blow its budget, so a POST
 	## refuses it. One render in good faith with the real budget.
-	hostility : List(U8) -> [Renderable, TooMuchFormatting]
-	hostility = |md| match run(md, { wrap: HardWrap, budget: MdText.for_input(md) }) {
+	hostility : List(U8), Md.Options -> [Renderable, TooMuchFormatting]
+	hostility = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads }) {
 		Ok(_) => Renderable
 		Err(Hostile) => TooMuchFormatting
 	}
@@ -89,18 +106,19 @@ Md := [].{
 
 ## The one seed every render grows from: `md`'s blocks from the top, as a
 ## document's, in `wrap` and against `budget`.
-run : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget } -> Try(MdText.Rendered, [Hostile])
-run = |md, { wrap, budget }| blocks_onto({
+run : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads } -> Try(MdText.Rendered, [Hostile])
+run = |md, { wrap, budget, uploads }| blocks_onto({
 	out: [],
 	md,
 	spacing: Loose,
 	depth: 0,
 	wrap,
 	budget,
+	uploads,
 })
 
-rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget } -> List(U8)
-rendered = |md, { wrap, budget }| match run(md, { wrap, budget }) {
+rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads } -> List(U8)
+rendered = |md, { wrap, budget, uploads }| match run(md, { wrap, budget, uploads }) {
 	Ok(done) => done.out
 	Err(Hostile) => Md.malformed_html
 }
@@ -122,6 +140,7 @@ blocks_onto : {
 	depth : U64,
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
+	uploads : MdSafety.Uploads,
 } -> Try(MdText.Rendered, [Hostile])
 blocks_onto = |
 	{
@@ -131,6 +150,7 @@ blocks_onto = |
 		depth,
 		wrap,
 		budget,
+		uploads,
 	},
 |
 	if depth > max_block_depth {
@@ -140,6 +160,7 @@ blocks_onto = |
 			text: md,
 			refs: Linked,
 			budget,
+			uploads,
 		})?
 		Ok({ out: List.concat(flat.out, MdHtml.p_close), budget: flat.budget })
 	} else {
@@ -154,6 +175,7 @@ blocks_onto = |
 			depth: depth + 1,
 			wrap,
 			budget: inner.budget,
+			uploads,
 		})
 		var $out = out
 		var $budget = budget
@@ -182,6 +204,7 @@ blocks_onto = |
 						wrap,
 						budget: $budget,
 						nested,
+						uploads,
 					},
 				)?
 				$out = block.out
@@ -207,6 +230,7 @@ block_at : List(U8),
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
 	nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
+	uploads : MdSafety.Uploads,
 } -> Try(MdText.Block, [Hostile])
 block_at = |
 	out,
@@ -219,13 +243,14 @@ block_at = |
 		wrap,
 		budget,
 		nested,
+		uploads,
 	},
 |
 	match MdFence.open_at(md, pos) {
 		Ok(open) => Ok(fence_onto(out, { md, open, budget }))
 		Err(NotAFence) =>
 			match atx_heading(line) {
-				Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget })
+				Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads })
 				Err(NotAHeading) =>
 					match MdList.list_marker_at(md, pos) {
 						Ok(marker) => MdList.list_onto(out, { md, pos, first: marker, budget, nested, is_block_start })
@@ -233,24 +258,25 @@ block_at = |
 							if MdQuote.is_quote_line(line) {
 								MdQuote.quote_onto(out, { md, pos, budget, nested, is_block_start })
 							} else if is_html_block_start(line) {
-								Ok(raw_html_onto(out, { md, pos, budget }))
+								Ok(raw_html_onto(out, { md, pos, budget, uploads }))
 							} else if MdTable.is_table_at(md, pos) {
-								table_onto(out, { md, pos, budget })
+								table_onto(out, { md, pos, budget, uploads })
 							} else {
-								paragraph_onto(out, { md, pos, spacing, wrap, budget })
+								paragraph_onto(out, { md, pos, spacing, wrap, budget, uploads })
 							}
 					}
 			}
 	}
 
 ## An ATX heading, its content's inlines rendered between its tags.
-heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget } -> Try(MdText.Block, [Hostile])
-heading_onto = |out, { level, content, after, budget }| {
+heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> Try(MdText.Block, [Hostile])
+heading_onto = |out, { level, content, after, budget, uploads }| {
 	heading = MdInline.render_onto({
 		out: List.concat(out, MdHtml.heading_open(level)),
 		text: content,
 		refs: Linked,
 		budget,
+		uploads,
 	})?
 	Ok({ out: List.concat(heading.out, MdHtml.heading_close(level)), budget: heading.budget, after })
 }
@@ -273,6 +299,7 @@ paragraph_onto : List(U8),
 	spacing : [Tight, Loose],
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
+	uploads : MdSafety.Uploads,
 } -> Try(MdText.Block, [Hostile])
 paragraph_onto = |
 	out,
@@ -282,6 +309,7 @@ paragraph_onto = |
 		spacing,
 		wrap,
 		budget,
+		uploads,
 	},
 | {
 	len = List.len(md)
@@ -323,6 +351,7 @@ paragraph_onto = |
 					text: $reflow,
 					refs: Linked,
 					budget: $budget,
+					uploads,
 				})?
 				$out = List.concat(broke.out, MdHtml.br)
 				$budget = broke.budget
@@ -336,6 +365,7 @@ paragraph_onto = |
 				text,
 				refs: Linked,
 				budget: $budget,
+				uploads,
 			})?
 			$out = wrapped.out
 			$budget = wrapped.budget
@@ -348,6 +378,7 @@ paragraph_onto = |
 			text: $reflow,
 			refs: Linked,
 			budget: $budget,
+			uploads,
 		})?
 		$out = joined.out
 		$budget = joined.budget
@@ -498,14 +529,15 @@ table_onto : List(U8),
 	md : List(U8),
 	pos : U64,
 	budget : MdText.Budget,
+	uploads : MdSafety.Uploads,
 } -> Try(MdText.Block, [Hostile])
-table_onto = |out, { md, pos, budget }| match MdTable.table_at(md, pos) {
+table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos) {
 	Err(NotATable) => crash "Md.table_onto: no table where the dispatcher found one"
 	Ok(table) => {
 		len = List.len(md)
 		head = row_onto(
 			List.concat(out, MdHtml.table_open),
-			{ cells: table.header, aligns: table.aligns, tag: Th, budget },
+			{ cells: table.header, aligns: table.aligns, tag: Th, budget, uploads },
 		)?
 		var $out = List.concat(head.out, MdHtml.thead_close)
 		var $budget = head.budget
@@ -520,6 +552,7 @@ table_onto = |out, { md, pos, budget }| match MdTable.table_at(md, pos) {
 					aligns: table.aligns,
 					tag: Td,
 					budget: $budget,
+					uploads,
 				},
 			)?
 			$out = row.out
@@ -543,8 +576,9 @@ row_onto : List(U8),
 	aligns : List(MdTable.Align),
 	tag : [Th, Td],
 	budget : MdText.Budget,
+	uploads : MdSafety.Uploads,
 } -> Try(MdText.Rendered, [Hostile])
-row_onto = |out, { cells, aligns, tag, budget }| {
+row_onto = |out, { cells, aligns, tag, budget, uploads }| {
 	var $out = List.concat(out, MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
 	var $k = 0
@@ -560,6 +594,7 @@ row_onto = |out, { cells, aligns, tag, budget }| {
 			text: List.get(cells, $k) ?? [],
 			refs: Linked,
 			budget: $budget,
+			uploads,
 		})?
 		$out = List.concat(cell.out, MdHtml.cell_close(tag))
 		$budget = cell.budget
@@ -572,8 +607,8 @@ row_onto = |out, { cells, aligns, tag, budget }| {
 
 ## A raw block, every same-origin `<img>` and
 ## `<video>` rebuilt (MdMedia), every other byte escaped. One unit a byte.
-raw_html_onto : List(U8), { md : List(U8), pos : U64, budget : MdText.Budget } -> MdText.Block
-raw_html_onto = |out, { md, pos, budget }| {
+raw_html_onto : List(U8), { md : List(U8), pos : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> MdText.Block
+raw_html_onto = |out, { md, pos, budget, uploads }| {
 	# CommonMark's type 7: only at a block's start, and up to a blank line,
 	# with no <p> and no newline added.
 	md_len = List.len(md)
@@ -590,9 +625,9 @@ raw_html_onto = |out, { md, pos, budget }| {
 		if MdText.at(raw, $i) != '<' {
 			$i = $i + 1
 		} else {
-			safe = match MdMedia.img_at(raw, $i) {
+			safe = match MdMedia.img_at(raw, $i, uploads) {
 				Ok(tag) => Ok(tag)
-				Err(NotSafe) => MdMedia.video_at(raw, $i)
+				Err(NotSafe) => MdMedia.video_at(raw, $i, uploads)
 			}
 			match safe {
 				Ok(tag) => {
@@ -658,20 +693,26 @@ html_tag_end = |t| {
 heading_space : List(U8)
 heading_space = [' ', '\t']
 
+# The chat's own options, as roc-chat passes them.
+chat : Md.Options
+chat = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")) }
+
 md : Str -> Str
-md = |text| Str.from_utf8(Md.render(Str.to_utf8(text))) ?? "not text"
+
+md = |text| Str.from_utf8(Md.render(Str.to_utf8(text), chat)) ?? "not text"
 
 # Whole messages, block by block: the media rule, hard wraps and their
 # backslash, fences, lists, quotes and headings as the dialect renders them.
 expect md("<video src=\"/user_uploads/1_3/abc.mp4\"></video>") == "<p><video controls preload=\"metadata\" src=\"/user_uploads/1_3/abc.mp4\"></video></p>\n"
-# Media outside the uploads prefix is text, the old chat's upload paths too.
+# Media outside the host's uploads is text: under roc-chat's rule, the old
+# chat's upload paths too.
 expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p>&lt;video src=&quot;/chat/c/1_3/yo/uploads/abc.mp4&quot;&gt;&lt;/video&gt;</p>\n"
 expect md("hello\nworld") == "<p>hello<br>\nworld</p>\n"
 expect Md.escape(Str.to_utf8("Bea <i>x</i> & \"co\" 'q'")) == Str.to_utf8("Bea &lt;i&gt;x&lt;/i&gt; &amp; &quot;co&quot; &#39;q&#39;")
 expect md("hello\\\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("hello\\\\\nworld") == "<p>hello\\<br>\nworld</p>\n"
 expect md("hello\\") == "<p>hello\\</p>\n"
-expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("*a\\\nb* c\nd"))) == Ok("<p>*a<br>\nb* c d</p>\n")
+expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("*a\\\nb* c\nd"), chat)) == Ok("<p>*a<br>\nb* c d</p>\n")
 expect md("# about MSG_plans_3") == "<h1>about <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></h1>\n"
 expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;b\n</code></pre>\n<p>after</p>\n"
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
@@ -679,8 +720,8 @@ expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
 expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
 expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
-expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("A **bold phrase that\nspans two lines** here."))) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
-expect Md.hostility(Str.to_utf8("some **bold** text and a [link](http://x.com)")) == Renderable
+expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("A **bold phrase that\nspans two lines** here."), chat)) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
+expect Md.hostility(Str.to_utf8("some **bold** text and a [link](http://x.com)"), chat) == Renderable
 # GFM's tables.
 expect md("| a | b |\n| :- | -: |\n| c |\n| d | e | f |") == "<table>\n<thead>\n<tr>\n<th align=\"left\">a</th>\n<th align=\"right\">b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align=\"left\">c</td>\n<td align=\"right\"></td>\n</tr>\n<tr>\n<td align=\"left\">d</td>\n<td align=\"right\">e</td>\n</tr>\n</tbody>\n</table>\n"
 expect md("see:\n| a |\n| - |\n\nafter") == "<p>see:</p>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n</table>\n<p>after</p>\n"

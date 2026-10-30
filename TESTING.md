@@ -19,12 +19,20 @@ showell/roc-apps release `toolchain-2026-10-27` carries it. Zig is 0.17.
 ## The corpora
 
 They're in `judge/data/`, each listed in `corpora.txt` with its answers
-beside it (`<name>.answers.jsonl`):
+beside it (`<name>.answers.jsonl`) and the uploads rule its cases were
+written for, passed as a host passes one (judge/answers.roc):
+`user-uploads` (roc-chat's `/user_uploads/`) for the dialect's own corpora,
+`same-origin` (any same-origin path) for the Zig renderer's unit tests and
+for **same_origin**, and the old chat's `<base>/<topic>/uploads/<file>` for
+gold (`--also`). The hostile shapes take `user-uploads`.
 
 - **adversarial**, **dialect** and **pinned:** shapes chosen by hand, and
   the dialect's deliberate departures from CommonMark.
 - **unit_cases:** every input of the original Zig renderer's unit tests,
   where the dialect came from.
+- **same_origin:** the package's own URL checks under the most permissive
+  rule a host can pass: another site, a `..` and an encoded `/` are refused
+  whatever the rule says.
 - **spec_agree:** 269 of CommonMark's and GFM's spec examples, held to the
   spec's HTML, less the deliberate divergences `spec_diverge.txt` lists.
   They are the examples of the sections the dialect covers (emphasis, code
@@ -110,7 +118,8 @@ roc.lynrummy.com/markdown/, through roc-apps' static site.
 **What the box publishes:** `zig-out/playground/*` at the site's `/markdown/`,
 and `zig-out/user_uploads/sample.png` at the site root's
 `/user_uploads/sample.png`: the `safety` example's image is an upload, as
-every image a message shows must be (`MdChat.uploads_prefix`).
+every image a message shows must be (the playground passes `/user_uploads/`
+as its uploads rule, as roc-chat does).
 
 ## Layout
 

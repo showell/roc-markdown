@@ -24,7 +24,7 @@ bare URLs. Where it differs:
 | A newline inside a paragraph | a line break (as in GitHub comments and Zulip) | a space, in documents |
 | `**bold` across a line break `**` | stays literal: inline markup pairs within a line | pairs |
 | Raw HTML | escaped, shown as text | a safe subset rendered |
-| `<img>`, `<video>` | only the chat's uploads (`/user_uploads/…`), rebuilt from safe attributes | sanitized |
+| `<img>`, `<video>` | only the uploads the host names, rebuilt from safe attributes | sanitized |
 | A link to another site | opens in a new tab | same tab |
 | `MSG_plans_3` | a link to that chat message | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
@@ -41,8 +41,12 @@ who reads it or what else is stored.
   except the markup the dialect itself writes. A `javascript:` link loses its
   href. A user's image or video tag, or a markdown `![alt](src)`, is
   rebuilt from an allowlist of attributes, and only when it points at the
-  chat's uploads (`/user_uploads/`, set in `package/MdChat.roc`), never at
-  another of the app's own routes.
+  host's uploads, never at another of the app's own routes or another site.
+- **The host names its uploads, in each render's options** (`Md.Options`):
+  where its files live is the host's to say, not the renderer's. The
+  renderer judges the src as a URL (same origin, no `..`, no encoded `/`),
+  then asks the host's rule. There is no default: `Md.no_uploads` renders
+  no media.
 - **A bounded cost.** Rendering is linear in the message, and every step is
   charged to a work budget sized by its length. A message built to blow it up
   (thousands of nested brackets, a table thousands of columns wide) is
@@ -65,13 +69,23 @@ app [main!] {
 import md.Md
 ```
 
+Every render takes the host's options, `{ uploads }`: a rule saying which
+same-origin paths are its uploads.
+
+```roc
+options = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")) }
+html = Md.render(message, options)
+```
+
 | Function | What it does |
 |---|---|
-| `Md.render : List(U8) -> List(U8)` | a chat message to HTML, within the budget |
-| `Md.hostility : List(U8) -> [Renderable, TooMuchFormatting]` | whether a message is within the budget, before you render it |
-| `Md.work_units : List(U8) -> U64` | what a render costs |
-| `Md.render_trusted : List(U8) -> List(U8)` | your own docs, no budget |
-| `Md.render_trusted_reflow : List(U8) -> List(U8)` | the same, a newline as a space |
+| `Md.render : List(U8), Md.Options -> List(U8)` | a chat message to HTML, within the budget |
+| `Md.hostility : List(U8), Md.Options -> [Renderable, TooMuchFormatting]` | whether a message is within the budget, before you render it |
+| `Md.work_units : List(U8), Md.Options -> U64` | what a render costs |
+| `Md.render_trusted : List(U8), Md.Options -> List(U8)` | your own docs, no budget |
+| `Md.render_trusted_reflow : List(U8), Md.Options -> List(U8)` | the same, a newline as a space |
+| `Md.uploads_under : List(U8) -> (List(U8) -> Bool)` | the rule of one uploads folder: every path under it |
+| `Md.no_uploads : List(U8) -> Bool` | the rule of a host with no uploads |
 | `Md.escape : List(U8) -> List(U8)` | text made safe for HTML, the renderer's own escape, for your pages |
 
 `MdFence`, `MdMedia` and `MdTable` are exposed for a host that reads one of
