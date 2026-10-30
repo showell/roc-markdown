@@ -28,8 +28,8 @@ bare URLs. Where it differs:
 | A link to another site | opens in a new tab | same tab |
 | `MSG_plans_3` | a link to that chat message | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
-| `![alt](src)` | an image only from the chat's uploads; any other src becomes a link | an image from anywhere |
-| `~strike~` (one tilde) | text, so "~5 minutes" stays as written | strikethrough |
+| `![alt](src)` | an image only from the uploads the host names; any other src becomes a link | an image from anywhere |
+| `~one tilde~` (`~~two~~` strikes, as on GitHub) | text, so "~5 minutes" stays as written | strikes too |
 
 Emoji and any script pass through untouched. There are no `:shortcodes:`
 and no `@mentions`: the HTML depends only on the message's bytes, never on
