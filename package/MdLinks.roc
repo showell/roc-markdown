@@ -162,11 +162,12 @@ MdLinks := [].{
 	}
 
 	## A `[label](url)` link's opening tag, a new tab when external
-	## (MdSafety's rule). Never asked of a dangerous url: such a link is
-	## shown as its source (MdInline).
+	## (MdSafety's rule). MdInline never asks it of a dangerous url (such a
+	## link is shown as its source); the href is still dropped here, so the
+	## sink stays safe whatever its callers do.
 	link_open : List(U8) -> List(U8)
 	link_open = |url| MdHtml.link_open({
-		href: url,
+		href: if (MdSafety.is_dangerous_url(url)) [] else url,
 		tab: if (MdSafety.is_external_href(url)) NewTab else SameTab,
 	})
 
