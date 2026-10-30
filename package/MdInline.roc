@@ -134,6 +134,10 @@ MdInline := [].{
 									$budget = alt.budget
 									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title, uploads }) ?? []
 									Token(Html(html), found.link.end)
+								} else if MdSafety.is_dangerous_url(found.dest.src) {
+									# Refused: the whole image's source, `!` and all,
+									# left in the pending text (MdSafety).
+									Skip(found.link.end)
 								} else {
 									Cut($i + 1)
 								}
@@ -153,6 +157,10 @@ MdInline := [].{
 						$closes = linked.closes
 						$budget = linked.budget
 						match linked.link {
+							Ok(link) if MdSafety.is_dangerous_url(link.url) =>
+							# Refused: the whole link's source left in the
+							# pending text, nothing in it read (MdSafety).
+								Skip(link.end)
 							Ok(link) => {
 								# The label is a line of its own, rendered `InLabel`
 								# inside the `<a>`.
@@ -422,7 +430,7 @@ expect inline("a**b**c") == "a<strong>b</strong>c"
 expect inline("***x***") == "<em><strong>x</strong></em>"
 expect inline("see MSG_plans_3 now") == "see <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a> now"
 expect inline("[about MSG_plans_3](https://example.org)") == "<a href=\"https://example.org\" target=\"_blank\" rel=\"noopener\">about MSG_plans_3</a>"
-expect inline("[x](java\tscript:alert(1))") == "<a href=\"\">x</a>"
+expect inline("[x](java\tscript:alert(1))") == "[x](java\tscript:alert(1))"
 expect inline("`a<b`") == "<code>a&lt;b</code>"
 expect inline("go to www.a.com, now") == "go to <a href=\"http://www.a.com\" target=\"_blank\" rel=\"noopener\">www.a.com</a>, now"
 expect inline("mail a.b@c.d.") == "mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a>."
@@ -443,11 +451,11 @@ expect inline("~~a *b~~ c*") == "<del>a *b</del> c*"
 # Backslash escapes: before ASCII punctuation, the character is text.
 expect inline("\\*not em\\* and \\[not](a link) \\`not code\\`") == "*not em* and [not](a link) `not code`"
 expect inline("[a](/b\\*c)") == "<a href=\"/b*c\">a</a>"
-expect inline("[a](javascript\\:alert(1))") == "<a href=\"\">a</a>"
+expect inline("[a](javascript\\:alert(1))") == "[a](javascript\\:alert(1))"
 expect inline("![a *cat*](/user_uploads/cat.png \"the cat\")") == "<img src=\"/user_uploads/cat.png\" alt=\"a cat\" title=\"the cat\">"
 expect inline("see ![](/user_uploads/x.png)!") == "see <img src=\"/user_uploads/x.png\" alt=\"\">!"
 expect inline("![off](https://evil.example/x.png)") == "<a href=\"https://evil.example/x.png\" target=\"_blank\" rel=\"noopener\">off</a>"
-expect inline("![js](javascript:alert(1))") == "<a href=\"\">js</a>"
+expect inline("![js](javascript:alert(1))") == "![js](javascript:alert(1))"
 expect inline("![a](//evil/x.png)") == "<a href=\"//evil/x.png\">a</a>"
 expect inline("![a \"q\" & <b>](/user_uploads/x.png)") == "<img src=\"/user_uploads/x.png\" alt=\"a &quot;q&quot; &amp; &lt;b&gt;\">"
 expect inline("![a](/x.png bad)") == "!<a href=\"/x.png bad\">a</a>"

@@ -26,6 +26,7 @@ bare URLs. Where it differs:
 | Raw HTML | escaped, shown as text | a safe subset rendered |
 | `<img>`, `<video>` | only the uploads the host names, rebuilt from safe attributes | sanitized |
 | A link to another site | opens in a new tab | same tab |
+| `[click](javascript:alert(1))` | its source, shown as text | the label, its href dropped |
 | `MSG_plans_3` | a link to that chat message | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
 | `![alt](src)` | an image only from the uploads the host names; any other src becomes a link | an image from anywhere |
@@ -38,10 +39,12 @@ who reads it or what else is stored.
 ## What it guarantees
 
 - **Safe output, whatever the input.** Every byte a user wrote is escaped,
-  except the markup the dialect itself writes. A `javascript:` link loses its
-  href. A user's image or video tag, or a markdown `![alt](src)`, is
-  rebuilt from an allowlist of attributes, and only when it points at the
-  host's uploads, never at another of the app's own routes or another site.
+  except the markup the dialect itself writes. What it won't run, it shows:
+  a `javascript:` link (or `![alt](src)`) is no link at all but its own
+  source, as text, as raw HTML is. A user's image or video tag, or a
+  markdown `![alt](src)`, is rebuilt from an allowlist of attributes, and
+  only when it points at the host's uploads, never at another of the
+  app's own routes or another site.
 - **The host names its uploads, in each render's options** (`Md.Options`):
   where its files live is the host's to say, not the renderer's. The
   renderer judges the src as a URL (same origin, no `..`, no encoded `/`),
@@ -50,7 +53,9 @@ who reads it or what else is stored.
 - **A bounded cost.** Rendering is linear in the message, and every step is
   charged to a work budget sized by its length. A message built to blow it up
   (thousands of nested brackets, a table thousands of columns wide) is
-  refused up front: `Md.hostility` says so before you render.
+  refused up front: `Md.hostility` says so before you render, and a chat
+  refuses it whole (the playground's `hostile` example). Trusted text has
+  no budget: its caller decides.
 - **A stable dialect.** The same input gives the same HTML from one release
   to the next unless a change is deliberate. The answers are frozen, and a
   change that moves one names it ([TESTING.md](TESTING.md)).

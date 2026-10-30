@@ -150,8 +150,8 @@ MdHtml := [].{
 	del_close : List(U8)
 	del_close = "</del>".to_utf8()
 
-	## A link's opening tag: its href escaped (an empty one where MdSafety
-	## dropped it), and a new tab, without the opener, when `NewTab`.
+	## A link's opening tag: its href escaped, and a new tab, without the
+	## opener, when `NewTab`.
 	link_open : { href : List(U8), tab : [SameTab, NewTab] } -> List(U8)
 	link_open = |{ href, tab }| List.join([
 		MdText.escape_onto(Str.to_utf8("<a href=\""), href),

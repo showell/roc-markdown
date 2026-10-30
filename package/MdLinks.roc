@@ -1,8 +1,10 @@
 ## **LINKS AND AUTOLINKS**: where a `[label](url)` link or a GFM
 ## autolink (`http://…`, `https://…`, `www.…`, `local@domain.tld`) stands in
 ## a line, and the `<a>` each becomes (its tags MdHtml's). Which hrefs are
-## dangerous and which open in a new tab is MdSafety's; a link's label is the inline pass's
-## (MdInline), which renders it as it renders a line. Pure.
+## dangerous and which open in a new tab is MdSafety's; a dangerous link
+## becomes no `<a>` at all, its source shown as text (MdInline). A link's
+## label is the inline pass's (MdInline), which renders it as it renders a
+## line. Pure.
 ##
 ## **LINEAR BY ITS CURSORS**: the first `]` ahead (`next_bracket`), the line's paren
 ## table (`Closes`), and the floor below which no email can start
@@ -159,11 +161,12 @@ MdLinks := [].{
 		Ok(MdHtml.img(attrs))
 	}
 
-	## A `[label](url)` link's opening tag: its href dropped when dangerous,
-	## and a new tab when external (MdSafety's rules both).
+	## A `[label](url)` link's opening tag, a new tab when external
+	## (MdSafety's rule). Never asked of a dangerous url: such a link is
+	## shown as its source (MdInline).
 	link_open : List(U8) -> List(U8)
 	link_open = |url| MdHtml.link_open({
-		href: if (MdSafety.is_dangerous_url(url)) [] else url,
+		href: url,
 		tab: if (MdSafety.is_external_href(url)) NewTab else SameTab,
 	})
 

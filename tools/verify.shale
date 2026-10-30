@@ -27,7 +27,7 @@
 --     inside a code span, one byte of a strikethrough;
 --   - the image shapes linear, and three more plants, each red: an image
 --     allowed from another origin, markup kept inside an alt, a
---     `javascript:` src rendered;
+--     `javascript:` src rendered as a link;
 --   - plants, each red: a media src outside the host's uploads accepted,
 --     a `'` left unescaped, one byte of a split function's answer, a
 --     host's uploads rule ignored, a `..` path let through by the most
@@ -254,10 +254,11 @@ plant("`~~` paired across a line", "dialect.answers.jsonl", "swap", {old = "\"ht
 plant("a backslash escape applied inside a code span", "spec_escapes.answers.jsonl", "swap", {old = "<code>\\\\[\\\\`</code>", new = "<code>[`</code>"}, "FAILID\tspec_escapes\t")
 plant("one byte of a frozen strikethrough (spec_strike)", "spec_strike.answers.jsonl", "one_byte", "<del>", "FAILID\tspec_strike\t")
 -- An image allowed from another origin; markup kept inside an
--- alt; a `javascript:` src rendered as an image.
+-- alt; a `javascript:` src rendered as a link (its href emptied),
+-- not shown as its source.
 plant("an image allowed from another origin", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"https://elsewhere.example/a.png\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">off</a>", new = "<img src=\\\"https://elsewhere.example/a.png\\\" alt=\\\"off\\\">"}, "FAILID\tdialect\t")
 plant("markup kept inside an alt", "dialect.answers.jsonl", "swap", {old = "alt=\\\"a b c d\\\"", new = "alt=\\\"a &lt;em&gt;b&lt;/em&gt; c d\\\""}, "FAILID\tdialect\t")
-plant("a javascript: src rendered", "dialect.answers.jsonl", "swap", {old = "<a href=\\\"\\\">js</a>", new = "<img src=\\\"javascript:alert(1)\\\" alt=\\\"js\\\">"}, "FAILID\tdialect\t")
+plant("a javascript: src rendered as a link", "dialect.answers.jsonl", "swap", {old = "<p>![js](javascript:alert(1))</p>", new = "<p><a href=\\\"\\\">js</a></p>"}, "FAILID\tdialect\t")
 -- A media src outside the host's uploads accepted (an app
 -- route, a held stream, rebuilt as an image).
 plant("a media src outside the host's uploads accepted", "dialect.answers.jsonl", "swap", {old = "&lt;img src=&quot;/conversations/1/stream&quot;&gt;", new = "<img src=\\\"/conversations/1/stream\\\">"}, "FAILID\tdialect\t")

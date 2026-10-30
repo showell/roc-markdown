@@ -1,9 +1,14 @@
 ## **WHAT A MEMBER'S LINK OR MEDIA MAY BECOME**: the one home of the renderer's URL and attribute rules, for an audit to read
 ## alone.
-##   - **Links** (MdLinks finds them and asks here): one whose destination a
-##     browser would run (`javascript:` and its kin) keeps its label but
-##     loses its href; a `scheme://` link opens in a new tab without the
-##     opener.
+##
+## **WHAT WE WON'T RUN, WE SHOW**: anything refused below is shown as its
+## source, escaped, never as a defanged version of itself that still looks
+## live.
+##   - **Links** (MdLinks finds them, MdInline asks here): one whose
+##     destination a browser would run (`javascript:` and its kin) is no
+##     link: its whole source, `[label](url)`, is text. A `scheme://` link
+##     opens in a new tab without the opener. (An autolink is only ever
+##     `http://`, `https://`, `www.` or an email, so none is dangerous.)
 ##   - **Media** (MdMedia scans a member's `<img>` or `<video>` and asks
 ##     here): the tag is rebuilt from an allowlist, and only when its src is
 ##     a same-origin URL that the host's rule calls one of its uploads (the
@@ -14,8 +19,9 @@
 ##     follow the media's rule exactly: a same-origin src is the very
 ##     `<img src alt title>` a member's tag of that src and alt is rebuilt
 ##     as. **ANY OTHER SRC IS A LINK, THE `!` DROPPED**: the label its text,
-##     under the link rules above (a `javascript:` src keeps no href, another
-##     site's opens a new tab). Not the text as written, because the link
+##     under the link rules above (another site's opens a new tab; a
+##     `javascript:` src is refused, its whole source, `!` and all, shown as
+##     text). Not the text as written, because the link
 ##     still says where the image is and lets a reader choose to open it,
 ##     while the page fetches nothing from another site (no tracking pixel,
 ##     no hotlink); and the markup as written would be noise.
