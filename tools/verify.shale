@@ -274,9 +274,16 @@ plant("a host's uploads rule ignored (media rendered without asking it)", "diale
 plant("a `..` path passed by a permissive rule", "same_origin.answers.jsonl", "swap", {old = "&lt;img src=&quot;/anything/../login&quot;&gt;", new = "<img src=\\\"/anything/../login\\\">"}, "FAILID\tsame_origin\t")
 
 -- ── the formatters ──
+-- **THE PINNED ROC**: tools:roc-<pin>/roc, a tree's roc-version naming the
+-- pin (pins live side by side; the PATH's may be another project's).
+function pinned_roc(pin_file)
+  local at = "tools:roc-" .. trim(read(pin_file)) .. "/roc"
+  if not exists(at) then fail("verify: no " .. at .. " (the toolchain release carries it)") end
+  return real(at)
+end
 local zf = run({"zig", "fmt", "--check", "build.zig", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
 say(zf.code == 0, "zig fmt --check build.zig judge playground" .. (zf.code == 0 and "" or (": " .. trim(zf.out))))
-local rf = run({"roc", "fmt", "--check", "package", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
+local rf = run({pinned_roc("roc-version"), "fmt", "--check", "package", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
 say(rf.code == 0, "roc fmt --check package judge playground")
 
 -- ── roc-chat against this package ──
@@ -290,7 +297,7 @@ local clone = run({"git", "clone", "-q", "--depth", "1", "--branch", chat_branch
 if clone.code ~= 0 then
   say(false, "roc-chat cloned (exit " .. clone.code .. ": " .. trim(clone.out) .. ")")
 else
-  local rt = run({"roc", "test", "app/main.roc"}, {cwd = scratch_dir .. "/roc-chat", timeout_ms = 600000, tail = 5})
+  local rt = run({pinned_roc(scratch_dir .. "/roc-chat/roc-version"), "test", "app/main.roc"}, {cwd = scratch_dir .. "/roc-chat", timeout_ms = 600000, tail = 5})
   say(rt.code == 0, "roc-chat's roc test against this package (exit " .. rt.code .. ": " .. trim(rt.out) .. ")")
 end
 

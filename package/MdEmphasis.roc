@@ -65,8 +65,8 @@ MdEmphasis := [].{
 		# closes only as `~~`.
 		is_star = c == '*'
 		is_strike = c == '~'
-		can_open = if is_strike flank.left and n == 2 else flank.left and (is_star or !flank.right or flank.before_punct)
-		can_close = if is_strike flank.right and n == 2 else flank.right and (is_star or !flank.left or flank.after_punct)
+		can_open = if (is_strike) flank.left and n == 2 else flank.left and (is_star or !flank.right or flank.before_punct)
+		can_close = if (is_strike) flank.right and n == 2 else flank.right and (is_star or !flank.left or flank.after_punct)
 		{
 			char: c,
 			count: n,
@@ -94,15 +94,15 @@ MdEmphasis := [].{
 			runs,
 			|run, k| {
 				..run,
-				below: if k == 0 Edge else At(k - 1),
-				above: if k + 1 == n Edge else At(k + 1),
+				below: if (k == 0) Edge else At(k - 1),
+				above: if (k + 1 == n) Edge else At(k + 1),
 			},
 		)
 		var $budget = budget
 		# The lowest opener a closer may look back to, by its floor key: an
 		# edge is the stack's bottom.
 		var $bottoms = List.repeat(Edge, floor_keys)
-		var $closer = if n == 0 Edge else At(0)
+		var $closer = if (n == 0) Edge else At(0)
 		while $closer != Edge {
 			ci = index_of($closer)
 			$budget = MdText.charge($budget, 1)
@@ -143,7 +143,7 @@ MdEmphasis := [].{
 				if $found {
 					oi = index_of($opener)
 					opener = MdEmphasis.run_at($runs, oi)
-					use = if opener.count >= 2 and closer.count >= 2 2 else 1
+					use = if (opener.count >= 2 and closer.count >= 2) 2 else 1
 					# Every run strictly between the two leaves the stack.
 					$runs = set_run(
 						$runs,
@@ -215,7 +215,7 @@ MdEmphasis := [].{
 	run_onto = |out, run| {
 		var $o = out
 		for use in run.closes {
-			$o = List.concat($o, if run.char == '~' MdHtml.del_close else if use == 2 MdHtml.strong_close else MdHtml.em_close)
+			$o = List.concat($o, if (run.char == '~') MdHtml.del_close else if (use == 2) MdHtml.strong_close else MdHtml.em_close)
 		}
 		$o = List.concat($o, List.repeat(run.char, run.count))
 		var $n = List.len(run.opens)
@@ -223,7 +223,7 @@ MdEmphasis := [].{
 			$n = $n - 1
 			$o = List.concat(
 				$o,
-				if run.char == '~' MdHtml.del_open else if (List.get(run.opens, $n) ?? 0) == 2 MdHtml.strong_open else MdHtml.em_open,
+				if (run.char == '~') MdHtml.del_open else if ((List.get(run.opens, $n) ?? 0) == 2) MdHtml.strong_open else MdHtml.em_open,
 			)
 		}
 		$o
@@ -254,8 +254,8 @@ set_run = |runs, { at, delimiters }| List.set(
 ## would have matched (`*a**b** c**`'s last `**`).
 floor_key : MdEmphasis.DelimiterRun -> U64
 floor_key = |closer| {
-	opens = if closer.can_open 3 else 0
-	character = if closer.char == '*' 0 else if closer.char == '_' 1 else 2
+	opens = if (closer.can_open) 3 else 0
+	character = if (closer.char == '*') 0 else if (closer.char == '_') 1 else 2
 	(opens + closer.orig % 3) * 3 + character
 }
 
@@ -292,8 +292,8 @@ flanking : List(U8),
 	after_punct : Bool,
 }
 flanking = |text, { start, end }| {
-	before = if start == 0 ' ' else MdText.at(text, start - 1)
-	after = if end >= List.len(text) ' ' else MdText.at(text, end)
+	before = if (start == 0) ' ' else MdText.at(text, start - 1)
+	after = if (end >= List.len(text)) ' ' else MdText.at(text, end)
 	before_space = MdText.is_space(before)
 	after_space = MdText.is_space(after)
 	before_punct = Ascii.is_punctuation(before)

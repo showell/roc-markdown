@@ -161,7 +161,7 @@ MdText := [].{
 
 	## The start of the line after the one ending at `eol`.
 	next_line : List(U8), U64 -> U64
-	next_line = |md, eol| if eol < md.len() eol + 1 else md.len()
+	next_line = |md, eol| if (eol < md.len()) eol + 1 else md.len()
 }
 
 per_byte : U64

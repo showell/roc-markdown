@@ -22,7 +22,7 @@ MdTable := [].{
 		var $cells = []
 		var $cell = []
 		var $after_pipe = Bool.False
-		var $i = if t.first() == Ok('|') 1 else 0
+		var $i = if (t.first() == Ok('|')) 1 else 0
 		while $i < len {
 			c = MdText.at(t, $i)
 			$after_pipe = Bool.False
@@ -43,7 +43,7 @@ MdTable := [].{
 			}
 		}
 		# A trailing `|` closes the last cell; it opens none.
-		if $after_pipe $cells else List.append($cells, MdText.trim_line($cell))
+		if ($after_pipe) $cells else List.append($cells, MdText.trim_line($cell))
 	}
 
 	## GFM's table at the line at `pos`: that line is its header row and the
@@ -99,9 +99,9 @@ delimiter_cell : List(U8) -> Try(MdTable.Align, [NotADelimiter])
 delimiter_cell = |cell| {
 	n = cell.len()
 	left = cell.first() == Ok(':')
-	l = if left 1 else 0
+	l = if (left) 1 else 0
 	right = n > l and cell.last() == Ok(':')
-	r = if right 1 else 0
+	r = if (right) 1 else 0
 	dashes = cell.sublist({ start: l, len: n - l - r })
 	if dashes == [] or !dashes.all(|c| c == '-') {
 		Err(NotADelimiter)

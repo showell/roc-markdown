@@ -163,8 +163,8 @@ MdLinks := [].{
 	## and a new tab when external (MdSafety's rules both).
 	link_open : List(U8) -> List(U8)
 	link_open = |url| MdHtml.link_open({
-		href: if MdSafety.is_dangerous_url(url) [] else url,
-		tab: if MdSafety.is_external_href(url) NewTab else SameTab,
+		href: if (MdSafety.is_dangerous_url(url)) [] else url,
+		tab: if (MdSafety.is_external_href(url)) NewTab else SameTab,
 	})
 
 	## An autolink starts only at the line's
@@ -236,7 +236,7 @@ MdLinks := [].{
 					j = Bytes.count_while(text, { keep: is_email_local_char, at })
 					{
 						link: Err(NotALink),
-						email_dead: if j > at j else at + 1,
+						email_dead: if (j > at) j else at + 1,
 						budget: MdText.charge(e.budget, j - at),
 					}
 				}
@@ -330,7 +330,7 @@ url_end = |text, { start, budget }| {
 				break
 			}
 		}
-		{ end: if $end <= start + 4 Err(NotALink) else Ok($end), budget: spent }
+		{ end: if ($end <= start + 4) Err(NotALink) else Ok($end), budget: spent }
 	}
 }
 

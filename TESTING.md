@@ -13,8 +13,10 @@ zig build judge -- --also <gold.jsonl>  # the judge, with a private corpus too
 shale tools/verify.shale                # every check above, the planted faults, a PASS/FAIL checklist
 ```
 
-The Roc is pinned (`roc-version`): `roc` on the PATH, or `-Droc=<path>`. The
-showell/roc-apps release `toolchain-2026-10-27` carries it. Zig is 0.17.
+The Roc is pinned (`roc-version`): `-Droc=<path>`, else `~/tools/roc-<pin>/roc`
+(pins live side by side while projects move one at a time), else `roc` on
+the PATH. The showell/roc-apps release `toolchain-2026-10-30` carries it.
+Zig is 0.17.
 
 ## The corpora
 

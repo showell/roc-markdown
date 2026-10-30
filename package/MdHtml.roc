@@ -63,7 +63,7 @@ MdHtml := [].{
 
 	## An ordered list's opening, its `start` when that is not 1.
 	ol_open : U64 -> List(U8)
-	ol_open = |start| if start == 1 "<ol>\n".to_utf8() else "<ol start=\"${start.to_str()}\">\n".to_utf8()
+	ol_open = |start| if (start == 1) "<ol>\n".to_utf8() else "<ol start=\"${start.to_str()}\">\n".to_utf8()
 
 	ol_close : List(U8)
 	ol_close = "</ol>\n".to_utf8()
@@ -105,7 +105,7 @@ MdHtml := [].{
 	## `<th>` or `<td>`, with GFM's `align` when the column has one.
 	cell_open : [Th, Td], MdTable.Align -> List(U8)
 	cell_open = |tag, align| {
-		name = if tag == Th "<th" else "<td"
+		name = if (tag == Th) "<th" else "<td"
 		attr = match align {
 			Plain => ""
 			Left => " align=\"left\""
@@ -116,7 +116,7 @@ MdHtml := [].{
 	}
 
 	cell_close : [Th, Td] -> List(U8)
-	cell_close = |tag| (if tag == Th "</th>\n" else "</td>\n").to_utf8()
+	cell_close = |tag| (if (tag == Th) "</th>\n" else "</td>\n").to_utf8()
 
 	## What a hostile message renders as: a paragraph the client is free to
 	## style as `.md-malformed`.
@@ -156,7 +156,7 @@ MdHtml := [].{
 	link_open = |{ href, tab }| List.join([
 		MdText.escape_onto(Str.to_utf8("<a href=\""), href),
 		['"'],
-		if tab == NewTab " target=\"_blank\" rel=\"noopener\"".to_utf8() else [],
+		if (tab == NewTab) " target=\"_blank\" rel=\"noopener\"".to_utf8() else [],
 		['>'],
 	])
 

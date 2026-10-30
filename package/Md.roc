@@ -154,7 +154,7 @@ blocks_onto = |
 	},
 |
 	if depth > max_block_depth {
-		start = if out != [] and List.last(out) != Ok('\n') List.append(out, '\n') else out
+		start = if (out != [] and List.last(out) != Ok('\n')) List.append(out, '\n') else out
 		flat = MdInline.render_onto({
 			out: List.concat(start, MdHtml.p_open),
 			text: md,
@@ -333,16 +333,16 @@ paragraph_onto = |
 		$p = MdText.next_line(md, eol)
 	}
 	last = List.len($lines) - 1
-	var $out = if spacing == Tight out else List.concat(out, MdHtml.p_open)
+	var $out = if (spacing == Tight) out else List.concat(out, MdHtml.p_open)
 	var $budget = budget
 	var $reflow = []
 	var $k = 0
 	for line in $lines {
 		breaks = $k < last and ends_in_hard_break(line)
-		text = MdText.trim_line(if breaks List.drop_last(line, 1) else line)
+		text = MdText.trim_line(if (breaks) List.drop_last(line, 1) else line)
 		if wrap == Reflow {
 			$reflow = List.concat(
-				if $reflow == [] $reflow else List.append($reflow, ' '),
+				if ($reflow == []) $reflow else List.append($reflow, ' '),
 				text,
 			)
 			if breaks {
@@ -361,7 +361,7 @@ paragraph_onto = |
 			}
 		} else {
 			wrapped = MdInline.render_onto({
-				out: if $k == 0 $out else List.concat($out, MdHtml.br),
+				out: if ($k == 0) $out else List.concat($out, MdHtml.br),
 				text,
 				refs: Linked,
 				budget: $budget,
@@ -386,7 +386,7 @@ paragraph_onto = |
 		{}
 	}
 	Ok({
-		out: if spacing == Tight $out else List.concat($out, MdHtml.p_close),
+		out: if (spacing == Tight) $out else List.concat($out, MdHtml.p_close),
 		budget: $budget,
 		after: $p,
 	})
@@ -403,7 +403,7 @@ tight_sep : List(U8), [Tight, Loose] -> List(U8)
 tight_sep = |
 	out,
 	spacing,
-| if spacing == Tight and out != [] and List.last(out) != Ok('\n') List.append(out, '\n') else out
+| if (spacing == Tight and out != [] and List.last(out) != Ok('\n')) List.append(out, '\n') else out
 
 # ── fenced code ──
 
@@ -443,7 +443,7 @@ fence_onto = |
 	}
 	content = MdText.cut(md, { start: body_start, end: $content_end })
 	is_quote = MdChat.is_quote_fence(open.lang)
-	(head, tail) = if is_quote (MdHtml.chat_quote_open, MdHtml.chat_quote_close) else (MdHtml.code_block_open(open.lang), MdHtml.code_block_close)
+	(head, tail) = if (is_quote) (MdHtml.chat_quote_open, MdHtml.chat_quote_close) else (MdHtml.code_block_open(open.lang), MdHtml.code_block_close)
 	code = code_lines_onto(List.concat(out, head), { content, indent: open.indent })
 	{
 		out: List.concat(code, tail),
@@ -546,7 +546,7 @@ table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos)
 		while $p < len and !is_block_start(md, $p) {
 			eol = MdText.line_end(md, $p)
 			row = row_onto(
-				if $rows == 0 List.concat($out, MdHtml.tbody_open) else $out,
+				if ($rows == 0) List.concat($out, MdHtml.tbody_open) else $out,
 				{
 					cells: MdTable.cells(MdText.cut(md, { start: $p, end: eol })),
 					aligns: table.aligns,
@@ -561,7 +561,7 @@ table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos)
 			$p = MdText.next_line(md, eol)
 		}
 		Ok({
-			out: List.concat(if $rows == 0 $out else List.concat($out, MdHtml.tbody_close), MdHtml.table_close),
+			out: List.concat(if ($rows == 0) $out else List.concat($out, MdHtml.tbody_close), MdHtml.table_close),
 			budget: $budget,
 			after: $p,
 		})

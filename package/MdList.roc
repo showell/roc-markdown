@@ -79,7 +79,7 @@ MdList := [].{
 					Ok({
 						kind,
 						content_col: marker_end + 1,
-						content_start: pos + marker_end + (if spaces == 0 0 else 1),
+						content_start: pos + marker_end + (if (spaces == 0) 0 else 1),
 					})
 				} else {
 					Ok({
@@ -184,7 +184,7 @@ MdList := [].{
 				$p = next
 			}
 		}
-		items = if $have_item List.append($items, $cur) else $items
+		items = if ($have_item) List.append($items, $cur) else $items
 		open = match first.kind {
 			Ordered(o) => MdHtml.ol_open(o.start)
 			Bullet(_) => MdHtml.ul_open
@@ -194,11 +194,11 @@ MdList := [].{
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
 			# separator sees only its content, not the <li>.
-			lead = if $loose or is_first_child_block(item, is_block_start) ['\n'] else []
+			lead = if ($loose or is_first_child_block(item, is_block_start)) ['\n'] else []
 			inner = nested({
 				out: lead,
 				md: item,
-				spacing: if $loose Loose else Tight,
+				spacing: if ($loose) Loose else Tight,
 				budget: $budget,
 			})?
 			# Appended in place, `$out` unique and first: a List.join of it

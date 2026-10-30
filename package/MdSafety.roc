@@ -105,8 +105,8 @@ MdSafety := [].{
 					_ => []
 				},
 			)
-			player = if kind == Video video_player else []
-			texts = if kind == Img kept(["alt".to_utf8(), "title".to_utf8()], |_| Bool.True) else []
+			player = if (kind == Video) video_player else []
+			texts = if (kind == Img) kept(["alt".to_utf8(), "title".to_utf8()], |_| Bool.True) else []
 			# The src as written, its ends' spaces kept.
 			Ok(
 				[
@@ -144,10 +144,10 @@ MdSafety := [].{
 	is_upload_url = |src, uploads|
 		src.starts_with(['/'])
 			and !src.starts_with(['/', '/'])
-				and src.all(|c| c >= 0x20 and c != 0x7f and c != '\\')
-					and !has_dot_dot_segment(src)
-						and !has_encoded_separator(src)
-							and uploads(src)
+			and src.all(|c| c >= 0x20 and c != 0x7f and c != '\\')
+			and !has_dot_dot_segment(src)
+			and !has_encoded_separator(src)
+			and uploads(src)
 
 	## **THE RULE OF ONE UPLOADS FOLDER**: a path under `prefix`
 	## (`/user_uploads/`), the shape most hosts need.

@@ -149,7 +149,7 @@ attrs_from = |raw, from| {
 		}
 	}
 	# A tag ends past its `>`, never at 0: 0 is a walk that ran off the end.
-	if $end == 0 Err(NotSafe) else Ok({ attrs: $attrs, end: $end })
+	if ($end == 0) Err(NotSafe) else Ok({ attrs: $attrs, end: $end })
 }
 
 skip_spaces : List(U8), U64 -> U64
@@ -175,7 +175,7 @@ close_tag_end = |raw, { at, name }| {
 		Err(NotSafe)
 	} else {
 		i = skip_spaces(raw, at + 2 + n)
-		if i >= List.len(raw) or MdText.at(raw, i) != '>' Err(NotSafe) else Ok(i + 1)
+		if (i >= List.len(raw) or MdText.at(raw, i) != '>') Err(NotSafe) else Ok(i + 1)
 	}
 }
 

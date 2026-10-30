@@ -12,7 +12,7 @@ Bytes := [].{
 
 	find_byte : List(U8), { byte : U8, at : U64 } -> Try(U64, [NotFound])
 	find_byte = |s, { byte: b, at: i }| match s.get(i) {
-		Ok(c) => if c == b Ok(i) else find_byte(s, { byte: b, at: i + 1 })
+		Ok(c) => if (c == b) Ok(i) else find_byte(s, { byte: b, at: i + 1 })
 		Err(_) => Err(NotFound)
 	}
 

@@ -176,15 +176,22 @@ fn linuxOnly(t: std.Target) void {
 
 const roc_pin = std.mem.trim(u8, @embedFile("roc-version"), " \n");
 
-/// **THE ROC IS PINNED** (roc-version): -Droc=<path>, or `roc` on the PATH,
-/// and it must be the pinned one. (roc-chat's build.zig's.)
+/// **THE ROC IS PINNED** (roc-version): -Droc=<path>; else
+/// `~/tools/roc-<pin>/roc`, where pins live side by side (projects move to a
+/// new Roc one at a time); else `roc` on the PATH. It must be the pinned
+/// one. (roc-chat's build.zig's.)
 fn rocCompiler(b: *std.Build) []const u8 {
-    const named = b.option([]const u8, "roc", "the Roc compiler (default: `roc` on the PATH); the version roc-version pins") orelse "roc";
-    const none = "the package is Roc, and there is no Roc compiler at `{s}`: put Roc {s} (roc-version) on the PATH (showell/roc-apps release toolchain-2026-10-27 carries it), or name it with -Droc=<path>";
+    const named = b.option([]const u8, "roc", "the Roc compiler (default: ~/tools/roc-<pin>/roc, else `roc` on the PATH); the version roc-version pins") orelse pinned: {
+        const home = b.graph.environ_map.get("HOME") orelse break :pinned "roc";
+        const beside = b.fmt("{s}/tools/roc-{s}/roc", .{ home, roc_pin });
+        _ = b.root.root_dir.handle.realPathFileAlloc(b.graph.io, beside, b.allocator) catch break :pinned "roc";
+        break :pinned beside;
+    };
+    const none = "the package is Roc, and there is no Roc compiler at `{s}`: put Roc {s} (roc-version) at ~/tools/roc-{s}/roc or on the PATH (showell/roc-apps release toolchain-2026-10-30 carries it), or name it with -Droc=<path>";
     const found = if (std.mem.indexOfScalar(u8, named, '/') == null)
-        b.findProgram(.{ .names = &.{named} }) orelse std.process.fatal(none, .{ named, roc_pin })
+        b.findProgram(.{ .names = &.{named} }) orelse std.process.fatal(none, .{ named, roc_pin, roc_pin })
     else
-        b.root.root_dir.handle.realPathFileAlloc(b.graph.io, named, b.allocator) catch std.process.fatal(none, .{ named, roc_pin });
+        b.root.root_dir.handle.realPathFileAlloc(b.graph.io, named, b.allocator) catch std.process.fatal(none, .{ named, roc_pin, roc_pin });
     const said = std.mem.trim(u8, b.run(&.{ found, "version" }), " \n");
     const version = if (std.mem.lastIndexOfScalar(u8, said, ' ')) |i| said[i + 1 ..] else said;
     if (!std.mem.eql(u8, version, roc_pin)) std.process.fatal("roc-markdown is pinned to Roc {s} (roc-version), and `{s}` is {s}: put the pinned one on the PATH or name it with -Droc=<path>", .{ roc_pin, found, version });

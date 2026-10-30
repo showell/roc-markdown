@@ -70,7 +70,7 @@ MdInline := [].{
 			# Each byte class's scan says what it found (a `Step`); the step is
 			# taken once, below. The chat's reference (MdChat) is read first,
 			# whole.
-			reference = if refs == Linked MdChat.reference_at(text, $i) else Err(NoRef)
+			reference = if (refs == Linked) MdChat.reference_at(text, $i) else Err(NoRef)
 			step = match reference {
 				Ok(ref) => Token(Html(ref.html), ref.end)
 				Err(NoRef) =>
@@ -261,7 +261,7 @@ Piece : [
 
 ## The pending text from `text_start` up to `at`, as a piece when any.
 flushed : List(Piece), { text_start : U64, at : U64 } -> List(Piece)
-flushed = |pieces, { text_start, at }| if at > text_start List.append(
+flushed = |pieces, { text_start, at }| if (at > text_start) List.append(
 	pieces,
 	Text(text_start, at),
 ) else pieces

@@ -64,12 +64,14 @@ msg_ref_end = |text, i| {
 			Err(NoRef)
 		} else {
 			end = Bytes.count_while(text, { keep: Ascii.is_digit, at: slug_end + 1 })
-			if end == slug_end + 1 or (
-				end < len and MdText.is_word_char(
-					MdText.at(
-						text,
-						end,
-					),
+			if (
+				end == slug_end + 1 or (
+					end < len and MdText.is_word_char(
+						MdText.at(
+							text,
+							end,
+						),
+					)
 				)
 			) Err(NoRef) else Ok(end)
 		}
