@@ -36,14 +36,14 @@ MdSafety := [].{
 	is_dangerous_url : List(U8) -> Bool
 	is_dangerous_url = |raw| {
 		start = Bytes.count_while(raw, { keep: |c| c <= ' ', at: 0 })
-		trimmed = List.drop_first(raw, start)
+		trimmed = raw.drop_first(start)
 		kept = List.drop_last(trimmed, Bytes.count_back(trimmed, |c| c <= ' '))
 		var $seen = []
 		for c in kept {
-			if c == '\t' or c == '\n' or c == '\r' or List.len($seen) == 32 {
+			if c == '\t' or c == '\n' or c == '\r' or $seen.len() == 32 {
 				{}
 			} else {
-				$seen = List.append($seen, c)
+				$seen = $seen.append(c)
 			}
 		}
 		url = $seen
@@ -63,7 +63,7 @@ MdSafety := [].{
 				|kind| MdText.is_prefixed_ignoring_case(url, { at: 11, prefix: Str.to_utf8(kind) }),
 			)
 		} else {
-			List.any(dangerous_schemes, starts_with)
+			dangerous_schemes.any(starts_with)
 		}
 	}
 
@@ -92,30 +92,29 @@ MdSafety := [].{
 		uploads : MdSafety.Uploads,
 	} -> Try(List(MdHtml.Attr), [NotSafe])
 	media_attrs = |{ kind, value_of, uploads }| {
-		src = match value_of(Str.to_utf8("src")) {
+		src = match value_of("src".to_utf8()) {
 			Ok(v) => v
 			Err(Absent) => return Err(NotSafe)
 		}
 		if !MdSafety.is_upload_url(Bytes.trim(src, Bytes.zig_spaces), uploads) {
 			Err(NotSafe)
 		} else {
-			kept = |names, keep| List.join_map(
-				names,
+			kept = |names, keep| names.join_map(
 				|name| match value_of(name) {
 					Ok(v) if keep(v) => [{ name, value: Is(v) }]
 					_ => []
 				},
 			)
 			player = if kind == Video video_player else []
-			texts = if kind == Img kept([Str.to_utf8("alt"), Str.to_utf8("title")], |_| Bool.True) else []
+			texts = if kind == Img kept(["alt".to_utf8(), "title".to_utf8()], |_| Bool.True) else []
 			# The src as written, its ends' spaces kept.
 			Ok(
-				List.join([
+				[
 					player,
-					[{ name: Str.to_utf8("src"), value: Is(src) }],
+					[{ name: "src".to_utf8(), value: Is(src) }],
 					texts,
-					kept([Str.to_utf8("width"), Str.to_utf8("height")], MdText.is_all_digits),
-				]),
+					kept(["width".to_utf8(), "height".to_utf8()], MdText.is_all_digits),
+				].join(),
 			)
 		}
 	}
@@ -143,9 +142,9 @@ MdSafety := [].{
 	## path the URL's own checks refuse.
 	is_upload_url : List(U8), MdSafety.Uploads -> Bool
 	is_upload_url = |src, uploads|
-		List.starts_with(src, ['/'])
-			and !List.starts_with(src, ['/', '/'])
-				and List.all(src, |c| c >= 0x20 and c != 0x7f and c != '\\')
+		src.starts_with(['/'])
+			and !src.starts_with(['/', '/'])
+				and src.all(|c| c >= 0x20 and c != 0x7f and c != '\\')
 					and !has_dot_dot_segment(src)
 						and !has_encoded_separator(src)
 							and uploads(src)
@@ -153,23 +152,23 @@ MdSafety := [].{
 	## **THE RULE OF ONE UPLOADS FOLDER**: a path under `prefix`
 	## (`/user_uploads/`), the shape most hosts need.
 	under : List(U8) -> MdSafety.Uploads
-	under = |prefix| |path| List.starts_with(path, prefix)
+	under = |prefix| |path| path.starts_with(prefix)
 
 	## The `://` that ends a URL's scheme: what makes a link external here,
 	## and where an autolink's host starts (MdLinks).
 	scheme_end : List(U8)
-	scheme_end = Str.to_utf8("://")
+	scheme_end = "://".to_utf8()
 }
 
 ## `%2e` (either case) read as the `.` a browser takes it for.
 dots_decoded : List(U8) -> List(U8)
 dots_decoded = |src| {
-	len = List.len(src)
+	len = src.len()
 	var $out = []
 	var $i = 0
 	while $i < len {
 		if is_escape_of(src, { at: $i, hex: ['2', 'e'] }) {
-			$out = List.append($out, '.')
+			$out = $out.append('.')
 			$i = $i + 3
 		} else {
 			$out = List.append($out, MdText.at(src, $i))
@@ -183,19 +182,19 @@ dots_decoded = |src| {
 ## either case.
 is_escape_of : List(U8), { at : U64, hex : List(U8) } -> Bool
 is_escape_of = |src, { at, hex }|
-	List.get(src, at) == Ok('%')
-		and List.map(List.sublist(src, { start: at + 1, len: 2 }), Ascii.to_lowercase) == hex
+	src.get(at) == Ok('%')
+		and src.sublist({ start: at + 1, len: 2 }).map(Ascii.to_lowercase) == hex
 
 ## A `..` path segment, its dots written or encoded.
 has_dot_dot_segment : List(U8) -> Bool
-has_dot_dot_segment = |src| List.any(List.split_on(dots_decoded(src), '/'), |segment| segment == ['.', '.'])
+has_dot_dot_segment = |src| dots_decoded(src).split_on('/').any(|segment| segment == ['.', '.'])
 
 ## An encoded `/` or `\`.
 has_encoded_separator : List(U8) -> Bool
 has_encoded_separator = |src| {
 	var $i = 0
 	var $found = Bool.False
-	while $i < List.len(src) and !$found {
+	while $i < src.len() and !$found {
 		$found = is_escape_of(src, { at: $i, hex: ['2', 'f'] }) or is_escape_of(src, { at: $i, hex: ['5', 'c'] })
 		$i = $i + 1
 	}
@@ -205,8 +204,8 @@ has_encoded_separator = |src| {
 ## A video is a player the reader starts: never autoplay.
 video_player : List(MdHtml.Attr)
 video_player = [
-	{ name: Str.to_utf8("controls"), value: Bare },
-	{ name: Str.to_utf8("preload"), value: Is(Str.to_utf8("metadata")) },
+	{ name: "controls".to_utf8(), value: Bare },
+	{ name: "preload".to_utf8(), value: Is("metadata".to_utf8()) },
 ]
 
 dangerous_schemes : List(Str)
@@ -217,40 +216,40 @@ dangerous_schemes = [
 	"data:",
 ]
 
-expect MdSafety.is_dangerous_url(Str.to_utf8("java\tscript:alert(1)"))
-expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a.png"), user_uploads)
-expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/1/caf%C3%A9 a.png"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/conversations/1/stream"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/login"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/../login"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%2e%2E/login"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/.%2e/login"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a/.."), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/..%2flogin"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/%5c..%5clogin"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploadsX/a.png"), user_uploads)
-expect !MdSafety.is_upload_url(Str.to_utf8("//user_uploads/a.png"), user_uploads)
-expect MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a..b.png"), user_uploads)
-expect MdSafety.is_dangerous_url(Str.to_utf8("  JavaScript:x"))
-expect MdSafety.is_dangerous_url(Str.to_utf8("data:text/html,x"))
-expect !MdSafety.is_dangerous_url(Str.to_utf8("data:image/png;base64,x"))
-expect !MdSafety.is_dangerous_url(Str.to_utf8("https://example.org"))
-expect MdSafety.is_external_href(Str.to_utf8("https://example.org"))
-expect !MdSafety.is_external_href(Str.to_utf8("#msg-plans_3"))
-expect !MdSafety.is_external_href(Str.to_utf8("mailto:a@b.c"))
+expect MdSafety.is_dangerous_url("java\tscript:alert(1)".to_utf8())
+expect MdSafety.is_upload_url("/user_uploads/a.png".to_utf8(), user_uploads)
+expect MdSafety.is_upload_url("/user_uploads/1/caf%C3%A9 a.png".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/conversations/1/stream".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/login".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploads/../login".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploads/%2e%2E/login".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploads/.%2e/login".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploads/a/..".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploads/..%2flogin".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploads/%5c..%5clogin".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("/user_uploadsX/a.png".to_utf8(), user_uploads)
+expect !MdSafety.is_upload_url("//user_uploads/a.png".to_utf8(), user_uploads)
+expect MdSafety.is_upload_url("/user_uploads/a..b.png".to_utf8(), user_uploads)
+expect MdSafety.is_dangerous_url("  JavaScript:x".to_utf8())
+expect MdSafety.is_dangerous_url("data:text/html,x".to_utf8())
+expect !MdSafety.is_dangerous_url("data:image/png;base64,x".to_utf8())
+expect !MdSafety.is_dangerous_url("https://example.org".to_utf8())
+expect MdSafety.is_external_href("https://example.org".to_utf8())
+expect !MdSafety.is_external_href("#msg-plans_3".to_utf8())
+expect !MdSafety.is_external_href("mailto:a@b.c".to_utf8())
 
 user_uploads : MdSafety.Uploads
-user_uploads = MdSafety.under(Str.to_utf8("/user_uploads/"))
+user_uploads = MdSafety.under("/user_uploads/".to_utf8())
 
 # The host's rule is asked only of a path the URL's checks let through: a
 # rule that takes every path still refuses another site and a `..`.
 anything : MdSafety.Uploads
 anything = |_| Bool.True
 
-expect MdSafety.is_upload_url(Str.to_utf8("/u/cat.png"), anything)
-expect !MdSafety.is_upload_url(Str.to_utf8("//evil/x.png"), anything)
-expect !MdSafety.is_upload_url(Str.to_utf8("/\\evil"), anything)
-expect !MdSafety.is_upload_url(Str.to_utf8("https://evil/x.png"), anything)
-expect !MdSafety.is_upload_url(Str.to_utf8("/u/../login"), anything)
-expect !MdSafety.is_upload_url(Str.to_utf8("x.png"), anything)
-expect !MdSafety.is_upload_url(Str.to_utf8("/user_uploads/a.png"), |_| Bool.False)
+expect MdSafety.is_upload_url("/u/cat.png".to_utf8(), anything)
+expect !MdSafety.is_upload_url("//evil/x.png".to_utf8(), anything)
+expect !MdSafety.is_upload_url("/\\evil".to_utf8(), anything)
+expect !MdSafety.is_upload_url("https://evil/x.png".to_utf8(), anything)
+expect !MdSafety.is_upload_url("/u/../login".to_utf8(), anything)
+expect !MdSafety.is_upload_url("x.png".to_utf8(), anything)
+expect !MdSafety.is_upload_url("/user_uploads/a.png".to_utf8(), |_| Bool.False)

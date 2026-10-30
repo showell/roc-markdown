@@ -46,7 +46,7 @@ MdText := [].{
 	## A member's message's budget: 16 units a byte, and 256 over. The
 	## densest linear text costs about 4.5 a byte.
 	for_input : List(U8) -> Budget
-	for_input = |md| { spent: 0, ceiling: per_byte * List.len(md) + base }
+	for_input = |md| { spent: 0, ceiling: per_byte * md.len() + base }
 
 	## The budget of server-owned text, and of a measurement: never blown.
 	unlimited : Budget
@@ -66,12 +66,12 @@ MdText := [].{
 		var $out = out
 		for c in text {
 			$out = match c {
-				'&' => List.concat($out, amp)
-				'<' => List.concat($out, lt)
-				'>' => List.concat($out, gt)
-				'"' => List.concat($out, quot)
-				'\'' => List.concat($out, apos)
-				_ => List.append($out, c)
+				'&' => $out.concat(amp)
+				'<' => $out.concat(lt)
+				'>' => $out.concat(gt)
+				'"' => $out.concat(quot)
+				'\'' => $out.concat(apos)
+				_ => $out.append(c)
 			}
 		}
 		$out
@@ -79,11 +79,11 @@ MdText := [].{
 
 	## `s` from `start` up to `end`, a Zig slice `s[start..end]`.
 	cut : List(U8), { start : U64, end : U64 } -> List(U8)
-	cut = |s, { start, end }| List.sublist(s, { start, len: end - start })
+	cut = |s, { start, end }| s.sublist({ start, len: end - start })
 
 	## The byte at `i`, which the caller has checked is there.
 	at : List(U8), U64 -> U8
-	at = |s, i| match List.get(s, i) {
+	at = |s, i| match s.get(i) {
 		Ok(c) => c
 		Err(OutOfBounds) => crash "MdText.at: a read past the end the caller checked"
 	}
@@ -103,27 +103,21 @@ MdText := [].{
 
 	## One digit or more, and nothing else.
 	is_all_digits : List(U8) -> Bool
-	is_all_digits = |s| s != [] and List.all(s, Ascii.is_digit)
+	is_all_digits = |s| s != [] and s.all(Ascii.is_digit)
 
 	## `s` is `lower`, a lowercase literal, in any case.
 	is_same_ignoring_case : List(U8), List(U8) -> Bool
-	is_same_ignoring_case = |s, lower| List.len(s) == List.len(lower) and List.map(
-		s,
-		Ascii.to_lowercase,
-	) == lower
+	is_same_ignoring_case = |s, lower| s.len() == lower.len() and s.map(Ascii.to_lowercase) == lower
 
 	## `s` from `at` begins with `prefix`, in
 	## any case.
 	is_prefixed_ignoring_case : List(U8), { at : U64, prefix : List(U8) } -> Bool
 	is_prefixed_ignoring_case = |s, { at: i, prefix }| {
-		n = List.len(prefix)
-		if i + n > List.len(s) {
+		n = prefix.len()
+		if i + n > s.len() {
 			Bool.False
 		} else {
-			List.map(
-				cut(s, { start: i, end: i + n }),
-				Ascii.to_lowercase,
-			) == List.map(prefix, Ascii.to_lowercase)
+			cut(s, { start: i, end: i + n }).map(Ascii.to_lowercase) == prefix.map(Ascii.to_lowercase)
 		}
 	}
 
@@ -141,16 +135,16 @@ MdText := [].{
 	## backslash. For text no inline pass reads (a fence's info string).
 	unescaped : List(U8) -> List(U8)
 	unescaped = |text| {
-		len = List.len(text)
+		len = text.len()
 		var $out = []
 		var $i = 0
 		while $i < len {
 			c = at(text, $i)
 			if c == '\\' and $i + 1 < len and Ascii.is_punctuation(at(text, $i + 1)) {
-				$out = List.append($out, at(text, $i + 1))
+				$out = $out.append(at(text, $i + 1))
 				$i = $i + 2
 			} else {
-				$out = List.append($out, c)
+				$out = $out.append(c)
 				$i = $i + 1
 			}
 		}
@@ -159,7 +153,7 @@ MdText := [].{
 
 	## Nothing but spaces, tabs and `\r`.
 	is_blank : List(U8) -> Bool
-	is_blank = |line| List.all(line, |c| c == ' ' or c == '\t' or c == '\r')
+	is_blank = |line| line.all(|c| c == ' ' or c == '\t' or c == '\r')
 
 	## The `\n` ending the line at `pos`, or the end.
 	line_end : List(U8), U64 -> U64
@@ -167,7 +161,7 @@ MdText := [].{
 
 	## The start of the line after the one ending at `eol`.
 	next_line : List(U8), U64 -> U64
-	next_line = |md, eol| if eol < List.len(md) eol + 1 else List.len(md)
+	next_line = |md, eol| if eol < md.len() eol + 1 else md.len()
 }
 
 per_byte : U64
@@ -187,34 +181,34 @@ line_space = [
 ]
 
 amp : List(U8)
-amp = Str.to_utf8("&amp;")
+amp = "&amp;".to_utf8()
 
 lt : List(U8)
-lt = Str.to_utf8("&lt;")
+lt = "&lt;".to_utf8()
 
 gt : List(U8)
-gt = Str.to_utf8("&gt;")
+gt = "&gt;".to_utf8()
 
 quot : List(U8)
-quot = Str.to_utf8("&quot;")
+quot = "&quot;".to_utf8()
 
 ## `'` as roc-chat's pages have always written it: so an escaped value is
 ## safe in a single-quoted attribute too.
 apos : List(U8)
-apos = Str.to_utf8("&#39;")
+apos = "&#39;".to_utf8()
 
-expect MdText.escape_onto([], Str.to_utf8("a<b>&\"c'")) == Str.to_utf8("a&lt;b&gt;&amp;&quot;c&#39;")
-expect MdText.for_input(Str.to_utf8("abc")).ceiling == 304
+expect MdText.escape_onto([], "a<b>&\"c'".to_utf8()) == "a&lt;b&gt;&amp;&quot;c&#39;".to_utf8()
+expect MdText.for_input("abc".to_utf8()).ceiling == 304
 expect MdText.is_blown(MdText.charge({ spent: 0, ceiling: 3 }, 4))
 expect !MdText.is_blown(MdText.charge({ spent: 0, ceiling: 3 }, 3))
 expect MdText.is_prefixed_ignoring_case(
-	Str.to_utf8("xHTTP://"),
-	{ at: 1, prefix: Str.to_utf8("http://") },
+	"xHTTP://".to_utf8(),
+	{ at: 1, prefix: "http://".to_utf8() },
 )
 expect !MdText.is_prefixed_ignoring_case(
-	Str.to_utf8("http:/"),
-	{ at: 0, prefix: Str.to_utf8("http://") },
+	"http:/".to_utf8(),
+	{ at: 0, prefix: "http://".to_utf8() },
 )
-expect MdText.is_same_ignoring_case(Str.to_utf8("ViDeO"), Str.to_utf8("video"))
-expect MdText.is_blank(Str.to_utf8(" \t\r"))
-expect !MdText.is_blank(Str.to_utf8(" \u(a0)"))
+expect MdText.is_same_ignoring_case("ViDeO".to_utf8(), "video".to_utf8())
+expect MdText.is_blank(" \t\r".to_utf8())
+expect !MdText.is_blank(" \u(a0)".to_utf8())

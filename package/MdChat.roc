@@ -42,7 +42,7 @@ MdChat := [].{
 	## The quote-reply: a fence whose language is `quote` holds a quoted
 	## message, rendered as preformatted text and not as code.
 	is_quote_fence : List(U8) -> Bool
-	is_quote_fence = |lang| lang == Str.to_utf8("quote")
+	is_quote_fence = |lang| lang == "quote".to_utf8()
 
 	## Eight quote-reply levels, plus 2: a level-8 quote-reply
 	## opens with 10 characters, and a longer run is no fence (MdFence).
@@ -52,8 +52,8 @@ MdChat := [].{
 
 msg_ref_end : List(U8), U64 -> Try(U64, [NoRef])
 msg_ref_end = |text, i| {
-	len = List.len(text)
-	n = List.len(msg_prefix)
+	len = text.len()
+	n = msg_prefix.len()
 	if i + n > len or MdText.cut(text, { start: i, end: i + n }) != msg_prefix {
 		Err(NoRef)
 	} else if i > 0 and MdText.is_word_char(MdText.at(text, i - 1)) {
@@ -81,8 +81,8 @@ is_slug_char : U8 -> Bool
 is_slug_char = |c| Ascii.is_alphanumeric(c) or c == '-'
 
 msg_prefix : List(U8)
-msg_prefix = Str.to_utf8("MSG_")
+msg_prefix = "MSG_".to_utf8()
 
-expect MdChat.reference_at(Str.to_utf8("MSG_plans_3."), 0) == Ok({ html: Str.to_utf8("<a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a>"), end: 11 })
-expect MdChat.reference_at(Str.to_utf8("xMSG_plans_3"), 1) == Err(NoRef)
-expect MdChat.reference_at(Str.to_utf8("MSG_plans_"), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_plans_3.".to_utf8(), 0) == Ok({ html: "<a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a>".to_utf8(), end: 11 })
+expect MdChat.reference_at("xMSG_plans_3".to_utf8(), 1) == Err(NoRef)
+expect MdChat.reference_at("MSG_plans_".to_utf8(), 0) == Err(NoRef)

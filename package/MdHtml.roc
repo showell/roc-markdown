@@ -15,14 +15,14 @@ MdHtml := [].{
 	# ── blocks ──
 
 	p_open : List(U8)
-	p_open = Str.to_utf8("<p>")
+	p_open = "<p>".to_utf8()
 
 	p_close : List(U8)
-	p_close = Str.to_utf8("</p>\n")
+	p_close = "</p>\n".to_utf8()
 
 	## A hard wrap's line break, in the hard-wrap mode's paragraphs.
 	br : List(U8)
-	br = Str.to_utf8("<br>\n")
+	br = "<br>\n".to_utf8()
 
 	## `<h1>` to `<h6>`, by the heading's level.
 	heading_open : U64 -> List(U8)
@@ -36,7 +36,7 @@ MdHtml := [].{
 	code_block_open : List(U8) -> List(U8)
 	code_block_open = |lang|
 		if lang == [] {
-			Str.to_utf8("<pre><code>")
+			"<pre><code>".to_utf8()
 		} else {
 			List.concat(
 				MdText.escape_onto(Str.to_utf8("<pre><code class=\"language-"), lang),
@@ -45,62 +45,62 @@ MdHtml := [].{
 		}
 
 	code_block_close : List(U8)
-	code_block_close = Str.to_utf8("</code></pre>\n")
+	code_block_close = "</code></pre>\n".to_utf8()
 
 	## The chat's quote-reply (a `quote` fence, MdChat): preformatted, but no
 	## code.
 	chat_quote_open : List(U8)
-	chat_quote_open = Str.to_utf8("<pre class=\"chat-quote\">")
+	chat_quote_open = "<pre class=\"chat-quote\">".to_utf8()
 
 	chat_quote_close : List(U8)
-	chat_quote_close = Str.to_utf8("</pre>\n")
+	chat_quote_close = "</pre>\n".to_utf8()
 
 	ul_open : List(U8)
-	ul_open = Str.to_utf8("<ul>\n")
+	ul_open = "<ul>\n".to_utf8()
 
 	ul_close : List(U8)
-	ul_close = Str.to_utf8("</ul>\n")
+	ul_close = "</ul>\n".to_utf8()
 
 	## An ordered list's opening, its `start` when that is not 1.
 	ol_open : U64 -> List(U8)
-	ol_open = |start| if start == 1 Str.to_utf8("<ol>\n") else Str.to_utf8("<ol start=\"${start.to_str()}\">\n")
+	ol_open = |start| if start == 1 "<ol>\n".to_utf8() else "<ol start=\"${start.to_str()}\">\n".to_utf8()
 
 	ol_close : List(U8)
-	ol_close = Str.to_utf8("</ol>\n")
+	ol_close = "</ol>\n".to_utf8()
 
 	li_open : List(U8)
-	li_open = Str.to_utf8("<li>")
+	li_open = "<li>".to_utf8()
 
 	li_close : List(U8)
-	li_close = Str.to_utf8("</li>\n")
+	li_close = "</li>\n".to_utf8()
 
 	blockquote_open : List(U8)
-	blockquote_open = Str.to_utf8("<blockquote>\n")
+	blockquote_open = "<blockquote>\n".to_utf8()
 
 	blockquote_close : List(U8)
-	blockquote_close = Str.to_utf8("</blockquote>\n")
+	blockquote_close = "</blockquote>\n".to_utf8()
 
 	## A table's opening, up to its header row.
 	table_open : List(U8)
-	table_open = Str.to_utf8("<table>\n<thead>\n")
+	table_open = "<table>\n<thead>\n".to_utf8()
 
 	thead_close : List(U8)
-	thead_close = Str.to_utf8("</thead>\n")
+	thead_close = "</thead>\n".to_utf8()
 
 	tbody_open : List(U8)
-	tbody_open = Str.to_utf8("<tbody>\n")
+	tbody_open = "<tbody>\n".to_utf8()
 
 	tbody_close : List(U8)
-	tbody_close = Str.to_utf8("</tbody>\n")
+	tbody_close = "</tbody>\n".to_utf8()
 
 	table_close : List(U8)
-	table_close = Str.to_utf8("</table>\n")
+	table_close = "</table>\n".to_utf8()
 
 	tr_open : List(U8)
-	tr_open = Str.to_utf8("<tr>\n")
+	tr_open = "<tr>\n".to_utf8()
 
 	tr_close : List(U8)
-	tr_close = Str.to_utf8("</tr>\n")
+	tr_close = "</tr>\n".to_utf8()
 
 	## `<th>` or `<td>`, with GFM's `align` when the column has one.
 	cell_open : [Th, Td], MdTable.Align -> List(U8)
@@ -112,43 +112,43 @@ MdHtml := [].{
 			Center => " align=\"center\""
 			Right => " align=\"right\""
 		}
-		List.append(List.concat(Str.to_utf8(name), Str.to_utf8(attr)), '>')
+		name.to_utf8().concat(attr.to_utf8()).append('>')
 	}
 
 	cell_close : [Th, Td] -> List(U8)
-	cell_close = |tag| Str.to_utf8(if tag == Th "</th>\n" else "</td>\n")
+	cell_close = |tag| (if tag == Th "</th>\n" else "</td>\n").to_utf8()
 
 	## What a hostile message renders as: a paragraph the client is free to
 	## style as `.md-malformed`.
 	malformed : List(U8)
-	malformed = Str.to_utf8("<p class=\"md-malformed\">⚠️ malformed markdown — not rendered</p>\n")
+	malformed = "<p class=\"md-malformed\">⚠️ malformed markdown — not rendered</p>\n".to_utf8()
 
 	# ── inline ──
 
 	code_open : List(U8)
-	code_open = Str.to_utf8("<code>")
+	code_open = "<code>".to_utf8()
 
 	code_close : List(U8)
-	code_close = Str.to_utf8("</code>")
+	code_close = "</code>".to_utf8()
 
 	em_open : List(U8)
-	em_open = Str.to_utf8("<em>")
+	em_open = "<em>".to_utf8()
 
 	em_close : List(U8)
-	em_close = Str.to_utf8("</em>")
+	em_close = "</em>".to_utf8()
 
 	strong_open : List(U8)
-	strong_open = Str.to_utf8("<strong>")
+	strong_open = "<strong>".to_utf8()
 
 	strong_close : List(U8)
-	strong_close = Str.to_utf8("</strong>")
+	strong_close = "</strong>".to_utf8()
 
 	## GFM's strikethrough, `~~text~~` (MdEmphasis).
 	del_open : List(U8)
-	del_open = Str.to_utf8("<del>")
+	del_open = "<del>".to_utf8()
 
 	del_close : List(U8)
-	del_close = Str.to_utf8("</del>")
+	del_close = "</del>".to_utf8()
 
 	## A link's opening tag: its href escaped (an empty one where MdSafety
 	## dropped it), and a new tab, without the opener, when `NewTab`.
@@ -156,24 +156,24 @@ MdHtml := [].{
 	link_open = |{ href, tab }| List.join([
 		MdText.escape_onto(Str.to_utf8("<a href=\""), href),
 		['"'],
-		if tab == NewTab Str.to_utf8(" target=\"_blank\" rel=\"noopener\"") else [],
+		if tab == NewTab " target=\"_blank\" rel=\"noopener\"".to_utf8() else [],
 		['>'],
 	])
 
 	link_close : List(U8)
-	link_close = Str.to_utf8("</a>")
+	link_close = "</a>".to_utf8()
 
 	## The chat's message reference (MdChat): a link to the message's anchor,
 	## `#msg-<slug>`, its label the reference as written. The slug grammar has
 	## no byte HTML gives a meaning, so both are written as they are.
 	msg_ref : { slug : List(U8), label : List(U8) } -> List(U8)
-	msg_ref = |{ slug, label }| List.join([
-		Str.to_utf8("<a href=\"#msg-"),
+	msg_ref = |{ slug, label }| [
+		"<a href=\"#msg-".to_utf8(),
 		slug,
-		Str.to_utf8("\" class=\"msg-ref\">"),
+		"\" class=\"msg-ref\">".to_utf8(),
 		label,
 		link_close,
-	])
+	].join()
 
 	# ── media ──
 
@@ -186,7 +186,7 @@ MdHtml := [].{
 
 	## A member's `<img>`, rebuilt from the attributes MdSafety let through.
 	img : List(Attr) -> List(U8)
-	img = |attrs| List.append(attrs_onto(Str.to_utf8("<img"), attrs), '>')
+	img = |attrs| attrs_onto("<img".to_utf8(), attrs).append('>')
 
 	## The text of html this renderer wrote, its markup gone: every tag
 	## dropped and the escapes MdText writes read back, so the text can be
@@ -196,7 +196,7 @@ MdHtml := [].{
 	## at its first `>` (one inside a value is `&gt;`).
 	plain_text : List(U8) -> List(U8)
 	plain_text = |html| {
-		len = List.len(html)
+		len = html.len()
 		var $out = []
 		var $i = 0
 		while $i < len {
@@ -206,16 +206,16 @@ MdHtml := [].{
 			} else if c == '&' {
 				match List.find_first(entities, |e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 })) {
 					Ok((written, byte)) => {
-						$out = List.append($out, byte)
-						$i = $i + List.len(written)
+						$out = $out.append(byte)
+						$i = $i + written.len()
 					}
 					Err(NotFound) => {
-						$out = List.append($out, c)
+						$out = $out.append(c)
 						$i = $i + 1
 					}
 				}
 			} else {
-				$out = List.append($out, c)
+				$out = $out.append(c)
 				$i = $i + 1
 			}
 		}
@@ -224,17 +224,17 @@ MdHtml := [].{
 
 	## A member's `<video>`, rebuilt as a player with no fallback content.
 	video : List(Attr) -> List(U8)
-	video = |attrs| List.concat(attrs_onto(Str.to_utf8("<video"), attrs), Str.to_utf8("></video>"))
+	video = |attrs| attrs_onto("<video".to_utf8(), attrs).concat("></video>".to_utf8())
 }
 
 ## The escapes MdText writes, and the byte each stands for.
 entities : List((List(U8), U8))
 entities = [
-	(Str.to_utf8("&amp;"), '&'),
-	(Str.to_utf8("&lt;"), '<'),
-	(Str.to_utf8("&gt;"), '>'),
-	(Str.to_utf8("&quot;"), '"'),
-	(Str.to_utf8("&#39;"), '\''),
+	("&amp;".to_utf8(), '&'),
+	("&lt;".to_utf8(), '<'),
+	("&gt;".to_utf8(), '>'),
+	("&quot;".to_utf8(), '"'),
+	("&#39;".to_utf8(), '\''),
 ]
 
 heading_digit : U64 -> U8
@@ -244,7 +244,7 @@ attrs_onto : List(U8), List(MdHtml.Attr) -> List(U8)
 attrs_onto = |out, attrs| {
 	var $out = out
 	for { name, value } in attrs {
-		named = List.concat(List.append($out, ' '), name)
+		named = $out.append(' ').concat(name)
 		$out = match value {
 			Bare => named
 			Is(v) => List.append(MdText.escape_onto(List.concat(named, ['=', '"']), v), '"')
@@ -253,9 +253,9 @@ attrs_onto = |out, attrs| {
 	$out
 }
 
-expect MdHtml.heading_open(3) == Str.to_utf8("<h3>")
-expect MdHtml.plain_text(Str.to_utf8("foo <em>bar</em> &amp; <code>a&lt;b</code> &quot;q&quot;")) == Str.to_utf8("foo bar & a<b \"q\"")
-expect MdHtml.plain_text(Str.to_utf8("<a href=\"/u?a&amp;b\" target=\"_blank\">x</a>")) == Str.to_utf8("x")
-expect MdHtml.ol_open(4) == Str.to_utf8("<ol start=\"4\">\n")
-expect MdHtml.link_open({ href: Str.to_utf8("/a?b&c"), tab: SameTab }) == Str.to_utf8("<a href=\"/a?b&amp;c\">")
-expect MdHtml.video([{ name: Str.to_utf8("controls"), value: Bare }, { name: Str.to_utf8("src"), value: Is(Str.to_utf8("/v\".mp4")) }]) == Str.to_utf8("<video controls src=\"/v&quot;.mp4\"></video>")
+expect MdHtml.heading_open(3) == "<h3>".to_utf8()
+expect MdHtml.plain_text("foo <em>bar</em> &amp; <code>a&lt;b</code> &quot;q&quot;".to_utf8()) == "foo bar & a<b \"q\"".to_utf8()
+expect MdHtml.plain_text("<a href=\"/u?a&amp;b\" target=\"_blank\">x</a>".to_utf8()) == "x".to_utf8()
+expect MdHtml.ol_open(4) == "<ol start=\"4\">\n".to_utf8()
+expect MdHtml.link_open({ href: "/a?b&c".to_utf8(), tab: SameTab }) == "<a href=\"/a?b&amp;c\">".to_utf8()
+expect MdHtml.video([{ name: "controls".to_utf8(), value: Bare }, { name: "src".to_utf8(), value: Is("/v\".mp4".to_utf8()) }]) == "<video controls src=\"/v&quot;.mp4\"></video>".to_utf8()

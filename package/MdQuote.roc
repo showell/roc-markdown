@@ -42,7 +42,7 @@ MdQuote := [].{
 			is_block_start,
 		},
 	| {
-		len = List.len(md)
+		len = md.len()
 		var $inner = []
 		var $last_was_text = Bool.False
 		# A table's rows are no paragraph's, so no line is lazy after them:
@@ -60,9 +60,9 @@ MdQuote := [].{
 			}
 			match quote_marker_len(line) {
 				Ok(strip) => {
-					stripped = List.drop_first(line, strip)
-					start = List.len($inner)
-					$inner = List.append(List.concat($inner, stripped), '\n')
+					stripped = line.drop_first(strip)
+					start = $inner.len()
+					$inner = $inner.concat(stripped).append('\n')
 					ends_text = MdText.is_blank(stripped) or is_block_start(md, $p + strip)
 					$in_table = !ends_text and ($in_table or ($last_was_text and MdTable.is_table_at($inner, $prev_start)))
 					$last_was_text = !ends_text and !$in_table
@@ -70,8 +70,8 @@ MdQuote := [].{
 				}
 				Err(NotAQuote) =>
 					if $last_was_text and !is_block_start(md, $p) {
-						$prev_start = List.len($inner)
-						$inner = List.append(List.concat($inner, line), '\n')
+						$prev_start = $inner.len()
+						$inner = $inner.concat(line).append('\n')
 					} else {
 						break
 					}
@@ -79,13 +79,13 @@ MdQuote := [].{
 			$p = MdText.next_line(md, eol)
 		}
 		quoted = nested({
-			out: List.concat(out, MdHtml.blockquote_open),
+			out: out.concat(MdHtml.blockquote_open),
 			md: $inner,
 			spacing: Loose,
 			budget,
 		})?
 		Ok({
-			out: List.concat(quoted.out, MdHtml.blockquote_close),
+			out: quoted.out.concat(MdHtml.blockquote_close),
 			budget: quoted.budget,
 			after: $p,
 		})
@@ -97,9 +97,9 @@ MdQuote := [].{
 quote_marker_len : List(U8) -> Try(U64, [NotAQuote])
 quote_marker_len = |line| {
 	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
-	if indent >= 4 or List.get(line, indent) != Ok('>') {
+	if indent >= 4 or line.get(indent) != Ok('>') {
 		Err(NotAQuote)
-	} else if List.get(line, indent + 1) == Ok(' ') {
+	} else if line.get(indent + 1) == Ok(' ') {
 		Ok(indent + 2)
 	} else {
 		Ok(indent + 1)

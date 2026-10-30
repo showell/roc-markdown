@@ -11,14 +11,14 @@ Bytes := [].{
 	find = |s, { needle }| find_from(s, { needle, at: 0 })
 
 	find_byte : List(U8), { byte : U8, at : U64 } -> Try(U64, [NotFound])
-	find_byte = |s, { byte: b, at: i }| match List.get(s, i) {
+	find_byte = |s, { byte: b, at: i }| match s.get(i) {
 		Ok(c) => if c == b Ok(i) else find_byte(s, { byte: b, at: i + 1 })
 		Err(_) => Err(NotFound)
 	}
 
 	## How many bytes from `i` on keep `keep`.
 	count_while : List(U8), { keep : (U8 -> Bool), at : U64 } -> U64
-	count_while = |s, { keep, at: i }| match List.get(s, i) {
+	count_while = |s, { keep, at: i }| match s.get(i) {
 		Ok(c) if keep(c) => count_while(s, { keep, at: i + 1 })
 		_ => i
 	}
@@ -30,15 +30,9 @@ Bytes := [].{
 	## `std.mem.trim(u8, s, set)`: the bytes in `set` off both ends.
 	trim : List(U8), List(U8) -> List(U8)
 	trim = |s, set| {
-		in_set = |c| List.contains(set, c)
-		front = List.drop_first(
-			s,
-			count_while(s, { keep: in_set, at: 0 }),
-		)
-		List.drop_last(
-			front,
-			count_back(front, in_set),
-		)
+		in_set = |c| set.contains(c)
+		front = s.drop_first(count_while(s, { keep: in_set, at: 0 }))
+		front.drop_last(count_back(front, in_set))
 	}
 
 	## The four bytes Zig's `std.mem.trim(u8, s, " \t\r\n")` trims: not
@@ -55,12 +49,9 @@ Bytes := [].{
 
 find_from : List(U8), { needle : List(U8), at : U64 } -> Try(U64, [NotFound])
 find_from = |s, { needle, at: i }|
-	if i + List.len(needle) > List.len(s) {
+	if i + needle.len() > s.len() {
 		Err(NotFound)
-	} else if List.get(s, i) == List.first(needle) and List.sublist(
-		s,
-		{ start: i, len: List.len(needle) },
-	) == needle {
+	} else if s.get(i) == needle.first() and s.sublist({ start: i, len: needle.len() }) == needle {
 		Ok(i)
 	} else {
 		find_from(s, { needle, at: i + 1 })
@@ -68,10 +59,10 @@ find_from = |s, { needle, at: i }|
 
 count_back_from : List(U8), { keep : (U8 -> Bool), kept : U64 } -> U64
 count_back_from = |s, { keep, kept: n }|
-	if n >= List.len(s) {
+	if n >= s.len() {
 		n
 	} else {
-		match List.get(s, List.len(s) - 1 - n) {
+		match s.get(s.len() - 1 - n) {
 			Ok(c) if keep(c) => count_back_from(s, { keep, kept: n + 1 })
 			_ => n
 		}
