@@ -11,3 +11,6 @@
 {"id":"uploads/dot-dot","md":"<img src=\"/user_uploads/../login\">","html":"&lt;img src=&quot;/user_uploads/../login&quot;&gt;\n"}
 {"id":"uploads/encoded-dot-dot","md":"<video src=\"/user_uploads/%2e%2E/login\"></video>","html":"<p>&lt;video src=&quot;/user_uploads/%2e%2E/login&quot;&gt;&lt;/video&gt;</p>\n"}
 {"id":"uploads/rule-asked","md":"![a file](/files/a.png) and <img src=\"/files/b.png\">"}
+{"id":"msg-ref/channel","md":"see MSG_Cobblestone.ChitChat_5.","html":"<p>see <a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>.</p>\n"}
+{"id":"msg-ref/both-forms","md":"see MSG_plans_3 and MSG_general.plans_3","html":"<p>see <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a> and <a href=\"#msg-general.plans_3\" class=\"msg-ref\">MSG_general.plans_3</a></p>\n"}
+{"id":"msg-ref/no-number","md":"MSG_x.y","html":"<p>MSG_x.y</p>\n"}
