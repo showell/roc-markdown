@@ -20,10 +20,16 @@ import MdText
 
 MdChat := [].{
 
-	## A message reference,
-	## `\bMSG_([A-Za-z0-9-]+_[0-9]+)\b`, at `i`: its link, and the index past
-	## it. The pass reads one first, whole, as its `_`s would otherwise be read
-	## as emphasis and split it.
+	## A message reference at `i`: its link, and the index past it. Two forms,
+	## each between word boundaries:
+	##   - `\bMSG_([A-Za-z0-9-]+_[0-9]+)\b`, a topic's message, on this page
+	##     only;
+	##   - `\bMSG_([A-Za-z][A-Za-z0-9-]{0,39}\.[A-Za-z0-9-]+_[0-9]+)\b`, a
+	##     channel's topic's message.
+	## Neither name can hold a `.` or a `_`, so a reference reads one way only.
+	## Both link to `#msg-<slug>`, naming no URL: where a reference goes is the
+	## host's to decide. The pass reads one first, whole, as its `_`s would
+	## otherwise be read as emphasis and split it.
 	reference_at : List(U8), U64 -> Try({ html : List(U8), end : U64 }, [NoRef])
 	reference_at = |text, i|
 		if MdText.at(text, i) != 'M' {
@@ -59,24 +65,45 @@ msg_ref_end = |text, i| {
 	} else if i > 0 and MdText.is_word_char(MdText.at(text, i - 1)) {
 		Err(NoRef)
 	} else {
-		slug_end = Bytes.count_while(text, { keep: is_slug_char, at: i + n })
-		if slug_end == i + n or slug_end >= len or MdText.at(text, slug_end) != '_' {
+		first_end = slug_end(text, i + n)?
+		topic_end = long_topic_end(text, { channel_start: i + n, first_end })?
+		if topic_end >= len or MdText.at(text, topic_end) != '_' {
 			Err(NoRef)
 		} else {
-			end = Bytes.count_while(text, { keep: Ascii.is_digit, at: slug_end + 1 })
-			if (
-				end == slug_end + 1 or (
-					end < len and MdText.is_word_char(
-						MdText.at(
-							text,
-							end,
-						),
-					)
-				)
-			) Err(NoRef) else Ok(end)
+			end = Bytes.count_while(text, { keep: Ascii.is_digit, at: topic_end + 1 })
+			if end == topic_end + 1 or (end < len and MdText.is_word_char(MdText.at(text, end))) {
+				Err(NoRef)
+			} else {
+				Ok(end)
+			}
 		}
 	}
 }
+
+## Where the topic's slug ends: at `first_end` for the short form; for the
+## long form (a `.` after the first run), past the second run, when what
+## came first is a channel's name.
+long_topic_end : List(U8), { channel_start : U64, first_end : U64 } -> Try(U64, [NoRef])
+long_topic_end = |text, { channel_start, first_end }|
+	if first_end >= text.len() or MdText.at(text, first_end) != '.' {
+		Ok(first_end)
+	} else if first_end - channel_start > channel_name_max or !Ascii.is_letter(MdText.at(text, channel_start)) {
+		Err(NoRef)
+	} else {
+		slug_end(text, first_end + 1)
+	}
+
+## The end of a run of slug characters from `start`, or no reference for none.
+slug_end : List(U8), U64 -> Try(U64, [NoRef])
+slug_end = |text, start| {
+	end = Bytes.count_while(text, { keep: is_slug_char, at: start })
+	if (end == start) Err(NoRef) else Ok(end)
+}
+
+## The longest channel name, in bytes (a channel is a letter, then letters,
+## digits and hyphens).
+channel_name_max : U64
+channel_name_max = 40
 
 ## A `MSG_` reference's slug.
 is_slug_char : U8 -> Bool
@@ -88,3 +115,20 @@ msg_prefix = "MSG_".to_utf8()
 expect MdChat.reference_at("MSG_plans_3.".to_utf8(), 0) == Ok({ html: "<a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a>".to_utf8(), end: 11 })
 expect MdChat.reference_at("xMSG_plans_3".to_utf8(), 1) == Err(NoRef)
 expect MdChat.reference_at("MSG_plans_".to_utf8(), 0) == Err(NoRef)
+
+# A channel's reference: its name, a `.`, then the topic's reference.
+expect MdChat.reference_at("MSG_Cobblestone.ChitChat_5.".to_utf8(), 0) == Ok({ html: "<a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>".to_utf8(), end: 26 })
+expect MdChat.reference_at("MSG_a-1-.road-trip_9 x".to_utf8(), 0).map_ok(|r| r.end) == Ok(20)
+expect MdChat.reference_at("MSG_${Str.repeat("a", 40)}.t_1".to_utf8(), 0).map_ok(|r| r.end) == Ok(48)
+# Not one: no number, a name too long, a channel not led by a letter, an
+# empty name, two dots, a word character after.
+expect MdChat.reference_at("MSG_x.y".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_x.y_".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_${Str.repeat("a", 41)}.t_1".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_1st.ChitChat_5".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_-a.ChitChat_5".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_.ChitChat_5".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_a._5".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_a.b.c_5".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_a.b_5x".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("xMSG_a.b_5".to_utf8(), 1) == Err(NoRef)

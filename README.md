@@ -27,7 +27,7 @@ bare URLs. Where it differs:
 | `<img>`, `<video>` | only the uploads the host names, rebuilt from safe attributes | sanitized |
 | A link to another site | opens in a new tab | same tab |
 | `[click](javascript:alert(1))` | its source, shown as text | the label, its href dropped |
-| `MSG_plans_3` | a link to that chat message | text |
+| `MSG_plans_3`, `MSG_Cobblestone.plans_3` | a link to that chat message (a topic's, on its own page; a channel's topic's) | text |
 | ```` ```quote ```` | a quoted message, shown as written | a code block |
 | `![alt](src)` | an image only from the uploads the host names; any other src becomes a link | an image from anywhere |
 | `~one tilde~` (`~~two~~` strikes, as on GitHub) | text, so "~5 minutes" stays as written | strikes too |
