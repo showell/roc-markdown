@@ -29,7 +29,7 @@
 //!   zig build judge -- --raise           the ratchet rewritten to today's counts
 //!   zig build judge -- --time            each corpus's render time
 //!   zig build judge -- --data DIR        a copy of judge/data in its place
-//!                             (tools/verify.shale's planted faults)
+//!                             (a planted fault's, made once by hand)
 //!
 //! **ITS DATA IS FOUND FROM THE BUILD** (`judge_data`, judge/data/'s path),
 //! never from the working directory; an `--also` path is the caller's, and
@@ -134,6 +134,38 @@ fn compare(a: std.mem.Allocator, want: Wants, got: Answers) !Verdict {
         any = any or differ[k];
     }
     return if (any) .{ .differ = differ } else .same;
+}
+
+test "compare: the answers frozen hold, and one byte off fails" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const got: Answers = .{ "<p>hi</p>\n", "16", "", "<p>hi</p>\n", "<p>hi</p>\n" };
+    var want: Wants = undefined;
+    for (got, 0..) |g, k| want[k] = .{ .text = g };
+    try std.testing.expect(try compare(a, want, got) == .same);
+    want[0] = .{ .text = "<q>hi</p>\n" };
+    const v = try compare(a, want, got);
+    try std.testing.expect(v == .differ);
+    try std.testing.expectEqual([part_count]bool{ true, false, false, false, false }, v.differ);
+}
+
+test "compare: a hashed answer holds, and one hash digit off fails" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const got: Answers = .{ "<p>hi</p>\n", "16", "", "<p>hi</p>\n", "<p>hi</p>\n" };
+    var want: Wants = undefined;
+    for (got, 0..) |g, k| want[k] = .{ .text = g };
+    const hash = try textHash(a, got[3]);
+    want[3] = .{ .hash = hash };
+    try std.testing.expect(try compare(a, want, got) == .same);
+    const off = try a.dupe(u8, hash);
+    off[0] = if (off[0] == '0') '1' else '0';
+    want[3] = .{ .hash = off };
+    const v = try compare(a, want, got);
+    try std.testing.expect(v == .differ);
+    try std.testing.expectEqual([part_count]bool{ false, false, false, true, false }, v.differ);
 }
 
 /// The package against the case's recorded answers.
@@ -683,6 +715,23 @@ fn readDiverge(io: Io, dir: Io.Dir, a: std.mem.Allocator) !std.StringHashMapUnma
     return ids;
 }
 
+/// A spec case's standing: agreeing unlisted, or differing listed, is sound;
+/// a listed case that agrees is stale, and one that differs unlisted fails.
+const SpecStanding = enum { sound, stale, unlisted };
+
+fn specStanding(same: bool, listed: bool) SpecStanding {
+    if (same and listed) return .stale;
+    if (!same and !listed) return .unlisted;
+    return .sound;
+}
+
+test "specStanding: the divergence list fails both ways" {
+    try std.testing.expectEqual(SpecStanding.sound, specStanding(true, false));
+    try std.testing.expectEqual(SpecStanding.sound, specStanding(false, true));
+    try std.testing.expectEqual(SpecStanding.stale, specStanding(true, true));
+    try std.testing.expectEqual(SpecStanding.unlisted, specStanding(false, false));
+}
+
 /// **THE PACKAGE AGAINST COMMONMARK, WITH ITS DIVERGENCES LISTED**: each
 /// spec case's `render`, normalised (specNormal), against the spec's html.
 /// A case that differs must be in spec_diverge.txt, with its reason, and a
@@ -713,12 +762,16 @@ fn specCheck(io: Io, dir: Io.Dir, arena: *std.heap.ArenaAllocator, sa: std.mem.A
         };
         const same = std.mem.eql(u8, try specNormal(a, ours), try specVoid(a, spec));
         if (same) agree += 1;
-        if (same and listed.contains(c.id)) {
-            fails += 1;
-            std.debug.print("SPECSTALE\t{s}\tmatches CommonMark now: take it out of {s}\n", .{ c.id, spec_diverge_path });
-        } else if (!same and !listed.contains(c.id)) {
-            fails += 1;
-            std.debug.print("SPECFAIL\t{s}\tdiffers from CommonMark, and {s} does not list it\n", .{ c.id, spec_diverge_path });
+        switch (specStanding(same, listed.contains(c.id))) {
+            .sound => {},
+            .stale => {
+                fails += 1;
+                std.debug.print("SPECSTALE\t{s}\tmatches CommonMark now: take it out of {s}\n", .{ c.id, spec_diverge_path });
+            },
+            .unlisted => {
+                fails += 1;
+                std.debug.print("SPECFAIL\t{s}\tdiffers from CommonMark, and {s} does not list it\n", .{ c.id, spec_diverge_path });
+            },
         }
     }
     var it = listed.keyIterator();
@@ -787,7 +840,7 @@ pub fn main(init: std.process.Init) !void {
     var raise = false;
     var timed = false;
     // The data folder: the build's judge/data, or `--data DIR`, a copy of it
-    // (tools/verify.shale plants its faults in one, never in the tree).
+    // (a fault is planted in one, never in the tree).
     var data_folder: []const u8 = data_path;
     const args = try init.minimal.args.toSlice(sa);
     var k: usize = 1;
@@ -864,7 +917,9 @@ pub fn main(init: std.process.Init) !void {
     var fell = false;
     var unrecorded = false;
     var total: Tally = .{};
+    const began = cpuMs();
     for (corpora.items) |c| {
+        const corpus_began = cpuMs();
         const t = if (contains(refreezing.items, c.label))
             try refreeze(io, &arena, c.label, c.cases, c.keep, try readAnswers(io, c.dir, sa, c.answers), c.dir, c.answers)
         else if (try readAnswers(io, c.dir, sa, c.answers)) |book|
@@ -878,7 +933,7 @@ pub fn main(init: std.process.Init) !void {
         total.fail += t.fail;
         total.hostile += t.hostile;
         try results.append(sa, .{ .label = c.label, .t = t, .ratcheted = c.ratcheted });
-        std.debug.print("== {s}: {d}/{d} hold to their answers ({d} fail; {d} hostile)", .{ c.label, t.pass, t.pass + t.fail, t.fail, t.hostile });
+        std.debug.print("== {s}: {d}/{d} hold to their answers ({d} fail; {d} hostile) in {d:.0} ms CPU", .{ c.label, t.pass, t.pass + t.fail, t.fail, t.hostile, cpuMs() - corpus_began });
         if (c.ratcheted) {
             const floor = rungFor(rungs, c.label) orelse 0;
             if (t.pass < floor) {
@@ -900,7 +955,7 @@ pub fn main(init: std.process.Init) !void {
     }
     const spec_checked = spec_found == spec_labels.len;
     const spec_fails = try specCheck(io, data, &arena, sa, spec_cases.items);
-    std.debug.print("==> {d}/{d} hold to their answers ({d} fail; {d} hostile)\n", .{ total.pass, total.pass + total.fail, total.fail, total.hostile });
+    std.debug.print("==> {d}/{d} hold to their answers ({d} fail; {d} hostile) in {d:.0} ms CPU\n", .{ total.pass, total.pass + total.fail, total.fail, total.hostile, cpuMs() - began });
     if (fell) std.debug.print("a corpus fell below its ratchet ({s})\n", .{ratchet_path});
     if (unrecorded) std.debug.print("a corpus has no answers\n", .{});
     if (!spec_checked) {

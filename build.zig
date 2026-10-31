@@ -59,8 +59,15 @@ pub fn build(b: *std.Build) void {
     tests.dependOn(&roc_test.step);
     const judged = b.addRunArtifact(judge_exe);
     judged.has_side_effects = true;
+    // A private corpus judged in the same run (tools/verify.shale's gold), so
+    // one judge run covers every corpus.
+    if (b.option([]const u8, "also", "a private corpus the test step's judge takes too (its --also)")) |also|
+        judged.addArgs(&.{ "--also", also });
     judged.step.dependOn(&roc_test.step);
     tests.dependOn(&judged.step);
+    // The judge's own checks, each held both ways (judge/judge.zig's tests).
+    const judge_unit = b.addRunArtifact(b.addTest(.{ .name = "judge_test", .root_module = judge_mod }));
+    tests.dependOn(&judge_unit.step);
 
     // The REPL, piped, against the judge's frozen answers
     // (judge/repl_check.zig).

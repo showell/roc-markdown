@@ -10,7 +10,7 @@ only rises.
 ```
 zig build test                          # roc test, then the judge, the REPL's and the playground's tests
 zig build judge -- --also <gold.jsonl>  # the judge, with a private corpus too
-shale tools/verify.shale                # every check above, the planted faults, a PASS/FAIL checklist
+shale tools/verify.shale                # every check above, a PASS/FAIL checklist
 ```
 
 The Roc is pinned (`roc-version`): `-Droc=<path>`, else `~/tools/roc-<pin>/roc`
@@ -81,9 +81,10 @@ moved without quoting it: "four tables, one link with parens".
 - gold, when it's on the machine (a `SKIP` elsewhere, the only skip
   allowed).
 
-**Planted faults:** a changed byte in a frozen answer, a wrong hostile hash,
-and a stale divergence. Each is made in a scratch copy and must turn the
-judge red for its own reason.
+**Planted faults are a one-time tool**, not a check verify runs: a fault
+planted (the judge's `--data DIR` takes a scratch copy of judge/data) proves
+once that a test bears load, and the test that stays asserts both sides of
+its condition.
 
 ## The REPL
 
