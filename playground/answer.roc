@@ -5,7 +5,7 @@
 ## chat's `render`, 1 `render_trusted`, 2 `render_trusted_reflow`.
 app [answer] {
 	md: "../package/main.roc",
-	pf: platform "platform/main.roc",
+	pf: platform "./platform/main.roc",
 }
 
 import md.Md

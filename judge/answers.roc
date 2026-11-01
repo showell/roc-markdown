@@ -12,7 +12,7 @@
 ##     `<base>` a DM's `/chat/c/<pair>` or a channel's `/channel/<name>`.
 app [answers] {
 	md: "../package/main.roc",
-	pf: platform "platform/main.roc",
+	pf: platform "./platform/main.roc",
 }
 
 import md.Md
