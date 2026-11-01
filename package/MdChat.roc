@@ -38,7 +38,7 @@ MdChat := [].{
 			end = msg_ref_end(text, i)?
 			Ok({
 				html: MdHtml.msg_ref({
-					slug: MdText.cut(text, { start: i + List.len(msg_prefix), end }),
+					slug: MdText.cut(text, { start: i + msg_prefix.len(), end }),
 					label: MdText.cut(text, { start: i, end }),
 				}),
 				end,
@@ -119,12 +119,12 @@ expect MdChat.reference_at("MSG_plans_".to_utf8(), 0) == Err(NoRef)
 # A channel's reference: its name, a `.`, then the topic's reference.
 expect MdChat.reference_at("MSG_Cobblestone.ChitChat_5.".to_utf8(), 0) == Ok({ html: "<a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>".to_utf8(), end: 26 })
 expect MdChat.reference_at("MSG_a-1-.road-trip_9 x".to_utf8(), 0).map_ok(|r| r.end) == Ok(20)
-expect MdChat.reference_at("MSG_${Str.repeat("a", 40)}.t_1".to_utf8(), 0).map_ok(|r| r.end) == Ok(48)
+expect MdChat.reference_at("MSG_${"a".repeat(40)}.t_1".to_utf8(), 0).map_ok(|r| r.end) == Ok(48)
 # Not one: no number, a name too long, a channel not led by a letter, an
 # empty name, two dots, a word character after.
 expect MdChat.reference_at("MSG_x.y".to_utf8(), 0) == Err(NoRef)
 expect MdChat.reference_at("MSG_x.y_".to_utf8(), 0) == Err(NoRef)
-expect MdChat.reference_at("MSG_${Str.repeat("a", 41)}.t_1".to_utf8(), 0) == Err(NoRef)
+expect MdChat.reference_at("MSG_${"a".repeat(41)}.t_1".to_utf8(), 0) == Err(NoRef)
 expect MdChat.reference_at("MSG_1st.ChitChat_5".to_utf8(), 0) == Err(NoRef)
 expect MdChat.reference_at("MSG_-a.ChitChat_5".to_utf8(), 0) == Err(NoRef)
 expect MdChat.reference_at("MSG_.ChitChat_5".to_utf8(), 0) == Err(NoRef)

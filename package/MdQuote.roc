@@ -96,7 +96,7 @@ MdQuote := [].{
 ## spaces, a `>`, and one space after it.
 quote_marker_len : List(U8) -> Try(U64, [NotAQuote])
 quote_marker_len = |line| {
-	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+	indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
 	if indent >= 4 or line.get(indent) != Ok('>') {
 		Err(NotAQuote)
 	} else if line.get(indent + 1) == Ok(' ') {

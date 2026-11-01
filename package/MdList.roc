@@ -35,8 +35,8 @@ MdList := [].{
 	list_marker_at = |md, pos| {
 		eol = MdText.line_end(md, pos)
 		line = MdText.cut(md, { start: pos, end: eol })
-		n = List.len(line)
-		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+		n = line.len()
+		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
 		if indent >= 4 or indent >= n {
 			Err(NotAMarker)
 		} else {
@@ -45,17 +45,10 @@ MdList := [].{
 				if c == '-' or c == '+' or c == '*' {
 					Ok({ kind: Bullet(c), marker_end: indent + 1 })
 				} else if Ascii.is_digit(c) {
-					digits_end = U64.min(
-						Bytes.count_while(line, { keep: Ascii.is_digit, at: indent }),
-						indent + 9,
-					)
-					match List.get(line, digits_end) {
+					digits_end = Bytes.count_while(line, { keep: Ascii.is_digit, at: indent }).min(indent + 9)
+					match line.get(digits_end) {
 						Ok(delim) if delim == '.' or delim == ')' => {
-							start = List.fold(
-								MdText.cut(line, { start: indent, end: digits_end }),
-								0,
-								|acc, d| acc * 10 + (d - '0').to_u64(),
-							)
+							start = MdText.cut(line, { start: indent, end: digits_end }).fold(0, |acc, d| acc * 10 + (d - '0').to_u64())
 							Ok({ kind: Ordered({ start, delim }), marker_end: digits_end + 1 })
 						}
 						_ => Err(NotAMarker)
@@ -64,7 +57,7 @@ MdList := [].{
 					Err(NotAMarker)
 				}
 			{ kind, marker_end } = found?
-			after = List.get(line, marker_end)
+			after = line.get(marker_end)
 			if after != Err(OutOfBounds) and after != Ok(' ') and after != Ok('\t') {
 				Err(NotAMarker)
 			} else {
@@ -129,7 +122,7 @@ MdList := [].{
 			is_block_start,
 		},
 	| {
-		len = List.len(md)
+		len = md.len()
 		var $items = []
 		var $loose = Bool.False
 		var $cur = []
@@ -155,7 +148,7 @@ MdList := [].{
 							{}
 						}
 						if $have_item {
-							$items = List.append($items, $cur)
+							$items = $items.append($cur)
 							$loose = $loose or $blanks > 0
 						} else {
 							{}
@@ -163,7 +156,7 @@ MdList := [].{
 						$have_item = Bool.True
 						$cur_col = m.content_col
 						$blanks = 0
-						$cur = List.append(MdText.cut(md, { start: m.content_start, end: eol }), '\n')
+						$cur = MdText.cut(md, { start: m.content_start, end: eol }).append('\n')
 					}
 					_ =>
 						if indent >= $cur_col and $have_item {
@@ -171,12 +164,12 @@ MdList := [].{
 							# The blank lines before it are the item's too: they
 							# part its paragraphs and stay in its fences.
 							$loose = $loose or $blanks > 0
-							$cur = List.concat($cur, List.repeat('\n', $blanks))
+							$cur = $cur.concat(List.repeat('\n', $blanks))
 							$blanks = 0
-							$cur = List.append(List.concat($cur, List.drop_first(line, $cur_col)), '\n')
+							$cur = $cur.concat(line.drop_first($cur_col)).append('\n')
 						} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
 							# A lazy continuation of the item's paragraph.
-							$cur = List.append(List.concat($cur, line), '\n')
+							$cur = $cur.concat(line).append('\n')
 						} else {
 							break
 						}
@@ -184,12 +177,12 @@ MdList := [].{
 				$p = next
 			}
 		}
-		items = if ($have_item) List.append($items, $cur) else $items
+		items = if ($have_item) $items.append($cur) else $items
 		open = match first.kind {
 			Ordered(o) => MdHtml.ol_open(o.start)
 			Bullet(_) => MdHtml.ul_open
 		}
-		var $out = List.concat(out, open)
+		var $out = out.concat(open)
 		var $budget = budget
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
@@ -203,9 +196,9 @@ MdList := [].{
 			})?
 			# Appended in place, `$out` unique and first: a List.join of it
 			# copies every byte so far, once an item.
-			$out = List.concat($out, MdHtml.li_open)
-			$out = List.concat($out, inner.out)
-			$out = List.concat($out, MdHtml.li_close)
+			$out = $out.concat(MdHtml.li_open)
+			$out = $out.concat(inner.out)
+			$out = $out.concat(MdHtml.li_close)
 			$budget = inner.budget
 		}
 		close = match first.kind {
@@ -213,7 +206,7 @@ MdList := [].{
 			Bullet(_) => MdHtml.ul_close
 		}
 		Ok({
-			out: List.concat($out, close),
+			out: $out.concat(close),
 			budget: $budget,
 			after: $p,
 		})
@@ -234,7 +227,7 @@ is_same_list = |a, b| match (a.kind, b.kind) {
 ## (`is_block_start`, which asks the first four in that order) or a table.
 is_first_child_block : List(U8), (List(U8), U64 -> Bool) -> Bool
 is_first_child_block = |item, is_block_start| {
-	len = List.len(item)
+	len = item.len()
 	var $pos = 0
 	while $pos < len {
 		eol = MdText.line_end(item, $pos)

@@ -23,7 +23,7 @@ MdMedia := [].{
 	## and the index past its `>`.
 	img_at : List(U8), U64, MdSafety.Uploads -> Try(Rebuilt, [NotSafe])
 	img_at = |raw, start, uploads| {
-		tag = scan(raw, { start, name: Str.to_utf8("img") })?
+		tag = scan(raw, { start, name: "img".to_utf8() })?
 		attrs = MdSafety.media_attrs({ kind: Img, value_of: |name| last_of(tag.attrs, name), uploads })?
 		Ok({ html: MdHtml.img(attrs), end: tag.end })
 	}
@@ -34,16 +34,16 @@ MdMedia := [].{
 	## fallback content is carried through.
 	video_at : List(U8), U64, MdSafety.Uploads -> Try(Rebuilt, [NotSafe])
 	video_at = |raw, start, uploads| {
-		tag = scan(raw, { start, name: Str.to_utf8("video") })?
+		tag = scan(raw, { start, name: "video".to_utf8() })?
 		attrs = MdSafety.media_attrs({ kind: Video, value_of: |name| last_of(tag.attrs, name), uploads })?
-		close = close_tag_end(raw, { at: skip_spaces(raw, tag.end), name: Str.to_utf8("video") })?
+		close = close_tag_end(raw, { at: skip_spaces(raw, tag.end), name: "video".to_utf8() })?
 		Ok({ html: MdHtml.video(attrs), end: close })
 	}
 
 	## The image tag `tag` (`<img …>`, from its `<`) rebuilt, or `Unsafe`:
 	## the Images feed's door, `img_at` at the tag's start.
 	rebuild : Str, MdSafety.Uploads -> Try(Str, [Unsafe])
-	rebuild = |tag, uploads| match img_at(Str.to_utf8(tag), 0, uploads) {
+	rebuild = |tag, uploads| match img_at(tag.to_utf8(), 0, uploads) {
 		Ok(rebuilt) =>
 			match Str.from_utf8(rebuilt.html) {
 				Ok(text) => Ok(text)
@@ -66,8 +66,8 @@ Tag : {
 ## of no name bytes, or `=` with nothing after is no tag.
 scan : List(U8), { start : U64, name : List(U8) } -> Try(Tag, [NotSafe])
 scan = |raw, { start, name }| {
-	after = start + 1 + List.len(name)
-	if after >= List.len(raw) or MdText.at(raw, start) != '<' or !MdText.is_same_ignoring_case(
+	after = start + 1 + name.len()
+	if after >= raw.len() or MdText.at(raw, start) != '<' or !MdText.is_same_ignoring_case(
 		MdText.cut(raw, { start: start + 1, end: after }),
 		name,
 	) {
@@ -85,7 +85,7 @@ scan = |raw, { start, name }| {
 ## TagScan's walk from `i`, just past the tag's name.
 attrs_from : List(U8), U64 -> Try(Tag, [NotSafe])
 attrs_from = |raw, from| {
-	len = List.len(raw)
+	len = raw.len()
 	var $i = from
 	var $attrs = []
 	var $end = 0
@@ -123,10 +123,7 @@ attrs_from = |raw, from| {
 					} else {
 						{}
 					}
-					$attrs = List.append(
-						$attrs,
-						(name, MdText.cut(raw, { start: value_start, end: close })),
-					)
+					$attrs = $attrs.append((name, MdText.cut(raw, { start: value_start, end: close })))
 					$i = close + 1
 				} else {
 					value_start = $i
@@ -138,13 +135,10 @@ attrs_from = |raw, from| {
 					) and MdText.at(raw, $i) != '>' {
 						$i = $i + 1
 					}
-					$attrs = List.append(
-						$attrs,
-						(name, MdText.cut(raw, { start: value_start, end: $i })),
-					)
+					$attrs = $attrs.append((name, MdText.cut(raw, { start: value_start, end: $i })))
 				}
 			} else {
-				$attrs = List.append($attrs, (name, []))
+				$attrs = $attrs.append((name, []))
 			}
 		}
 	}
@@ -155,7 +149,7 @@ attrs_from = |raw, from| {
 skip_spaces : List(U8), U64 -> U64
 skip_spaces = |raw, from| {
 	var $i = from
-	while $i < List.len(raw) and MdText.is_space(MdText.at(raw, $i)) {
+	while $i < raw.len() and MdText.is_space(MdText.at(raw, $i)) {
 		$i = $i + 1
 	}
 	$i
@@ -165,8 +159,8 @@ skip_spaces = |raw, from| {
 ## before the `>`), and the index past it.
 close_tag_end : List(U8), { at : U64, name : List(U8) } -> Try(U64, [NotSafe])
 close_tag_end = |raw, { at, name }| {
-	n = List.len(name)
-	if at + 2 + n > List.len(raw) or MdText.at(raw, at) != '<' or MdText.at(raw, at + 1) != '/' {
+	n = name.len()
+	if at + 2 + n > raw.len() or MdText.at(raw, at) != '<' or MdText.at(raw, at + 1) != '/' {
 		Err(NotSafe)
 	} else if !MdText.is_same_ignoring_case(
 		MdText.cut(raw, { start: at + 2, end: at + 2 + n }),
@@ -175,16 +169,13 @@ close_tag_end = |raw, { at, name }| {
 		Err(NotSafe)
 	} else {
 		i = skip_spaces(raw, at + 2 + n)
-		if (i >= List.len(raw) or MdText.at(raw, i) != '>') Err(NotSafe) else Ok(i + 1)
+		if (i >= raw.len() or MdText.at(raw, i) != '>') Err(NotSafe) else Ok(i + 1)
 	}
 }
 
 ## The last value of attribute `name` (lowercase), in any case.
 last_of : List((List(U8), List(U8))), List(U8) -> Try(List(U8), [Absent])
-last_of = |attrs, name| match List.find_last(
-	attrs,
-	|(n, _)| MdText.is_same_ignoring_case(n, name),
-) {
+last_of = |attrs, name| match attrs.find_last(|(n, _)| MdText.is_same_ignoring_case(n, name)) {
 	Ok((_, v)) => Ok(v)
 	Err(NotFound) => Err(Absent)
 }
@@ -192,16 +183,16 @@ last_of = |attrs, name| match List.find_last(
 # markdown_media's cases, each as its test has it, under a host whose uploads
 # are `/user_uploads/`.
 user_uploads : MdSafety.Uploads
-user_uploads = MdSafety.under(Str.to_utf8("/user_uploads/"))
+user_uploads = MdSafety.under("/user_uploads/".to_utf8())
 
 img : Str -> Str
-img = |raw| match MdMedia.img_at(Str.to_utf8(raw), 0, user_uploads) {
+img = |raw| match MdMedia.img_at(raw.to_utf8(), 0, user_uploads) {
 	Ok(r) => Str.from_utf8(r.html) ?? "not text"
 	Err(NotSafe) => ""
 }
 
 video : Str -> Str
-video = |raw| match MdMedia.video_at(Str.to_utf8(raw), 0, user_uploads) {
+video = |raw| match MdMedia.video_at(raw.to_utf8(), 0, user_uploads) {
 	Ok(r) => Str.from_utf8(r.html) ?? "not text"
 	Err(NotSafe) => ""
 }
@@ -224,8 +215,8 @@ expect video("<video src=\"/\t/evil.example/x.mp4\"></video>") == ""
 expect img("<img src=\" /user_uploads/cat.png \">") == "<img src=\" /user_uploads/cat.png \">"
 # The host's rule decides: none renders no media, and its own path is the
 # only one it lets through.
-expect MdMedia.img_at(Str.to_utf8("<img src=\"/user_uploads/x.png\">"), 0, |_| Bool.False) == Err(NotSafe)
-expect MdMedia.img_at(Str.to_utf8("<img src=\"/files/x.png\">"), 0, MdSafety.under(Str.to_utf8("/files/"))).is_ok()
+expect MdMedia.img_at("<img src=\"/user_uploads/x.png\">".to_utf8(), 0, |_| Bool.False) == Err(NotSafe)
+expect MdMedia.img_at("<img src=\"/files/x.png\">".to_utf8(), 0, MdSafety.under("/files/".to_utf8())).is_ok()
 # The Images feed's (SafeImg's, folded here): its plants, escaped values,
 # case-blind names, the last of a name winning, single quotes, a bare name.
 expect MdMedia.rebuild("<img src=x onerror=\"alert(1)\">", user_uploads) == Err(Unsafe)
@@ -235,7 +226,7 @@ expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\" alt=\"<b>\">", user_upl
 expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\"", user_uploads) == Err(Unsafe)
 expect MdMedia.rebuild("<img src=\"/a.png>", user_uploads) == Err(Unsafe)
 expect MdMedia.rebuild("<img src=", user_uploads) == Err(Unsafe)
-expect MdMedia.video_at(Str.to_utf8("x<VIDEO src=/user_uploads/v.mp4 >  </Video >y"), 1, user_uploads) == Ok({
-	html: Str.to_utf8("<video controls preload=\"metadata\" src=\"/user_uploads/v.mp4\"></video>"),
+expect MdMedia.video_at("x<VIDEO src=/user_uploads/v.mp4 >  </Video >y".to_utf8(), 1, user_uploads) == Ok({
+	html: "<video controls preload=\"metadata\" src=\"/user_uploads/v.mp4\"></video>".to_utf8(),
 	end: 44,
 })

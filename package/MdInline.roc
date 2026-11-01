@@ -50,7 +50,7 @@ MdInline := [].{
 			uploads,
 		},
 	| {
-		len = List.len(text)
+		len = text.len()
 		var $budget = budget
 		var $pieces = []
 		var $runs = []
@@ -96,7 +96,7 @@ MdInline := [].{
 								Skip($i + n)
 							}
 						}
-					} else if c == '!' and List.get(text, $i + 1) == Ok('[') {
+					} else if c == '!' and text.get($i + 1) == Ok('[') {
 						# `![alt](src)`: an image where its src is an upload, else
 						# the `!` is dropped and the `[` read as a link (MdSafety).
 						linked = MdLinks.link_at(
@@ -172,7 +172,7 @@ MdInline := [].{
 									uploads,
 								})?
 								$budget = label.budget
-								Token(Html(List.concat(label.out, MdHtml.link_close)), link.end)
+								Token(Html(label.out.concat(MdHtml.link_close)), link.end)
 							}
 							Err(NotALink) => Skip($i + 1)
 						}
@@ -186,8 +186,8 @@ MdInline := [].{
 						if c == '~' and !run.can_open and !run.can_close {
 							Skip($i + n)
 						} else {
-							$runs = List.append($runs, run)
-							Token(Run(List.len($runs) - 1), $i + n)
+							$runs = $runs.append(run)
+							Token(Run($runs.len() - 1), $i + n)
 						}
 					} else if MdLinks.is_autolink_boundary(text, $i) {
 						found = MdLinks.autolink_at(
@@ -254,7 +254,7 @@ MdInline := [].{
 ## escapes.
 is_escapable : List(U8), U64 -> Bool
 is_escapable = |text, i|
-	match List.get(text, i) {
+	match text.get(i) {
 		Ok(c) => Ascii.is_punctuation(c)
 		Err(OutOfBounds) => Bool.False
 	}
@@ -269,10 +269,7 @@ Piece : [
 
 ## The pending text from `text_start` up to `at`, as a piece when any.
 flushed : List(Piece), { text_start : U64, at : U64 } -> List(Piece)
-flushed = |pieces, { text_start, at }| if (at > text_start) List.append(
-	pieces,
-	Text(text_start, at),
-) else pieces
+flushed = |pieces, { text_start, at }| if (at > text_start) pieces.append(Text(text_start, at)) else pieces
 
 with_token : List(Piece),
 {
@@ -287,7 +284,7 @@ with_token = |
 		at,
 		token,
 	},
-| List.append(flushed(pieces, { text_start, at }), token)
+| flushed(pieces, { text_start, at }).append(token)
 
 ## What one byte's scan found: a piece, ending at `end` (the pending text
 ## before it flushed first); the pending text cut at `end` with nothing taken
@@ -313,10 +310,7 @@ media_at = |text, at, uploads|
 ## A code span's html: its content `text[start..end]`, as CommonMark trims
 ## it, escaped.
 code_html : List(U8), { start : U64, end : U64 } -> List(U8)
-code_html = |text, span| List.concat(
-	MdText.escape_onto(MdHtml.code_open, code_span_content(MdText.cut(text, span))),
-	MdHtml.code_close,
-)
+code_html = |text, span| MdText.escape_onto(MdHtml.code_open, code_span_content(MdText.cut(text, span))).concat(MdHtml.code_close)
 
 ## How many `byte`s run from `at`.
 run_length : List(U8), { byte : U8, at : U64 } -> U64
@@ -342,7 +336,7 @@ emit = |
 	for piece in pieces {
 		$out = match piece {
 			Text(start, end) => MdText.escape_onto($out, MdText.cut(text, { start, end }))
-			Html(html) => List.concat($out, html)
+			Html(html) => $out.concat(html)
 			Run(k) => MdEmphasis.run_onto($out, MdEmphasis.run_at(runs, k))
 		}
 	}
@@ -369,7 +363,7 @@ code_span_at : List(U8),
 	budget : MdText.Budget,
 }
 code_span_at = |text, { at, budget }| {
-	len = List.len(text)
+	len = text.len()
 	n = run_length(text, { byte: '`', at })
 	var $budget = MdText.charge(budget, n)
 	var $k = at + n
@@ -402,11 +396,8 @@ code_span_at = |text, { at, budget }| {
 ## are spaces and it is not all spaces.
 code_span_content : List(U8) -> List(U8)
 code_span_content = |content| {
-	n = List.len(content)
-	if n >= 2 and List.first(content) == Ok(' ') and List.last(content) == Ok(' ') and List.any(
-		content,
-		|c| c != ' ',
-	) {
+	n = content.len()
+	if n >= 2 and content.first() == Ok(' ') and content.last() == Ok(' ') and content.any(|c| c != ' ') {
 		MdText.cut(content, { start: 1, end: n - 1 })
 	} else {
 		content
@@ -416,10 +407,10 @@ code_span_content = |content| {
 inline : Str -> Str
 inline = |text| match MdInline.render_onto({
 	out: [],
-	text: Str.to_utf8(text),
+	text: text.to_utf8(),
 	refs: Linked,
 	budget: MdText.unlimited,
-	uploads: MdSafety.under(Str.to_utf8("/user_uploads/")),
+	uploads: MdSafety.under("/user_uploads/".to_utf8()),
 }) {
 	Ok(r) => Str.from_utf8(r.out) ?? "not text"
 	Err(Hostile) => "hostile"

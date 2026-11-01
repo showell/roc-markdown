@@ -59,7 +59,7 @@ MdLinks := [].{
 			budget,
 		},
 	| {
-		len = List.len(text)
+		len = text.len()
 		var $next_bracket = next_bracket
 		var $budget = budget
 		while $next_bracket < len and $next_bracket < at + 1 {
@@ -82,7 +82,7 @@ MdLinks := [].{
 				Unscanned => (paren_closes(text), MdText.charge($budget, len))
 			}
 			$budget = scanned
-			close_paren = List.get(table, open_paren) ?? len
+			close_paren = table.get(open_paren) ?? len
 			if close_paren >= len {
 				{
 					link: Err(NotALink),
@@ -119,9 +119,9 @@ MdLinks := [].{
 	image_dest = |url| {
 		dest = MdText.trim_line(url)
 		src_len = Bytes.count_while(dest, { keep: |c| c != ' ' and c != '\t', at: 0 })
-		src = List.take_first(dest, src_len)
-		rest = MdText.trim_line(List.drop_first(dest, src_len))
-		n = List.len(rest)
+		src = dest.take_first(src_len)
+		rest = MdText.trim_line(dest.drop_first(src_len))
+		n = rest.len()
 		if n == 0 {
 			Ok({ src, title: None })
 		} else {
@@ -145,11 +145,11 @@ MdLinks := [].{
 			kind: Img,
 			uploads,
 			value_of: |name|
-				if name == Str.to_utf8("src") {
+				if name == "src".to_utf8() {
 					Ok(src)
-				} else if name == Str.to_utf8("alt") {
+				} else if name == "alt".to_utf8() {
 					Ok(alt)
-				} else if name == Str.to_utf8("title") {
+				} else if name == "title".to_utf8() {
 					match title {
 						Some(t) => Ok(t)
 						None => Err(Absent)
@@ -212,7 +212,7 @@ MdLinks := [].{
 	| {
 		starts_with = |prefix| MdText.is_prefixed_ignoring_case(
 			text,
-			{ at, prefix: Str.to_utf8(prefix) },
+			{ at, prefix: prefix.to_utf8() },
 		)
 		if starts_with("http://") or starts_with("https://") {
 			u = url_end(text, { start: at, budget })
@@ -260,28 +260,28 @@ MdLinks := [].{
 	autolink_html = |link, kind| {
 		head = match kind {
 			Url => MdHtml.link_open({ href: link, tab: NewTab })
-			Www => MdHtml.link_open({ href: List.concat(Str.to_utf8("http://"), link), tab: NewTab })
-			Email => MdHtml.link_open({ href: List.concat(Str.to_utf8("mailto:"), link), tab: SameTab })
+			Www => MdHtml.link_open({ href: "http://".to_utf8().concat(link), tab: NewTab })
+			Email => MdHtml.link_open({ href: "mailto:".to_utf8().concat(link), tab: SameTab })
 		}
-		List.concat(MdText.escape_onto(head, link), MdHtml.link_close)
+		MdText.escape_onto(head, link).concat(MdHtml.link_close)
 	}
 }
 
 paren_closes : List(U8) -> List(U64)
 paren_closes = |text| {
-	len = List.len(text)
+	len = text.len()
 	var $closes = List.repeat(len, len)
 	var $open = []
 	var $i = 0
 	while $i < len {
 		c = MdText.at(text, $i)
 		if c == '(' {
-			$open = List.append($open, $i)
+			$open = $open.append($i)
 		} else if c == ')' {
-			match List.last($open) {
+			match $open.last() {
 				Ok(j) => {
-					$closes = List.set($closes, j, $i) ?? crash "MdLinks.paren_closes: a ( past the line"
-					$open = List.drop_last($open, 1)
+					$closes = $closes.set(j, $i) ?? crash "MdLinks.paren_closes: a ( past the line"
+					$open = $open.drop_last(1)
 				}
 				Err(ListWasEmpty) => {}
 			}
@@ -314,18 +314,15 @@ url_end = |text, { start, budget }| {
 		url,
 		{ keep: |c| c != '/' and c != '?' and c != '#' and c != ':', at: host_start },
 	)
-	if !List.contains(
-		MdText.cut(url, { start: host_start, end: U64.max(host_start, host_end) }),
-		'.',
-	) {
+	if !MdText.cut(url, { start: host_start, end: host_start.max(host_end) }).contains('.') {
 		{ end: Err(NotALink), budget: spent }
 	} else {
-		opens = List.count_if(url, |c| c == '(')
-		var $closes = List.count_if(url, |c| c == ')')
+		opens = url.count_if(|c| c == '(')
+		var $closes = url.count_if(|c| c == ')')
 		var $end = scanned
 		while $end > start {
 			c = MdText.at(text, $end - 1)
-			if List.contains(trailing_punct, c) {
+			if trailing_punct.contains(c) {
 				$end = $end - 1
 			} else if c == ')' and $closes > opens {
 				$end = $end - 1
@@ -348,7 +345,7 @@ email_end : List(U8),
 email_end = |text, { start, budget }| {
 	local_end = Bytes.count_while(text, { keep: is_email_local_char, at: start })
 	local_spent = MdText.charge(budget, local_end - start)
-	if local_end == start or local_end >= List.len(text) or MdText.at(text, local_end) != '@' {
+	if local_end == start or local_end >= text.len() or MdText.at(text, local_end) != '@' {
 		{ end: Err(NotALink), budget: local_spent }
 	} else {
 		domain_start = local_end + 1
@@ -360,21 +357,15 @@ email_end = |text, { start, budget }| {
 			},
 		)
 		spent = MdText.charge(local_spent, domain_end - domain_start)
-		if domain_end == domain_start or !List.contains(
-			MdText.cut(text, { start: domain_start, end: domain_end }),
-			'.',
-		) {
+		if domain_end == domain_start or !MdText.cut(text, { start: domain_start, end: domain_end }).contains('.') {
 			{ end: Err(NotALink), budget: spent }
 		} else {
 			var $j = domain_end
-			while $j > domain_start and List.contains(
-				[
-					'.',
-					'-',
-					'_',
-				],
-				MdText.at(text, $j - 1),
-			) {
+			while $j > domain_start and [
+				'.',
+				'-',
+				'_',
+			].contains(MdText.at(text, $j - 1)) {
 				$j = $j - 1
 			}
 			{ end: Ok($j), budget: spent }
@@ -386,4 +377,4 @@ is_email_local_char : U8 -> Bool
 is_email_local_char = |c| Ascii.is_alphanumeric(c) or c == '.' or c == '_' or c == '+' or c == '-'
 
 trailing_punct : List(U8)
-trailing_punct = Str.to_utf8("?!.,:*_~'\"")
+trailing_punct = "?!.,:*_~'\"".to_utf8()

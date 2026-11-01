@@ -30,10 +30,10 @@ MdTable := [].{
 				$cell = $cell.append('|')
 				$i = $i + 2
 			} else if c == '\\' and $i + 1 < len {
-				$cell = List.concat($cell, [c, MdText.at(t, $i + 1)])
+				$cell = $cell.concat([c, MdText.at(t, $i + 1)])
 				$i = $i + 2
 			} else if c == '|' {
-				$cells = List.append($cells, MdText.trim_line($cell))
+				$cells = $cells.append(MdText.trim_line($cell))
 				$cell = []
 				$after_pipe = Bool.True
 				$i = $i + 1
@@ -43,7 +43,7 @@ MdTable := [].{
 			}
 		}
 		# A trailing `|` closes the last cell; it opens none.
-		if ($after_pipe) $cells else List.append($cells, MdText.trim_line($cell))
+		if ($after_pipe) $cells else $cells.append(MdText.trim_line($cell))
 	}
 
 	## GFM's table at the line at `pos`: that line is its header row and the
@@ -117,7 +117,7 @@ delimiter_cell = |cell| {
 }
 
 cells_of : Str -> List(Str)
-cells_of = |line| List.map(MdTable.cells(Str.to_utf8(line)), |c| Str.from_utf8(c) ?? "not text")
+cells_of = |line| MdTable.cells(line.to_utf8()).map(|c| Str.from_utf8(c) ?? "not text")
 
 expect cells_of("| a | b |") == ["a", "b"]
 expect cells_of("a | b") == ["a", "b"]

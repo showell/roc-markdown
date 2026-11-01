@@ -43,7 +43,7 @@ MdSafety := [].{
 	is_dangerous_url = |raw| {
 		start = Bytes.count_while(raw, { keep: |c| c <= ' ', at: 0 })
 		trimmed = raw.drop_first(start)
-		kept = List.drop_last(trimmed, Bytes.count_back(trimmed, |c| c <= ' '))
+		kept = trimmed.drop_last(Bytes.count_back(trimmed, |c| c <= ' '))
 		var $seen = []
 		for c in kept {
 			if c == '\t' or c == '\n' or c == '\r' or $seen.len() == 32 {
@@ -55,19 +55,16 @@ MdSafety := [].{
 		url = $seen
 		starts_with = |prefix| MdText.is_prefixed_ignoring_case(
 			url,
-			{ at: 0, prefix: Str.to_utf8(prefix) },
+			{ at: 0, prefix: prefix.to_utf8() },
 		)
 		if starts_with("data:image/") {
-			!List.any(
-				[
-					"png",
-					"gif",
-					"jpeg",
-					"webp",
-					"svg",
-				],
-				|kind| MdText.is_prefixed_ignoring_case(url, { at: 11, prefix: Str.to_utf8(kind) }),
-			)
+			![
+				"png",
+				"gif",
+				"jpeg",
+				"webp",
+				"svg",
+			].any(|kind| MdText.is_prefixed_ignoring_case(url, { at: 11, prefix: kind.to_utf8() }))
 		} else {
 			dangerous_schemes.any(starts_with)
 		}
@@ -78,10 +75,7 @@ MdSafety := [].{
 	is_external_href : List(U8) -> Bool
 	is_external_href = |href| match Bytes.find(href, { needle: MdSafety.scheme_end }) {
 		Ok(p) =>
-			p > 0 and Ascii.is_letter(MdText.at(href, 0)) and List.all(
-				MdText.cut(href, { start: 1, end: p }),
-				|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-',
-			)
+			p > 0 and Ascii.is_letter(MdText.at(href, 0)) and MdText.cut(href, { start: 1, end: p }).all(|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-')
 		Err(NotFound) => Bool.False
 	}
 
@@ -177,7 +171,7 @@ dots_decoded = |src| {
 			$out = $out.append('.')
 			$i = $i + 3
 		} else {
-			$out = List.append($out, MdText.at(src, $i))
+			$out = $out.append(MdText.at(src, $i))
 			$i = $i + 1
 		}
 	}

@@ -124,7 +124,7 @@ MdText := [].{
 	## The first `byte` at `at` or after, or the end: `indexOfScalarPos`
 	## orelse `len`.
 	find_or_end : List(U8), { byte : U8, at : U64 } -> U64
-	find_or_end = |s, wanted| Bytes.find_byte(s, wanted) ?? List.len(s)
+	find_or_end = |s, wanted| Bytes.find_byte(s, wanted) ?? s.len()
 
 	## Spaces, tabs and `\r` off both ends.
 	trim_line : List(U8) -> List(U8)

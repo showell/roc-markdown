@@ -24,24 +24,21 @@ MdFence := [].{
 	## string holds no backtick.
 	open : List(U8) -> Try(Open, [NotAFence])
 	open = |line| {
-		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
-		match List.get(line, indent) {
+		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+		match line.get(indent) {
 			Err(_) => Err(NotAFence)
 			Ok(f) =>
 				if indent >= 4 or (f != '`' and f != '~') {
 					Err(NotAFence)
 				} else {
 					count = Bytes.count_while(line, { keep: |c| c == f, at: indent }) - indent
-					info = Bytes.trim(List.drop_first(line, indent + count), info_space)
-					if count < 3 or count > MdChat.max_fence_run or (f == '`' and List.contains(info, '`')) {
+					info = Bytes.trim(line.drop_first(indent + count), info_space)
+					if count < 3 or count > MdChat.max_fence_run or (f == '`' and info.contains('`')) {
 						Err(NotAFence)
 					} else {
 						# The language's backslash escapes are CommonMark's (`foo\+bar`).
 						lang = MdText.unescaped(
-							List.take_first(
-								info,
-								Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 }),
-							),
+							info.take_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })),
 						)
 						Ok({
 							char: f,
@@ -67,12 +64,12 @@ MdFence := [].{
 	## `char`, then only whitespace (a close carries no info string).
 	is_close : List(U8), { char : U8, count : U64 } -> Bool
 	is_close = |line, { char, count }| {
-		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
 		if indent >= 4 {
 			Bool.False
 		} else {
 			n = Bytes.count_while(line, { keep: |c| c == char, at: indent }) - indent
-			n >= count and Bytes.trim(List.drop_first(line, indent + n), info_space) == []
+			n >= count and Bytes.trim(line.drop_first(indent + n), info_space) == []
 		}
 	}
 
@@ -94,7 +91,7 @@ MdFence := [].{
 		},
 	| {
 		var $j = at
-		while $j < List.len(lines) and !is_close(List.get(lines, $j) ?? [], { char, count }) {
+		while $j < lines.len() and !is_close(lines.get($j) ?? [], { char, count }) {
 			$j = $j + 1
 		}
 		$j
@@ -110,21 +107,21 @@ info_space = [
 
 # Where a fence opens and closes: its run's length and cap, its indent, its
 # language, and a backtick fence's info string.
-expect MdFence.open(Str.to_utf8("~~~~ quote")) == Ok({
+expect MdFence.open("~~~~ quote".to_utf8()) == Ok({
 	char: '~',
 	count: 4,
 	indent: 0,
-	lang: Str.to_utf8("quote"),
+	lang: "quote".to_utf8(),
 })
-expect MdFence.open(Str.to_utf8("```zig")) == Ok({
+expect MdFence.open("```zig".to_utf8()) == Ok({
 	char: '`',
 	count: 3,
 	indent: 0,
-	lang: Str.to_utf8("zig"),
+	lang: "zig".to_utf8(),
 })
-expect MdFence.open(Str.to_utf8("plain text")) == Err(NotAFence)
-expect MdFence.open(Str.to_utf8("~~ short")) == Err(NotAFence)
-expect MdFence.open(Str.to_utf8("```a`b")) == Err(NotAFence)
+expect MdFence.open("plain text".to_utf8()) == Err(NotAFence)
+expect MdFence.open("~~ short".to_utf8()) == Err(NotAFence)
+expect MdFence.open("```a`b".to_utf8()) == Err(NotAFence)
 expect MdFence.open(List.repeat('~', 10)) == Ok({
 	char: '~',
 	count: 10,
@@ -133,21 +130,21 @@ expect MdFence.open(List.repeat('~', 10)) == Ok({
 })
 expect MdFence.open(List.repeat('~', 11)) == Err(NotAFence)
 expect MdFence.open(List.repeat('`', 15)) == Err(NotAFence)
-expect MdFence.open(Str.to_utf8("   ~~~ a b")) == Ok({
+expect MdFence.open("   ~~~ a b".to_utf8()) == Ok({
 	char: '~',
 	count: 3,
 	indent: 3,
-	lang: Str.to_utf8("a"),
+	lang: "a".to_utf8(),
 })
-expect MdFence.open(Str.to_utf8("    ~~~")) == Err(NotAFence)
-expect MdFence.open(Str.to_utf8("``` foo\\+bar\\x")).map_ok(|o| o.lang) == Ok(Str.to_utf8("foo+bar\\x"))
-expect !MdFence.is_close(Str.to_utf8("~~~"), { char: '~', count: 4 })
-expect MdFence.is_close(Str.to_utf8("~~~~"), { char: '~', count: 4 })
-expect MdFence.is_close(Str.to_utf8("~~~~~"), { char: '~', count: 4 })
-expect !MdFence.is_close(Str.to_utf8("```"), { char: '~', count: 3 })
-expect !MdFence.is_close(Str.to_utf8("~~~ quote"), { char: '~', count: 3 })
+expect MdFence.open("    ~~~".to_utf8()) == Err(NotAFence)
+expect MdFence.open("``` foo\\+bar\\x".to_utf8()).map_ok(|o| o.lang) == Ok("foo+bar\\x".to_utf8())
+expect !MdFence.is_close("~~~".to_utf8(), { char: '~', count: 4 })
+expect MdFence.is_close("~~~~".to_utf8(), { char: '~', count: 4 })
+expect MdFence.is_close("~~~~~".to_utf8(), { char: '~', count: 4 })
+expect !MdFence.is_close("```".to_utf8(), { char: '~', count: 3 })
+expect !MdFence.is_close("~~~ quote".to_utf8(), { char: '~', count: 3 })
 expect MdFence.close_at(
-	[Str.to_utf8("a"), Str.to_utf8("~~~")],
+	["a".to_utf8(), "~~~".to_utf8()],
 	{
 		char: '~',
 		count: 3,
@@ -155,7 +152,7 @@ expect MdFence.close_at(
 	},
 ) == 1
 expect MdFence.close_at(
-	[Str.to_utf8("a")],
+	["a".to_utf8()],
 	{
 		char: '~',
 		count: 3,

@@ -38,10 +38,7 @@ MdHtml := [].{
 		if lang == [] {
 			"<pre><code>".to_utf8()
 		} else {
-			List.concat(
-				MdText.escape_onto(Str.to_utf8("<pre><code class=\"language-"), lang),
-				['"', '>'],
-			)
+			MdText.escape_onto("<pre><code class=\"language-".to_utf8(), lang).concat(['"', '>'])
 		}
 
 	code_block_close : List(U8)
@@ -153,12 +150,12 @@ MdHtml := [].{
 	## A link's opening tag: its href escaped, and a new tab, without the
 	## opener, when `NewTab`.
 	link_open : { href : List(U8), tab : [SameTab, NewTab] } -> List(U8)
-	link_open = |{ href, tab }| List.join([
-		MdText.escape_onto(Str.to_utf8("<a href=\""), href),
+	link_open = |{ href, tab }| [
+		MdText.escape_onto("<a href=\"".to_utf8(), href),
 		['"'],
 		if (tab == NewTab) " target=\"_blank\" rel=\"noopener\"".to_utf8() else [],
 		['>'],
-	])
+	].join()
 
 	link_close : List(U8)
 	link_close = "</a>".to_utf8()
@@ -204,7 +201,7 @@ MdHtml := [].{
 			if c == '<' {
 				$i = MdText.find_or_end(html, { byte: '>', at: $i }) + 1
 			} else if c == '&' {
-				match List.find_first(entities, |e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 })) {
+				match entities.find_first(|e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 })) {
 					Ok((written, byte)) => {
 						$out = $out.append(byte)
 						$i = $i + written.len()
@@ -247,7 +244,7 @@ attrs_onto = |out, attrs| {
 		named = $out.append(' ').concat(name)
 		$out = match value {
 			Bare => named
-			Is(v) => List.append(MdText.escape_onto(List.concat(named, ['=', '"']), v), '"')
+			Is(v) => MdText.escape_onto(named.concat(['=', '"']), v).append('"')
 		}
 	}
 	$out

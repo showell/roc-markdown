@@ -154,17 +154,17 @@ blocks_onto = |
 	},
 |
 	if depth > max_block_depth {
-		start = if (out != [] and List.last(out) != Ok('\n')) List.append(out, '\n') else out
+		start = if (out != [] and out.last() != Ok('\n')) out.append('\n') else out
 		flat = MdInline.render_onto({
-			out: List.concat(start, MdHtml.p_open),
+			out: start.concat(MdHtml.p_open),
 			text: md,
 			refs: Linked,
 			budget,
 			uploads,
 		})?
-		Ok({ out: List.concat(flat.out, MdHtml.p_close), budget: flat.budget })
+		Ok({ out: flat.out.concat(MdHtml.p_close), budget: flat.budget })
 	} else {
-		len = List.len(md)
+		len = md.len()
 		# A container's content is blocks one level deeper, in this render's
 		# wrap: the recursion MdList and MdQuote are handed, so they need no
 		# import of Md (a cycle) and the depth stays this module's.
@@ -272,13 +272,13 @@ block_at = |
 heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> Try(MdText.Block, [Hostile])
 heading_onto = |out, { level, content, after, budget, uploads }| {
 	heading = MdInline.render_onto({
-		out: List.concat(out, MdHtml.heading_open(level)),
+		out: out.concat(MdHtml.heading_open(level)),
 		text: content,
 		refs: Linked,
 		budget,
 		uploads,
 	})?
-	Ok({ out: List.concat(heading.out, MdHtml.heading_close(level)), budget: heading.budget, after })
+	Ok({ out: heading.out.concat(MdHtml.heading_close(level)), budget: heading.budget, after })
 }
 
 ## A paragraph: the longest run of lines that are not blank and start no
@@ -312,7 +312,7 @@ paragraph_onto = |
 		uploads,
 	},
 | {
-	len = List.len(md)
+	len = md.len()
 	var $lines = []
 	var $p = pos
 	while $p < len {
@@ -329,22 +329,19 @@ paragraph_onto = |
 		} else {
 			{}
 		}
-		$lines = List.append($lines, line)
+		$lines = $lines.append(line)
 		$p = MdText.next_line(md, eol)
 	}
-	last = List.len($lines) - 1
-	var $out = if (spacing == Tight) out else List.concat(out, MdHtml.p_open)
+	last = $lines.len() - 1
+	var $out = if (spacing == Tight) out else out.concat(MdHtml.p_open)
 	var $budget = budget
 	var $reflow = []
 	var $k = 0
 	for line in $lines {
 		breaks = $k < last and ends_in_hard_break(line)
-		text = MdText.trim_line(if (breaks) List.drop_last(line, 1) else line)
+		text = MdText.trim_line(if (breaks) line.drop_last(1) else line)
 		if wrap == Reflow {
-			$reflow = List.concat(
-				if ($reflow == []) $reflow else List.append($reflow, ' '),
-				text,
-			)
+			$reflow = (if ($reflow == []) $reflow else $reflow.append(' ')).concat(text)
 			if breaks {
 				broke = MdInline.render_onto({
 					out: $out,
@@ -353,7 +350,7 @@ paragraph_onto = |
 					budget: $budget,
 					uploads,
 				})?
-				$out = List.concat(broke.out, MdHtml.br)
+				$out = broke.out.concat(MdHtml.br)
 				$budget = broke.budget
 				$reflow = []
 			} else {
@@ -361,7 +358,7 @@ paragraph_onto = |
 			}
 		} else {
 			wrapped = MdInline.render_onto({
-				out: if ($k == 0) $out else List.concat($out, MdHtml.br),
+				out: if ($k == 0) $out else $out.concat(MdHtml.br),
 				text,
 				refs: Linked,
 				budget: $budget,
@@ -386,7 +383,7 @@ paragraph_onto = |
 		{}
 	}
 	Ok({
-		out: if (spacing == Tight) $out else List.concat($out, MdHtml.p_close),
+		out: if (spacing == Tight) $out else $out.concat(MdHtml.p_close),
 		budget: $budget,
 		after: $p,
 	})
@@ -403,7 +400,7 @@ tight_sep : List(U8), [Tight, Loose] -> List(U8)
 tight_sep = |
 	out,
 	spacing,
-| if (spacing == Tight and out != [] and List.last(out) != Ok('\n')) List.append(out, '\n') else out
+| if (spacing == Tight and out != [] and out.last() != Ok('\n')) out.append('\n') else out
 
 # ── fenced code ──
 
@@ -424,7 +421,7 @@ fence_onto = |
 		budget,
 	},
 | {
-	len = List.len(md)
+	len = md.len()
 	var $content_end = len
 	var $after = len
 	var $p = body_start
@@ -444,10 +441,10 @@ fence_onto = |
 	content = MdText.cut(md, { start: body_start, end: $content_end })
 	is_quote = MdChat.is_quote_fence(open.lang)
 	(head, tail) = if (is_quote) (MdHtml.chat_quote_open, MdHtml.chat_quote_close) else (MdHtml.code_block_open(open.lang), MdHtml.code_block_close)
-	code = code_lines_onto(List.concat(out, head), { content, indent: open.indent })
+	code = code_lines_onto(out.concat(head), { content, indent: open.indent })
 	{
-		out: List.concat(code, tail),
-		budget: MdText.charge(budget, List.len(content)),
+		out: code.concat(tail),
+		budget: MdText.charge(budget, content.len()),
 		after: $after,
 	}
 }
@@ -456,14 +453,14 @@ fence_onto = |
 ## less up to the fence's own indent of spaces.
 code_lines_onto : List(U8), { content : List(U8), indent : U64 } -> List(U8)
 code_lines_onto = |out, { content, indent }| {
-	len = List.len(content)
+	len = content.len()
 	var $out = out
 	var $i = 0
 	while $i < len {
 		eol = MdText.line_end(content, $i)
 		line = MdText.cut(content, { start: $i, end: eol })
-		strip = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), indent)
-		$out = List.append(MdText.escape_onto($out, List.drop_first(line, strip)), '\n')
+		strip = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(indent)
+		$out = MdText.escape_onto($out, line.drop_first(strip)).append('\n')
 		$i = MdText.next_line(content, eol)
 	}
 	$out
@@ -475,27 +472,22 @@ code_lines_onto = |out, { content, indent }| {
 ## a tab or the line's end; a closing run of `#` is no content.
 atx_heading : List(U8) -> Try({ level : U64, content : List(U8) }, [NotAHeading])
 atx_heading = |line| {
-	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+	indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
 	level_end = Bytes.count_while(line, { keep: |c| c == '#', at: indent })
 	level = level_end - indent
 	# The marks end the line, or a space or a tab follows them.
-	is_ended = match List.get(line, level_end) {
+	is_ended = match line.get(level_end) {
 		Ok(c) => c == ' ' or c == '\t'
 		Err(OutOfBounds) => Bool.True
 	}
 	if indent >= 4 or level == 0 or level > 6 or !is_ended {
 		Err(NotAHeading)
 	} else {
-		content = Bytes.trim(List.drop_first(line, level_end), heading_space)
-		h = List.len(content) - Bytes.count_back(content, |c| c == '#')
+		content = Bytes.trim(line.drop_first(level_end), heading_space)
+		h = content.len() - Bytes.count_back(content, |c| c == '#')
 		closed =
-			if h < List.len(content) and (
-				h == 0 or List.get(
-					content,
-					h - 1,
-				) == Ok(' ') or List.get(content, h - 1) == Ok('\t')
-			) {
-				Bytes.trim(List.take_first(content, h), heading_space)
+			if h < content.len() and (h == 0 or content.get(h - 1) == Ok(' ') or content.get(h - 1) == Ok('\t')) {
+				Bytes.trim(content.take_first(h), heading_space)
 			} else {
 				content
 			}
@@ -534,19 +526,19 @@ table_onto : List(U8),
 table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos) {
 	Err(NotATable) => crash "Md.table_onto: no table where the dispatcher found one"
 	Ok(table) => {
-		len = List.len(md)
+		len = md.len()
 		head = row_onto(
-			List.concat(out, MdHtml.table_open),
+			out.concat(MdHtml.table_open),
 			{ cells: table.header, aligns: table.aligns, tag: Th, budget, uploads },
 		)?
-		var $out = List.concat(head.out, MdHtml.thead_close)
+		var $out = head.out.concat(MdHtml.thead_close)
 		var $budget = head.budget
 		var $rows = 0
 		var $p = table.body
 		while $p < len and !is_block_start(md, $p) {
 			eol = MdText.line_end(md, $p)
 			row = row_onto(
-				if ($rows == 0) List.concat($out, MdHtml.tbody_open) else $out,
+				if ($rows == 0) $out.concat(MdHtml.tbody_open) else $out,
 				{
 					cells: MdTable.cells(MdText.cut(md, { start: $p, end: eol })),
 					aligns: table.aligns,
@@ -561,7 +553,7 @@ table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos)
 			$p = MdText.next_line(md, eol)
 		}
 		Ok({
-			out: List.concat(if ($rows == 0) $out else List.concat($out, MdHtml.tbody_close), MdHtml.table_close),
+			out: (if ($rows == 0) $out else $out.concat(MdHtml.tbody_close)).concat(MdHtml.table_close),
 			budget: $budget,
 			after: $p,
 		})
@@ -579,7 +571,7 @@ row_onto : List(U8),
 	uploads : MdSafety.Uploads,
 } -> Try(MdText.Rendered, [Hostile])
 row_onto = |out, { cells, aligns, tag, budget, uploads }| {
-	var $out = List.concat(out, MdHtml.tr_open)
+	var $out = out.concat(MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
 	var $k = 0
 	for align in aligns {
@@ -590,17 +582,17 @@ row_onto = |out, { cells, aligns, tag, budget, uploads }| {
 			{}
 		}
 		cell = MdInline.render_onto({
-			out: List.concat($out, MdHtml.cell_open(tag, align)),
-			text: List.get(cells, $k) ?? [],
+			out: $out.concat(MdHtml.cell_open(tag, align)),
+			text: cells.get($k) ?? [],
 			refs: Linked,
 			budget: $budget,
 			uploads,
 		})?
-		$out = List.concat(cell.out, MdHtml.cell_close(tag))
+		$out = cell.out.concat(MdHtml.cell_close(tag))
 		$budget = cell.budget
 		$k = $k + 1
 	}
-	Ok({ out: List.concat($out, MdHtml.tr_close), budget: $budget })
+	Ok({ out: $out.concat(MdHtml.tr_close), budget: $budget })
 }
 
 # ── raw HTML ──
@@ -611,13 +603,13 @@ raw_html_onto : List(U8), { md : List(U8), pos : U64, budget : MdText.Budget, up
 raw_html_onto = |out, { md, pos, budget, uploads }| {
 	# CommonMark's type 7: only at a block's start, and up to a blank line,
 	# with no <p> and no newline added.
-	md_len = List.len(md)
+	md_len = md.len()
 	var $p = MdText.next_line(md, MdText.line_end(md, pos))
 	while $p < md_len and !MdText.is_blank(MdText.cut(md, { start: $p, end: MdText.line_end(md, $p) })) {
 		$p = MdText.next_line(md, MdText.line_end(md, $p))
 	}
 	raw = MdText.cut(md, { start: pos, end: $p })
-	len = List.len(raw)
+	len = raw.len()
 	var $out = out
 	var $last = 0
 	var $i = 0
@@ -631,10 +623,7 @@ raw_html_onto = |out, { md, pos, budget, uploads }| {
 			}
 			match safe {
 				Ok(tag) => {
-					$out = List.concat(
-						MdText.escape_onto($out, MdText.cut(raw, { start: $last, end: $i })),
-						tag.html,
-					)
+					$out = MdText.escape_onto($out, MdText.cut(raw, { start: $last, end: $i })).concat(tag.html)
 					$i = tag.end
 					$last = tag.end
 				}
@@ -645,7 +634,7 @@ raw_html_onto = |out, { md, pos, budget, uploads }| {
 		}
 	}
 	{
-		out: MdText.escape_onto($out, List.drop_first(raw, $last)),
+		out: MdText.escape_onto($out, raw.drop_first($last)),
 		budget: MdText.charge(budget, len),
 		after: $p,
 	}
@@ -659,7 +648,7 @@ is_html_block_start = |line| {
 	match t {
 		['<', second, ..] if Ascii.is_letter(second) or second == '/' =>
 			match html_tag_end(t) {
-				Ok(end) => MdText.is_blank(List.drop_first(t, end))
+				Ok(end) => MdText.is_blank(t.drop_first(end))
 				Err(Unterminated) => Bool.False
 			}
 		_ => Bool.False
@@ -670,7 +659,7 @@ is_html_block_start = |line| {
 ## quoted values respected.
 html_tag_end : List(U8) -> Try(U64, [Unterminated])
 html_tag_end = |t| {
-	len = List.len(t)
+	len = t.len()
 	var $i = 1
 	while $i < len {
 		c = MdText.at(t, $i)
@@ -695,11 +684,11 @@ heading_space = [' ', '\t']
 
 # The chat's own options, as roc-chat passes them.
 chat : Md.Options
-chat = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")) }
+chat = { uploads: Md.uploads_under("/user_uploads/".to_utf8()) }
 
 md : Str -> Str
 
-md = |text| Str.from_utf8(Md.render(Str.to_utf8(text), chat)) ?? "not text"
+md = |text| Str.from_utf8(Md.render(text.to_utf8(), chat)) ?? "not text"
 
 # Whole messages, block by block: the media rule, hard wraps and their
 # backslash, fences, lists, quotes and headings as the dialect renders them.
@@ -708,11 +697,11 @@ expect md("<video src=\"/user_uploads/1_3/abc.mp4\"></video>") == "<p><video con
 # chat's upload paths too.
 expect md("<video src=\"/chat/c/1_3/yo/uploads/abc.mp4\"></video>") == "<p>&lt;video src=&quot;/chat/c/1_3/yo/uploads/abc.mp4&quot;&gt;&lt;/video&gt;</p>\n"
 expect md("hello\nworld") == "<p>hello<br>\nworld</p>\n"
-expect Md.escape(Str.to_utf8("Bea <i>x</i> & \"co\" 'q'")) == Str.to_utf8("Bea &lt;i&gt;x&lt;/i&gt; &amp; &quot;co&quot; &#39;q&#39;")
+expect Md.escape("Bea <i>x</i> & \"co\" 'q'".to_utf8()) == "Bea &lt;i&gt;x&lt;/i&gt; &amp; &quot;co&quot; &#39;q&#39;".to_utf8()
 expect md("hello\\\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("hello\\\\\nworld") == "<p>hello\\<br>\nworld</p>\n"
 expect md("hello\\") == "<p>hello\\</p>\n"
-expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("*a\\\nb* c\nd"), chat)) == Ok("<p>*a<br>\nb* c d</p>\n")
+expect Str.from_utf8(Md.render_trusted_reflow("*a\\\nb* c\nd".to_utf8(), chat)) == Ok("<p>*a<br>\nb* c d</p>\n")
 expect md("# about MSG_plans_3") == "<h1>about <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></h1>\n"
 expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;b\n</code></pre>\n<p>after</p>\n"
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
@@ -720,8 +709,8 @@ expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
 expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
 expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
-expect Str.from_utf8(Md.render_trusted_reflow(Str.to_utf8("A **bold phrase that\nspans two lines** here."), chat)) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
-expect Md.hostility(Str.to_utf8("some **bold** text and a [link](http://x.com)"), chat) == Renderable
+expect Str.from_utf8(Md.render_trusted_reflow("A **bold phrase that\nspans two lines** here.".to_utf8(), chat)) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
+expect Md.hostility("some **bold** text and a [link](http://x.com)".to_utf8(), chat) == Renderable
 # GFM's tables.
 expect md("| a | b |\n| :- | -: |\n| c |\n| d | e | f |") == "<table>\n<thead>\n<tr>\n<th align=\"left\">a</th>\n<th align=\"right\">b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align=\"left\">c</td>\n<td align=\"right\"></td>\n</tr>\n<tr>\n<td align=\"left\">d</td>\n<td align=\"right\">e</td>\n</tr>\n</tbody>\n</table>\n"
 expect md("see:\n| a |\n| - |\n\nafter") == "<p>see:</p>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n</table>\n<p>after</p>\n"

@@ -93,11 +93,7 @@ del = 127
 # ranges the code tests, and every check is held to it over all 256 bytes.
 
 all_bytes : List(U8)
-all_bytes = Iter.fold(
-	U8.to(0, 255),
-	[],
-	|acc, b| acc.append(b),
-)
+all_bytes = U8.to(0, 255).fold([], |acc, b| acc.append(b))
 
 ascii : List(U8)
 ascii = all_bytes.take_first(128)

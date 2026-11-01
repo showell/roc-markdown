@@ -89,9 +89,8 @@ MdEmphasis := [].{
 		[Hostile],
 	)
 	emphasis = |{ runs, budget }| {
-		n = List.len(runs)
-		var $runs = List.map_with_index(
-			runs,
+		n = runs.len()
+		var $runs = runs.map_with_index(
 			|run, k| {
 				..run,
 				below: if (k == 0) Edge else At(k - 1),
@@ -116,7 +115,7 @@ MdEmphasis := [].{
 				$closer = closer.above
 			} else {
 				slot = floor_key(closer)
-				bottom = List.get($bottoms, slot) ?? Edge
+				bottom = $bottoms.get(slot) ?? Edge
 				var $opener = closer.below
 				var $found = Bool.False
 				while $opener != Edge {
@@ -153,7 +152,7 @@ MdEmphasis := [].{
 								..opener,
 								count: opener.count - use,
 								above: At(ci),
-								opens: List.append(opener.opens, use),
+								opens: opener.opens.append(use),
 							},
 						},
 					)
@@ -165,7 +164,7 @@ MdEmphasis := [].{
 								..closer,
 								count: closer.count - use,
 								below: At(oi),
-								closes: List.append(closer.closes, use),
+								closes: closer.closes.append(use),
 							},
 						},
 					)
@@ -184,11 +183,7 @@ MdEmphasis := [].{
 					# A closer with delimiters left is looked at again.
 				} else {
 					$closer = closer.above
-					$bottoms = List.set(
-						$bottoms,
-						slot,
-						closer.below,
-					) ?? crash "MdEmphasis: a bottom's slot past the floor keys"
+					$bottoms = $bottoms.set(slot, closer.below) ?? crash "MdEmphasis: a bottom's slot past the floor keys"
 					if !closer.can_open {
 						$runs = unlinked($runs, ci)
 					} else {
@@ -202,7 +197,7 @@ MdEmphasis := [].{
 
 	## Run `k` of the line's runs.
 	run_at : List(DelimiterRun), U64 -> DelimiterRun
-	run_at = |runs, k| match List.get(runs, k) {
+	run_at = |runs, k| match runs.get(k) {
 		Ok(run) => run
 		Err(OutOfBounds) => crash "MdEmphasis: a run's index past the runs"
 	}
@@ -215,16 +210,13 @@ MdEmphasis := [].{
 	run_onto = |out, run| {
 		var $o = out
 		for use in run.closes {
-			$o = List.concat($o, if (run.char == '~') MdHtml.del_close else if (use == 2) MdHtml.strong_close else MdHtml.em_close)
+			$o = $o.concat(if (run.char == '~') MdHtml.del_close else if (use == 2) MdHtml.strong_close else MdHtml.em_close)
 		}
-		$o = List.concat($o, List.repeat(run.char, run.count))
-		var $n = List.len(run.opens)
+		$o = $o.concat(List.repeat(run.char, run.count))
+		var $n = run.opens.len()
 		while $n > 0 {
 			$n = $n - 1
-			$o = List.concat(
-				$o,
-				if (run.char == '~') MdHtml.del_open else if ((List.get(run.opens, $n) ?? 0) == 2) MdHtml.strong_open else MdHtml.em_open,
-			)
+			$o = $o.concat(if (run.char == '~') MdHtml.del_open else if ((run.opens.get($n) ?? 0) == 2) MdHtml.strong_open else MdHtml.em_open)
 		}
 		$o
 	}
@@ -240,11 +232,7 @@ index_of = |link| match link {
 }
 
 set_run : List(MdEmphasis.DelimiterRun), { at : U64, delimiters : MdEmphasis.DelimiterRun } -> List(MdEmphasis.DelimiterRun)
-set_run = |runs, { at, delimiters }| List.set(
-	runs,
-	at,
-	delimiters,
-) ?? crash "MdEmphasis: a run set past the runs"
+set_run = |runs, { at, delimiters }| runs.set(at, delimiters) ?? crash "MdEmphasis: a run set past the runs"
 
 ## **THE FLOOR'S KEY, COMMONMARK'S** (commonmark.js's `openers_bottom`,
 ## markdown-it's): a closer's character, whether it may also open, and its
@@ -293,7 +281,7 @@ flanking : List(U8),
 }
 flanking = |text, { start, end }| {
 	before = if (start == 0) ' ' else MdText.at(text, start - 1)
-	after = if (end >= List.len(text)) ' ' else MdText.at(text, end)
+	after = if (end >= text.len()) ' ' else MdText.at(text, end)
 	before_space = MdText.is_space(before)
 	after_space = MdText.is_space(after)
 	before_punct = Ascii.is_punctuation(before)
@@ -311,8 +299,8 @@ flanking = |text, { start, end }| {
 # the inline pass's part in it, and no other markup.
 em : Str -> Str
 em = |line| {
-	text = Str.to_utf8(line)
-	len = List.len(text)
+	text = line.to_utf8()
+	len = text.len()
 	var $runs = []
 	var $texts = []
 	var $text_start = 0
@@ -324,8 +312,8 @@ em = |line| {
 			while $end < len and MdText.at(text, $end) == c {
 				$end = $end + 1
 			}
-			$texts = List.append($texts, MdText.cut(text, { start: $text_start, end: $i }))
-			$runs = List.append($runs, MdEmphasis.delimiter_run(text, { start: $i, end: $end }))
+			$texts = $texts.append(MdText.cut(text, { start: $text_start, end: $i }))
+			$runs = $runs.append(MdEmphasis.delimiter_run(text, { start: $i, end: $end }))
 			$i = $end
 			$text_start = $end
 		} else {
@@ -339,10 +327,10 @@ em = |line| {
 	var $out = []
 	var $k = 0
 	for run in matched {
-		$out = MdEmphasis.run_onto(List.concat($out, List.get($texts, $k) ?? []), run)
+		$out = MdEmphasis.run_onto($out.concat($texts.get($k) ?? []), run)
 		$k = $k + 1
 	}
-	Str.from_utf8(List.concat($out, MdText.cut(text, { start: $text_start, end: len }))) ?? "not text"
+	Str.from_utf8($out.concat(MdText.cut(text, { start: $text_start, end: len }))) ?? "not text"
 }
 
 # The nearest opener wins, and two from each side is `<strong>`.
