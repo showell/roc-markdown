@@ -60,6 +60,13 @@ MdFence := [].{
 		Ok({ open: fence, body_start: MdText.next_line(md, eol) })
 	}
 
+	## The info string after the language, on the opening line `line`.
+	args : List(U8), Open -> List(U8)
+	args = |line, open_line| {
+		info = Bytes.trim(line.drop_first(open_line.indent + open_line.count), info_space)
+		Bytes.trim(info.drop_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })), info_space)
+	}
+
 	## Up to three spaces, at least `count` of
 	## `char`, then only whitespace (a close carries no info string).
 	is_close : List(U8), { char : U8, count : U64 } -> Bool
@@ -119,6 +126,8 @@ expect MdFence.open("```zig".to_utf8()) == Ok({
 	indent: 0,
 	lang: "zig".to_utf8(),
 })
+expect MdFence.args("  ```widget  big sky ".to_utf8(), { char: '`', count: 3, indent: 2, lang: "widget".to_utf8() }) == "big sky".to_utf8()
+expect MdFence.args("```widget".to_utf8(), { char: '`', count: 3, indent: 0, lang: "widget".to_utf8() }) == []
 expect MdFence.open("plain text".to_utf8()) == Err(NotAFence)
 expect MdFence.open("~~ short".to_utf8()) == Err(NotAFence)
 expect MdFence.open("```a`b".to_utf8()) == Err(NotAFence)
