@@ -795,7 +795,7 @@ expect doc("```roc\na<b\n```") == "<pre><code class=\"language-roc\">a&lt;b\n</c
 expect doc("```\na\n```") == "<pre><code>a\n</code></pre>\n"
 expect doc("  ```dot\n  a\n   b\n  ```") == "<svg>a\n b\n</svg>\n"
 expect doc("- x\n\n  ```dot\n  a\n  ```\n") == "<ul>\n<li>\n<p>x</p>\n<svg>a\n</svg>\n</li>\n</ul>\n"
-# A chat has no hook: the same fences are code, whatever a caller's rule.
+# A chat has no hook, so the same fences are code.
 expect md("```widget sky\n```\n") == "<pre><code class=\"language-widget\"></code></pre>\n"
 expect md("```dot\na -> b\n```") == "<pre><code class=\"language-dot\">a -&gt; b\n</code></pre>\n"
 
@@ -812,6 +812,10 @@ expect doc("[a MSG_x_1](https://y.org)") == "<p><a href=\"https://y.org\">a MSG_
 expect doc("![b](https://x.org/i.png)") == "<p><a href=\"https://x.org/i.png\">b</a></p>\n"
 expect md("![b](https://x.org/i.png)") == "<p><a href=\"https://x.org/i.png\" target=\"_blank\" rel=\"noopener\">b</a></p>\n"
 expect doc("[js](javascript:alert(1))") == "<p>[js](javascript:alert(1))</p>\n"
+
+# Tables and nested lists are the chat's, in a document too.
+expect doc("| a | b |\n| - | :-: |\n| c | `d` |\n") == md("| a | b |\n| - | :-: |\n| c | `d` |\n")
+expect doc("- a\n  - b\n\n    ```roc\n    c\n    ```\n- d\n") == md("- a\n  - b\n\n    ```roc\n    c\n    ```\n- d\n")
 
 # A newline is a space, and raw HTML is escaped, media and all.
 expect doc("a\nb") == "<p>a b</p>\n"
@@ -831,10 +835,11 @@ expect Md.render_document("# A\n\n> ## A\n\n- ## `A`\n".to_utf8(), { fence: widg
 ]
 # A heading in a code block is code, and a hook's own stay as the hook wrote them.
 expect Md.render_document("```\n## no\n```".to_utf8(), { fence: widgets }).headings == []
+expect Md.render_document("<h2 id=\"\">x</h2>\n\na <h2 id=\"\">b</h2>".to_utf8(), { fence: widgets }).headings == []
 expect doc("```heading\n```\n# mine") == "<h2>mine</h2>\n<h2 id=\"x\">too</h2>\n<h1 id=\"mine\">mine</h1>\n"
 
-# The chat's answers for a text with every feature here, frozen before
-# document mode, in each mode a chat has.
+# The chat's answers for a text with every feature here, in each mode a
+# chat has.
 every_feature : Str
 every_feature = "# a MSG_x_1\n\nb\nc [d](https://x.org) https://y.org\n\n```quote\ne\n```\n\n```dot\nf\n```\n\n| g |\n| - |\n| h |\n\n<video src=\"/user_uploads/i.mp4\"></video>\n"
 
