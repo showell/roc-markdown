@@ -4,6 +4,8 @@
 ## very grammar the renderer does. Pure.
 import Bytes
 import MdChat
+import MdDialect
+import MdHtml
 import MdText
 
 MdFence := [].{
@@ -67,6 +69,63 @@ MdFence := [].{
 		Bytes.trim(info.drop_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })), info_space)
 	}
 
+	## The code block, up to its closing fence or the
+	## end (an unclosed fence runs to the end). Its body is charged whole, its
+	## close-scan and escape being linear in it; no check follows here.
+	fence_onto : List(U8),
+	{
+		md : List(U8),
+		open : { open : MdFence.Open, body_start : U64 },
+		line : List(U8),
+		budget : MdText.Budget,
+		dialect : MdDialect.Dialect,
+	} -> MdText.Block
+	fence_onto = |
+		out,
+		{
+			md,
+			open: { open: fence, body_start },
+			line,
+			budget,
+			dialect,
+		},
+	| {
+		len = md.len()
+		var $content_end = len
+		var $after = len
+		var $p = body_start
+		while $p < len {
+			eol = MdText.line_end(md, $p)
+			if MdFence.is_close(
+				MdText.cut(md, { start: $p, end: eol }),
+				{ char: fence.char, count: fence.count },
+			) {
+				$content_end = $p
+				$after = MdText.next_line(md, eol)
+				break
+			} else {
+				$p = MdText.next_line(md, eol)
+			}
+		}
+		content = MdText.cut(md, { start: body_start, end: $content_end })
+		body = dedented({ content, indent: fence.indent })
+		code = || MdText.escape_onto(MdHtml.code_block_open(fence.lang), body).concat(MdHtml.code_block_close)
+		block = match dialect {
+			Chat if MdChat.is_quote_fence(fence.lang) => MdText.escape_onto(MdHtml.chat_quote_open, body).concat(MdHtml.chat_quote_close)
+			Chat => code()
+			Document(options) =>
+				match (options.fence)({ tag: fence.lang, args: MdFence.args(line, fence), body }) {
+					Html(html) => html
+					Pass => code()
+				}
+		}
+		{
+			out: out.concat(block),
+			budget: MdText.charge(budget, content.len()),
+			after: $after,
+		}
+	}
+
 	## Up to three spaces, at least `count` of
 	## `char`, then only whitespace (a close carries no info string).
 	is_close : List(U8), { char : U8, count : U64 } -> Bool
@@ -103,6 +162,23 @@ MdFence := [].{
 		}
 		$j
 	}
+}
+
+## Each line ended with a newline, less up to the fence's own indent of
+## spaces.
+dedented : { content : List(U8), indent : U64 } -> List(U8)
+dedented = |{ content, indent }| {
+	len = content.len()
+	var $out = []
+	var $i = 0
+	while $i < len {
+		eol = MdText.line_end(content, $i)
+		line = MdText.cut(content, { start: $i, end: eol })
+		strip = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(indent)
+		$out = $out.concat(line.drop_first(strip)).append('\n')
+		$i = MdText.next_line(content, eol)
+	}
+	$out
 }
 
 info_space : List(U8)

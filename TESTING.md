@@ -133,9 +133,12 @@ as its uploads rule, as roc-chat does).
 | Path | What |
 |---|---|
 | `package/main.roc` | the package and what it exposes |
-| `package/Md.roc` | the API, the modes, the block dispatch and the leaf blocks |
-| `package/MdList.roc`, `MdQuote.roc` | the container blocks, handed the dispatch by `Md` |
-| `package/MdTable.roc`, `MdFence.roc` | tables, and code fences |
+| `package/Md.roc` | the API, the modes, and the expects of whole messages and pages |
+| `package/MdBlocks.roc` | the block dispatch and paragraphs |
+| `package/MdDialect.roc` | what a chat and a document read differently |
+| `package/MdList.roc`, `MdQuote.roc` | the container blocks, handed the dispatch by `MdBlocks` |
+| `package/MdTable.roc`, `MdTableBlock.roc` | a table's grammar, and the table rendered |
+| `package/MdFence.roc`, `MdHeading.roc`, `MdRawHtml.roc` | code fences, headings and raw HTML blocks |
 | `package/MdInline.roc` | the inline pass: a line's pieces and code spans |
 | `package/MdEmphasis.roc` | the emphasis engine, CommonMark's delimiter stack |
 | `package/MdLinks.roc` | links and autolinks |

@@ -6,6 +6,7 @@
 import Ascii
 import Bytes
 import MdHtml
+import MdSafety
 import MdText
 
 MdDocument := [].{
@@ -21,6 +22,10 @@ MdDocument := [].{
 	## The caller's answer for a fence. `Html` goes out as it is, unescaped,
 	## and `Pass` leaves the fence to render as ordinary code.
 	FenceHook : Fence -> [Html(List(U8)), Pass]
+
+	## How a document's render treats a fenced block it doesn't know, and how
+	## its `![alt](src)` appears. Neither has a default.
+	Options : { fence : FenceHook, images : MdSafety.Images }
 
 	## A heading, for a table of contents. Its `text` is plain and unescaped.
 	Heading : {
