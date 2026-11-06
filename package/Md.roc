@@ -29,6 +29,7 @@ import Ascii
 import Bytes
 import MdText
 import MdChat
+import MdDocument
 import MdFence
 import MdHtml
 import MdInline
@@ -59,18 +60,28 @@ Md := [].{
 	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
 	render : List(U8), Md.Options -> List(U8)
-	render = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads })
+	render = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads, dialect: Chat })
 
 	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
 	render_trusted : List(U8), Md.Options -> List(U8)
-	render_trusted = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.unlimited, uploads })
+	render_trusted = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.unlimited, uploads, dialect: Chat })
 
 	## Server-owned prose, whose source line
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
-	render_trusted_reflow = |md, { uploads }| rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads })
+	render_trusted_reflow = |md, { uploads }| rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads, dialect: Chat })
+
+	## How a document's render treats a fenced block it doesn't know.
+	DocumentOptions : { fence : MdDocument.FenceHook }
+
+	## Server-owned prose as a page of a book. It has no budget and no chat
+	## syntax, a newline is a space, a link to another site stays in its tab,
+	## raw HTML is escaped, and each heading has an id. The hook is the one
+	## way in for HTML of the caller's own.
+	render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered
+	render_document = |md, { fence }| MdDocument.named(rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads: no_uploads, dialect: Document(fence) }))
 
 	## Text made safe for HTML, an element's content or an attribute's value
 	## (either quote): `&`, `<`, `>`, `"` and `'` as entities, every other
@@ -81,7 +92,7 @@ Md := [].{
 	## The work a render of `md` costs, unlimited, the
 	## measure the budget caps.
 	work_units : List(U8), Md.Options -> U64
-	work_units = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.unlimited, uploads }) {
+	work_units = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.unlimited, uploads, dialect: Chat }) {
 		Ok(done) => done.budget.spent
 		Err(Hostile) => crash "Md.work_units: an unlimited budget blown"
 	}
@@ -89,7 +100,7 @@ Md := [].{
 	## Whether `md` would blow its budget, so a POST
 	## refuses it. One render in good faith with the real budget.
 	hostility : List(U8), Md.Options -> [Renderable, TooMuchFormatting]
-	hostility = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads }) {
+	hostility = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads, dialect: Chat }) {
 		Ok(_) => Renderable
 		Err(Hostile) => TooMuchFormatting
 	}
@@ -104,10 +115,13 @@ Md := [].{
 	malformed_html = MdHtml.malformed
 }
 
+## A chat's syntax, or a document's, with the hook its fences go through.
+Dialect : [Chat, Document(MdDocument.FenceHook)]
+
 ## The one seed every render grows from: `md`'s blocks from the top, as a
 ## document's, in `wrap` and against `budget`.
-run : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads } -> Try(MdText.Rendered, [Hostile])
-run = |md, { wrap, budget, uploads }| blocks_onto({
+run : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : Dialect } -> Try(MdText.Rendered, [Hostile])
+run = |md, { wrap, budget, uploads, dialect }| blocks_onto({
 	out: [],
 	md,
 	spacing: Loose,
@@ -115,10 +129,11 @@ run = |md, { wrap, budget, uploads }| blocks_onto({
 	wrap,
 	budget,
 	uploads,
+	dialect,
 })
 
-rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads } -> List(U8)
-rendered = |md, { wrap, budget, uploads }| match run(md, { wrap, budget, uploads }) {
+rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : Dialect } -> List(U8)
+rendered = |md, { wrap, budget, uploads, dialect }| match run(md, { wrap, budget, uploads, dialect }) {
 	Ok(done) => done.out
 	Err(Hostile) => Md.malformed_html
 }
@@ -141,6 +156,7 @@ blocks_onto : {
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
 	uploads : MdSafety.Uploads,
+	dialect : Dialect,
 } -> Try(MdText.Rendered, [Hostile])
 blocks_onto = |
 	{
@@ -151,6 +167,7 @@ blocks_onto = |
 		wrap,
 		budget,
 		uploads,
+		dialect,
 	},
 |
 	if depth > max_block_depth {
@@ -158,7 +175,7 @@ blocks_onto = |
 		flat = MdInline.render_onto({
 			out: start.concat(MdHtml.p_open),
 			text: md,
-			refs: Linked,
+			refs: inline_refs(dialect),
 			budget,
 			uploads,
 		})?
@@ -176,6 +193,7 @@ blocks_onto = |
 			wrap,
 			budget: inner.budget,
 			uploads,
+			dialect,
 		})
 		var $out = out
 		var $budget = budget
@@ -205,6 +223,7 @@ blocks_onto = |
 						budget: $budget,
 						nested,
 						uploads,
+						dialect,
 					},
 				)?
 				$out = block.out
@@ -231,6 +250,7 @@ block_at : List(U8),
 	budget : MdText.Budget,
 	nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
 	uploads : MdSafety.Uploads,
+	dialect : Dialect,
 } -> Try(MdText.Block, [Hostile])
 block_at = |
 	out,
@@ -244,13 +264,14 @@ block_at = |
 		budget,
 		nested,
 		uploads,
+		dialect,
 	},
 |
 	match MdFence.open_at(md, pos) {
-		Ok(open) => Ok(fence_onto(out, { md, open, budget }))
+		Ok(open) => Ok(fence_onto(out, { md, open, line, budget, dialect }))
 		Err(NotAFence) =>
 			match atx_heading(line) {
-				Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads })
+				Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads, dialect })
 				Err(NotAHeading) =>
 					match MdList.list_marker_at(md, pos) {
 						Ok(marker) => MdList.list_onto(out, { md, pos, first: marker, budget, nested, is_block_start })
@@ -260,21 +281,26 @@ block_at = |
 							} else if is_html_block_start(line) {
 								Ok(raw_html_onto(out, { md, pos, budget, uploads }))
 							} else if MdTable.is_table_at(md, pos) {
-								table_onto(out, { md, pos, budget, uploads })
+								table_onto(out, { md, pos, budget, uploads, dialect })
 							} else {
-								paragraph_onto(out, { md, pos, spacing, wrap, budget, uploads })
+								paragraph_onto(out, { md, pos, spacing, wrap, budget, uploads, dialect })
 							}
 					}
 			}
 	}
 
 ## An ATX heading, its content's inlines rendered between its tags.
-heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> Try(MdText.Block, [Hostile])
-heading_onto = |out, { level, content, after, budget, uploads }| {
+heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : Dialect } -> Try(MdText.Block, [Hostile])
+heading_onto = |out, { level, content, after, budget, uploads, dialect }| {
 	heading = MdInline.render_onto({
-		out: out.concat(MdHtml.heading_open(level)),
+		out: out.concat(
+			match dialect {
+				Chat => MdHtml.heading_open(level)
+				Document(_) => MdHtml.heading_open_with_id(level, [])
+			},
+		),
 		text: content,
-		refs: Linked,
+		refs: inline_refs(dialect),
 		budget,
 		uploads,
 	})?
@@ -300,6 +326,7 @@ paragraph_onto : List(U8),
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
 	uploads : MdSafety.Uploads,
+	dialect : Dialect,
 } -> Try(MdText.Block, [Hostile])
 paragraph_onto = |
 	out,
@@ -310,6 +337,7 @@ paragraph_onto = |
 		wrap,
 		budget,
 		uploads,
+		dialect,
 	},
 | {
 	len = md.len()
@@ -346,7 +374,7 @@ paragraph_onto = |
 				broke = MdInline.render_onto({
 					out: $out,
 					text: $reflow,
-					refs: Linked,
+					refs: inline_refs(dialect),
 					budget: $budget,
 					uploads,
 				})?
@@ -360,7 +388,7 @@ paragraph_onto = |
 			wrapped = MdInline.render_onto({
 				out: if ($k == 0) $out else $out.concat(MdHtml.br),
 				text,
-				refs: Linked,
+				refs: inline_refs(dialect),
 				budget: $budget,
 				uploads,
 			})?
@@ -373,7 +401,7 @@ paragraph_onto = |
 		joined = MdInline.render_onto({
 			out: $out,
 			text: $reflow,
-			refs: Linked,
+			refs: inline_refs(dialect),
 			budget: $budget,
 			uploads,
 		})?
@@ -394,6 +422,13 @@ paragraph_onto = |
 ends_in_hard_break : List(U8) -> Bool
 ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
 
+## How the inline pass reads a dialect's text.
+inline_refs : Dialect -> [Linked, InLabel, Document]
+inline_refs = |dialect| match dialect {
+	Chat => Linked
+	Document(_) => Document
+}
+
 ## Inside a tight list item, a block after a bare
 ## paragraph starts on a line of its own.
 tight_sep : List(U8), [Tight, Loose] -> List(U8)
@@ -411,14 +446,18 @@ fence_onto : List(U8),
 {
 	md : List(U8),
 	open : { open : MdFence.Open, body_start : U64 },
+	line : List(U8),
 	budget : MdText.Budget,
+	dialect : Dialect,
 } -> MdText.Block
 fence_onto = |
 	out,
 	{
 		md,
 		open: { open, body_start },
+		line,
 		budget,
+		dialect,
 	},
 | {
 	len = md.len()
@@ -439,28 +478,36 @@ fence_onto = |
 		}
 	}
 	content = MdText.cut(md, { start: body_start, end: $content_end })
-	is_quote = MdChat.is_quote_fence(open.lang)
-	(head, tail) = if (is_quote) (MdHtml.chat_quote_open, MdHtml.chat_quote_close) else (MdHtml.code_block_open(open.lang), MdHtml.code_block_close)
-	code = code_lines_onto(out.concat(head), { content, indent: open.indent })
+	body = dedented({ content, indent: open.indent })
+	code = || MdText.escape_onto(MdHtml.code_block_open(open.lang), body).concat(MdHtml.code_block_close)
+	block = match dialect {
+		Chat if MdChat.is_quote_fence(open.lang) => MdText.escape_onto(MdHtml.chat_quote_open, body).concat(MdHtml.chat_quote_close)
+		Chat => code()
+		Document(hook) =>
+			match hook({ tag: open.lang, args: MdFence.args(line, open), body }) {
+				Html(html) => html
+				Pass => code()
+			}
+	}
 	{
-		out: code.concat(tail),
+		out: out.concat(block),
 		budget: MdText.charge(budget, content.len()),
 		after: $after,
 	}
 }
 
-## Each line escaped and ended with a newline,
-## less up to the fence's own indent of spaces.
-code_lines_onto : List(U8), { content : List(U8), indent : U64 } -> List(U8)
-code_lines_onto = |out, { content, indent }| {
+## Each line ended with a newline, less up to the fence's own indent of
+## spaces.
+dedented : { content : List(U8), indent : U64 } -> List(U8)
+dedented = |{ content, indent }| {
 	len = content.len()
-	var $out = out
+	var $out = []
 	var $i = 0
 	while $i < len {
 		eol = MdText.line_end(content, $i)
 		line = MdText.cut(content, { start: $i, end: eol })
 		strip = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(indent)
-		$out = MdText.escape_onto($out, line.drop_first(strip)).append('\n')
+		$out = $out.concat(line.drop_first(strip)).append('\n')
 		$i = MdText.next_line(content, eol)
 	}
 	$out
@@ -522,14 +569,15 @@ table_onto : List(U8),
 	pos : U64,
 	budget : MdText.Budget,
 	uploads : MdSafety.Uploads,
+	dialect : Dialect,
 } -> Try(MdText.Block, [Hostile])
-table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos) {
+table_onto = |out, { md, pos, budget, uploads, dialect }| match MdTable.table_at(md, pos) {
 	Err(NotATable) => crash "Md.table_onto: no table where the dispatcher found one"
 	Ok(table) => {
 		len = md.len()
 		head = row_onto(
 			out.concat(MdHtml.table_open),
-			{ cells: table.header, aligns: table.aligns, tag: Th, budget, uploads },
+			{ cells: table.header, aligns: table.aligns, tag: Th, budget, uploads, dialect },
 		)?
 		var $out = head.out.concat(MdHtml.thead_close)
 		var $budget = head.budget
@@ -545,6 +593,7 @@ table_onto = |out, { md, pos, budget, uploads }| match MdTable.table_at(md, pos)
 					tag: Td,
 					budget: $budget,
 					uploads,
+					dialect,
 				},
 			)?
 			$out = row.out
@@ -569,8 +618,9 @@ row_onto : List(U8),
 	tag : [Th, Td],
 	budget : MdText.Budget,
 	uploads : MdSafety.Uploads,
+	dialect : Dialect,
 } -> Try(MdText.Rendered, [Hostile])
-row_onto = |out, { cells, aligns, tag, budget, uploads }| {
+row_onto = |out, { cells, aligns, tag, budget, uploads, dialect }| {
 	var $out = out.concat(MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
 	var $k = 0
@@ -584,7 +634,7 @@ row_onto = |out, { cells, aligns, tag, budget, uploads }| {
 		cell = MdInline.render_onto({
 			out: $out.concat(MdHtml.cell_open(tag, align)),
 			text: cells.get($k) ?? [],
-			refs: Linked,
+			refs: inline_refs(dialect),
 			budget: $budget,
 			uploads,
 		})?
@@ -721,3 +771,77 @@ expect md("| a | b |\n| - | - |\n| `x|y` |") == "<table>\n<thead>\n<tr>\n<th>a</
 expect md("- | a |\n  | - |\n  | b |\n- next") == "<ul>\n<li>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>b</td>\n</tr>\n</tbody>\n</table>\n</li>\n<li>next</li>\n</ul>\n"
 # No line is lazy after a quoted table: its rows are no paragraph.
 expect md("> | a |\n> | - |\n> | MSG_x_1 |\nlazy") == "<blockquote>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><a href=\"#msg-x_1\" class=\"msg-ref\">MSG_x_1</a></td>\n</tr>\n</tbody>\n</table>\n</blockquote>\n<p>lazy</p>\n"
+
+# A document's render, and a chat's of the same text beside it.
+widgets : MdDocument.FenceHook
+widgets = |{ tag, args, body }|
+	if tag == "widget".to_utf8() {
+		Html("<iframe src=\"/w/".to_utf8().concat(args).concat("\"></iframe>\n".to_utf8()))
+	} else if tag == "dot".to_utf8() {
+		Html("<svg>".to_utf8().concat(body).concat("</svg>\n".to_utf8()))
+	} else if tag == "heading".to_utf8() {
+		Html("<h2>mine</h2>\n<h2 id=\"x\">too</h2>\n".to_utf8())
+	} else {
+		Pass
+	}
+
+doc : Str -> Str
+doc = |text| Str.from_utf8(Md.render_document(text.to_utf8(), { fence: widgets }).html) ?? "not text"
+
+# The hook answers with HTML, unescaped, or passes the fence on as code.
+expect doc("```widget sky\n```\n") == "<iframe src=\"/w/sky\"></iframe>\n"
+expect doc("```dot\na -> b\n```") == "<svg>a -> b\n</svg>\n"
+expect doc("```roc\na<b\n```") == "<pre><code class=\"language-roc\">a&lt;b\n</code></pre>\n"
+expect doc("```\na\n```") == "<pre><code>a\n</code></pre>\n"
+expect doc("  ```dot\n  a\n   b\n  ```") == "<svg>a\n b\n</svg>\n"
+expect doc("- x\n\n  ```dot\n  a\n  ```\n") == "<ul>\n<li>\n<p>x</p>\n<svg>a\n</svg>\n</li>\n</ul>\n"
+# A chat has no hook: the same fences are code, whatever a caller's rule.
+expect md("```widget sky\n```\n") == "<pre><code class=\"language-widget\"></code></pre>\n"
+expect md("```dot\na -> b\n```") == "<pre><code class=\"language-dot\">a -&gt; b\n</code></pre>\n"
+
+# The chat's syntax is off in a document, and on in a chat.
+expect doc("see MSG_plans_3") == "<p>see MSG_plans_3</p>\n"
+expect md("see MSG_plans_3") == "<p>see <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></p>\n"
+expect doc("```quote\nhi\n```") == "<pre><code class=\"language-quote\">hi\n</code></pre>\n"
+expect md("```quote\nhi\n```") == "<pre class=\"chat-quote\">hi\n</pre>\n"
+
+# A link to another site stays in its tab in a document, in every form.
+expect doc("[a](https://x.org) https://y.org www.z.org") == "<p><a href=\"https://x.org\">a</a> <a href=\"https://y.org\">https://y.org</a> <a href=\"http://www.z.org\">www.z.org</a></p>\n"
+expect md("[a](https://x.org) https://y.org www.z.org") == "<p><a href=\"https://x.org\" target=\"_blank\" rel=\"noopener\">a</a> <a href=\"https://y.org\" target=\"_blank\" rel=\"noopener\">https://y.org</a> <a href=\"http://www.z.org\" target=\"_blank\" rel=\"noopener\">www.z.org</a></p>\n"
+expect doc("[a MSG_x_1](https://y.org)") == "<p><a href=\"https://y.org\">a MSG_x_1</a></p>\n"
+expect doc("![b](https://x.org/i.png)") == "<p><a href=\"https://x.org/i.png\">b</a></p>\n"
+expect md("![b](https://x.org/i.png)") == "<p><a href=\"https://x.org/i.png\" target=\"_blank\" rel=\"noopener\">b</a></p>\n"
+expect doc("[js](javascript:alert(1))") == "<p>[js](javascript:alert(1))</p>\n"
+
+# A newline is a space, and raw HTML is escaped, media and all.
+expect doc("a\nb") == "<p>a b</p>\n"
+expect md("a\nb") == "<p>a<br>\nb</p>\n"
+expect doc("<div>x</div>") == "<p>&lt;div&gt;x&lt;/div&gt;</p>\n"
+expect doc("<video src=\"/user_uploads/a.mp4\"></video>") == "<p>&lt;video src=&quot;/user_uploads/a.mp4&quot;&gt;&lt;/video&gt;</p>\n"
+expect doc("<img src=\"/user_uploads/a.png\">") == "&lt;img src=&quot;/user_uploads/a.png&quot;&gt;"
+expect md("<img src=\"/user_uploads/a.png\">") == "<img src=\"/user_uploads/a.png\">"
+
+# A document's headings have ids, wherever they stand; a chat's have none.
+expect doc("## The *sky*") == "<h2 id=\"the-sky\">The <em>sky</em></h2>\n"
+expect md("## The *sky*") == "<h2>The <em>sky</em></h2>\n"
+expect Md.render_document("# A\n\n> ## A\n\n- ## `A`\n".to_utf8(), { fence: widgets }).headings == [
+	{ level: 1, id: "a".to_utf8(), text: "A".to_utf8() },
+	{ level: 2, id: "a-2".to_utf8(), text: "A".to_utf8() },
+	{ level: 2, id: "a-3".to_utf8(), text: "A".to_utf8() },
+]
+# A heading in a code block is code, and a hook's own stay as the hook wrote them.
+expect Md.render_document("```\n## no\n```".to_utf8(), { fence: widgets }).headings == []
+expect doc("```heading\n```\n# mine") == "<h2>mine</h2>\n<h2 id=\"x\">too</h2>\n<h1 id=\"mine\">mine</h1>\n"
+
+# The chat's answers for a text with every feature here, frozen before
+# document mode, in each mode a chat has.
+every_feature : Str
+every_feature = "# a MSG_x_1\n\nb\nc [d](https://x.org) https://y.org\n\n```quote\ne\n```\n\n```dot\nf\n```\n\n| g |\n| - |\n| h |\n\n<video src=\"/user_uploads/i.mp4\"></video>\n"
+
+every_feature_html : Str -> Str
+every_feature_html = |line_join| "<h1>a <a href=\"#msg-x_1\" class=\"msg-ref\">MSG_x_1</a></h1>\n<p>b${line_join}c <a href=\"https://x.org\" target=\"_blank\" rel=\"noopener\">d</a> <a href=\"https://y.org\" target=\"_blank\" rel=\"noopener\">https://y.org</a></p>\n<pre class=\"chat-quote\">e\n</pre>\n<pre><code class=\"language-dot\">f\n</code></pre>\n<table>\n<thead>\n<tr>\n<th>g</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>h</td>\n</tr>\n</tbody>\n</table>\n<p><video controls preload=\"metadata\" src=\"/user_uploads/i.mp4\"></video></p>\n"
+
+expect md(every_feature) == every_feature_html("<br>\n")
+expect Str.from_utf8(Md.render_trusted(every_feature.to_utf8(), chat)) == Ok(every_feature_html("<br>\n"))
+expect Str.from_utf8(Md.render_trusted_reflow(every_feature.to_utf8(), chat)) == Ok(every_feature_html(" "))
+expect Md.hostility(every_feature.to_utf8(), chat) == Renderable

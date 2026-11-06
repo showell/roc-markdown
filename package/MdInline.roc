@@ -33,11 +33,13 @@ MdInline := [].{
 
 	## `text` rendered onto `out`. `Linked`
 	## turns the chat's `MSG_` reference (MdChat) into its link; `InLabel` leaves it text, as a
-	## link's label must be, being inside an `<a>` already.
+	## link's label must be, being inside an `<a>` already. `Document` has no
+	## reference, in or out of a label, and its links to other sites stay in
+	## their tab.
 	render_onto : {
 		out : List(U8),
 		text : List(U8),
-		refs : [Linked, InLabel],
+		refs : [Linked, InLabel, Document],
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
@@ -51,6 +53,8 @@ MdInline := [].{
 		},
 	| {
 		len = text.len()
+		outside = if (refs == Document) SameTab else NewTab
+		label_refs = if (refs == Document) Document else InLabel
 		var $budget = budget
 		var $pieces = []
 		var $runs = []
@@ -127,7 +131,7 @@ MdInline := [].{
 									alt = MdInline.render_onto({
 										out: [],
 										text: MdText.cut(text, found.link.label),
-										refs: InLabel,
+										refs: label_refs,
 										budget: $budget,
 										uploads,
 									})?
@@ -165,9 +169,9 @@ MdInline := [].{
 								# The label is a line of its own, rendered `InLabel`
 								# inside the `<a>`.
 								label = MdInline.render_onto({
-									out: MdLinks.link_open(link.url),
+									out: MdLinks.link_open(link.url, outside),
 									text: MdText.cut(text, link.label),
-									refs: InLabel,
+									refs: label_refs,
 									budget: $budget,
 									uploads,
 								})?
@@ -203,7 +207,7 @@ MdInline := [].{
 						match found.link {
 							Ok(link) =>
 								Token(
-									Html(MdLinks.autolink_html(MdText.cut(text, { start: $i, end: link.end }), link.kind)),
+									Html(MdLinks.autolink_html(MdText.cut(text, { start: $i, end: link.end }), link.kind, outside)),
 									link.end,
 								)
 							Err(NotALink) => Skip($i + 1)

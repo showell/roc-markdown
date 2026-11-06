@@ -28,6 +28,11 @@ MdHtml := [].{
 	heading_open : U64 -> List(U8)
 	heading_open = |level| ['<', 'h', heading_digit(level), '>']
 
+	## A document's heading with its id. Empty, it is the mark MdDocument looks
+	## for, so a heading a caller's hook wrote stays as the hook wrote it.
+	heading_open_with_id : U64, List(U8) -> List(U8)
+	heading_open_with_id = |level, id| ['<', 'h', heading_digit(level)].concat(" id=\"".to_utf8()).concat(id).concat(['"', '>'])
+
 	heading_close : U64 -> List(U8)
 	heading_close = |level| ['<', '/', 'h', heading_digit(level), '>', '\n']
 

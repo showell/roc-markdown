@@ -161,14 +161,14 @@ MdLinks := [].{
 		Ok(MdHtml.img(attrs))
 	}
 
-	## A `[label](url)` link's opening tag, a new tab when external
-	## (MdSafety's rule). MdInline never asks it of a dangerous url (such a
-	## link is shown as its source); the href is still dropped here, so the
-	## sink stays safe whatever its callers do.
-	link_open : List(U8) -> List(U8)
-	link_open = |url| MdHtml.link_open({
+	## A `[label](url)` link's opening tag, `outside` saying how a link to
+	## another site opens (MdSafety's rule). MdInline never asks it of a
+	## dangerous url (such a link is shown as its source); the href is still
+	## dropped here, so the sink stays safe whatever its callers do.
+	link_open : List(U8), [SameTab, NewTab] -> List(U8)
+	link_open = |url, outside| MdHtml.link_open({
 		href: if (MdSafety.is_dangerous_url(url)) [] else url,
-		tab: if (MdSafety.is_external_href(url)) NewTab else SameTab,
+		tab: if (MdSafety.is_external_href(url)) outside else SameTab,
 	})
 
 	## An autolink starts only at the line's
@@ -255,12 +255,12 @@ MdLinks := [].{
 	}
 
 	## The link, a URL's and a `www.`'s opening
-	## in a new tab, an email's as `mailto:`.
-	autolink_html : List(U8), AutoKind -> List(U8)
-	autolink_html = |link, kind| {
+	## as `outside` says, an email's as `mailto:`.
+	autolink_html : List(U8), AutoKind, [SameTab, NewTab] -> List(U8)
+	autolink_html = |link, kind, outside| {
 		head = match kind {
-			Url => MdHtml.link_open({ href: link, tab: NewTab })
-			Www => MdHtml.link_open({ href: "http://".to_utf8().concat(link), tab: NewTab })
+			Url => MdHtml.link_open({ href: link, tab: outside })
+			Www => MdHtml.link_open({ href: "http://".to_utf8().concat(link), tab: outside })
 			Email => MdHtml.link_open({ href: "mailto:".to_utf8().concat(link), tab: SameTab })
 		}
 		MdText.escape_onto(head, link).concat(MdHtml.link_close)
