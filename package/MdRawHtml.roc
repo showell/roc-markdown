@@ -9,13 +9,21 @@ MdRawHtml := [].{
 
 	## A raw block, every same-origin `<img>` and
 	## `<video>` rebuilt (MdMedia), every other byte escaped. One unit a byte.
-	raw_html_onto : List(U8), { md : List(U8), line_start : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> MdText.Block
+	raw_html_onto : List(U8),
+	{
+		md : List(U8),
+		line_start : U64,
+		budget : MdText.Budget,
+		uploads : MdSafety.Uploads,
+	} -> MdText.Block
 	raw_html_onto = |out, { md, line_start, budget, uploads }| {
 		# CommonMark's type 7: only at a block's start, and up to a blank line,
 		# with no <p> and no newline added.
 		md_len = md.len()
 		var $p = MdText.next_line(md, MdText.line_end(md, line_start))
-		while $p < md_len and !MdText.is_blank(MdText.cut(md, { start: $p, end: MdText.line_end(md, $p) })) {
+		while $p < md_len and !MdText.is_blank(
+			MdText.cut(md, { start: $p, end: MdText.line_end(md, $p) }),
+		) {
 			$p = MdText.next_line(md, MdText.line_end(md, $p))
 		}
 		raw = MdText.cut(md, { start: line_start, end: $p })
@@ -33,7 +41,10 @@ MdRawHtml := [].{
 				}
 				match safe {
 					Ok(tag) => {
-						$out = MdText.escape_onto($out, MdText.cut(raw, { start: $last, end: $i })).concat(tag.html)
+						$out = MdText.escape_onto(
+							$out,
+							MdText.cut(raw, { start: $last, end: $i }),
+						).concat(tag.html)
 						$i = tag.end
 						$last = tag.end
 					}

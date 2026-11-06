@@ -22,7 +22,11 @@ MdTable := [].{
 		var $cells = []
 		var $cell = []
 		var $after_pipe = Bool.False
-		var $i = if (t.first() == Ok('|')) 1 else 0
+		var $i = if t.first() == Ok('|') {
+			1
+		} else {
+			0
+		}
 		while $i < len {
 			c = MdText.at(t, $i)
 			$after_pipe = Bool.False
@@ -43,7 +47,11 @@ MdTable := [].{
 			}
 		}
 		# A trailing `|` closes the last cell; it opens none.
-		if ($after_pipe) $cells else $cells.append(MdText.trim_line($cell))
+		if $after_pipe {
+			$cells
+		} else {
+			$cells.append(MdText.trim_line($cell))
+		}
 	}
 
 	## GFM's table at the line at `line_start`: that line is its header row and the
@@ -67,7 +75,11 @@ MdTable := [].{
 				Ok(aligns) => {
 					header = cells(MdText.cut(md, { start: line_start, end: eol }))
 					if header.len() == aligns.len() {
-						Ok({ header, aligns, body: MdText.next_line(md, delim_end) })
+						Ok({
+							header,
+							aligns,
+							body: MdText.next_line(md, delim_end),
+						})
 					} else {
 						Err(NotATable)
 					}
@@ -99,9 +111,17 @@ delimiter_cell : List(U8) -> Try(MdTable.Align, [NotADelimiter])
 delimiter_cell = |cell| {
 	n = cell.len()
 	left = cell.first() == Ok(':')
-	l = if (left) 1 else 0
+	l = if left {
+		1
+	} else {
+		0
+	}
 	right = n > l and cell.last() == Ok(':')
-	r = if (right) 1 else 0
+	r = if right {
+		1
+	} else {
+		0
+	}
 	dashes = cell.sublist({ start: l, len: n - l - r })
 	if dashes == [] or !dashes.all(|c| c == '-') {
 		Err(NotADelimiter)
@@ -127,7 +147,12 @@ expect cells_of("bar") == ["bar"]
 expect cells_of("| f\\|oo | `\\|` |") == ["f|oo", "`|`"]
 expect cells_of("a \\\\| b") == ["a \\\\", "b"]
 expect cells_of("a \\") == ["a \\"]
-expect MdTable.delimiter_row("| --- | :-- | :-: | --: |".to_utf8()) == Ok([Plain, Left, Center, Right])
+expect MdTable.delimiter_row("| --- | :-- | :-: | --: |".to_utf8()) == Ok([
+	Plain,
+	Left,
+	Center,
+	Right,
+])
 expect MdTable.delimiter_row(":-: | -----------:".to_utf8()) == Ok([Center, Right])
 expect MdTable.delimiter_row("---".to_utf8()) == Err(NotADelimiter)
 expect MdTable.delimiter_row("| : |".to_utf8()) == Err(NotADelimiter)

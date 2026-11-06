@@ -34,7 +34,11 @@ MdHtml := [].{
 
 	## A document's heading with its id.
 	heading_open_with_id : U64, List(U8) -> List(U8)
-	heading_open_with_id = |level, id| ['<', 'h', heading_digit(level)].concat(" id=\"".to_utf8()).concat(id).concat(['"', '>'])
+	heading_open_with_id = |level, id| [
+		'<',
+		'h',
+		heading_digit(level),
+	].concat(" id=\"".to_utf8()).concat(id).concat(['"', '>'])
 
 	## A document's heading before it has its id, which MdDocument looks for.
 	## An author's `<` is always escaped, and a control byte keeps it from a
@@ -43,7 +47,14 @@ MdHtml := [].{
 	heading_mark = |level| heading_open_with_id(level, [mark_byte])
 
 	heading_close : U64 -> List(U8)
-	heading_close = |level| ['<', '/', 'h', heading_digit(level), '>', '\n']
+	heading_close = |level| [
+		'<',
+		'/',
+		'h',
+		heading_digit(level),
+		'>',
+		'\n',
+	]
 
 	## A code block's opening, its language (escaped) as a `language-` class
 	## when it has one.
@@ -74,7 +85,12 @@ MdHtml := [].{
 
 	## An ordered list's opening, its `start` when that is not 1.
 	ol_open : U64 -> List(U8)
-	ol_open = |start| if (start == 1) "<ol>\n".to_utf8() else "<ol start=\"${start.to_str()}\">\n".to_utf8()
+	ol_open = |start|
+		if start == 1 {
+			"<ol>\n".to_utf8()
+		} else {
+			"<ol start=\"${start.to_str()}\">\n".to_utf8()
+		}
 
 	ol_close : List(U8)
 	ol_close = "</ol>\n".to_utf8()
@@ -116,7 +132,11 @@ MdHtml := [].{
 	## `<th>` or `<td>`, with GFM's `align` when the column has one.
 	cell_open : [Th, Td], MdTable.Align -> List(U8)
 	cell_open = |tag, align| {
-		name = if (tag == Th) "<th" else "<td"
+		name = if tag == Th {
+			"<th"
+		} else {
+			"<td"
+		}
 		attr = match align {
 			Plain => ""
 			Left => " align=\"left\""
@@ -127,7 +147,13 @@ MdHtml := [].{
 	}
 
 	cell_close : [Th, Td] -> List(U8)
-	cell_close = |tag| (if (tag == Th) "</th>\n" else "</td>\n").to_utf8()
+	cell_close = |tag| (
+		if tag == Th {
+			"</th>\n"
+		} else {
+			"</td>\n"
+		}
+	).to_utf8()
 
 	## What a hostile message renders as: a paragraph the client is free to
 	## style as `.md-malformed`.
@@ -167,7 +193,11 @@ MdHtml := [].{
 
 	## A link's opening tag: its href and title escaped, and a new tab, without
 	## the opener, when `NewTab`.
-	link_open : { href : List(U8), tab : [SameTab, NewTab], title : Title } -> List(U8)
+	link_open : {
+		href : List(U8),
+		tab : [SameTab, NewTab],
+		title : Title,
+	} -> List(U8)
 	link_open = |{ href, tab, title }| [
 		MdText.escape_onto("<a href=\"".to_utf8(), href),
 		['"'],
@@ -175,7 +205,11 @@ MdHtml := [].{
 			Untitled => []
 			Titled(text) => attrs_onto([], [{ name: "title".to_utf8(), value: Is(text) }])
 		},
-		if (tab == NewTab) " target=\"_blank\" rel=\"noopener\"".to_utf8() else [],
+		if tab == NewTab {
+			" target=\"_blank\" rel=\"noopener\"".to_utf8()
+		} else {
+			[]
+		},
 		['>'],
 	].join()
 
@@ -198,10 +232,7 @@ MdHtml := [].{
 
 	## One attribute of a rebuilt media tag: ` name`, or ` name="value"`,
 	## the value escaped.
-	Attr : {
-		name : List(U8),
-		value : [Bare, Is(List(U8))],
-	}
+	Attr : { name : List(U8), value : [Bare, Is(List(U8))] }
 
 	## A member's `<img>`, rebuilt from the attributes MdSafety let through.
 	img : List(Attr) -> List(U8)
@@ -223,7 +254,9 @@ MdHtml := [].{
 			if c == '<' {
 				$i = MdText.find_or_end(html, { byte: '>', at: $i }) + 1
 			} else if c == '&' {
-				match entities.find_first(|e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 })) {
+				match entities.find_first(
+					|e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 }),
+				) {
 					Ok((written, byte)) => {
 						$out = $out.append(byte)
 						$i = $i + written.len()
@@ -279,5 +312,12 @@ expect MdHtml.heading_open(3) == "<h3>".to_utf8()
 expect MdHtml.plain_text("foo <em>bar</em> &amp; <code>a&lt;b</code> &quot;q&quot;".to_utf8()) == "foo bar & a<b \"q\"".to_utf8()
 expect MdHtml.plain_text("<a href=\"/u?a&amp;b\" target=\"_blank\">x</a>".to_utf8()) == "x".to_utf8()
 expect MdHtml.ol_open(4) == "<ol start=\"4\">\n".to_utf8()
-expect MdHtml.link_open({ href: "/a?b&c".to_utf8(), tab: SameTab, title: Untitled }) == "<a href=\"/a?b&amp;c\">".to_utf8()
-expect MdHtml.video([{ name: "controls".to_utf8(), value: Bare }, { name: "src".to_utf8(), value: Is("/v\".mp4".to_utf8()) }]) == "<video controls src=\"/v&quot;.mp4\"></video>".to_utf8()
+expect MdHtml.link_open({
+	href: "/a?b&c".to_utf8(),
+	tab: SameTab,
+	title: Untitled,
+}) == "<a href=\"/a?b&amp;c\">".to_utf8()
+expect MdHtml.video([
+	{ name: "controls".to_utf8(), value: Bare },
+	{ name: "src".to_utf8(), value: Is("/v\".mp4".to_utf8()) },
+]) == "<video controls src=\"/v&quot;.mp4\"></video>".to_utf8()

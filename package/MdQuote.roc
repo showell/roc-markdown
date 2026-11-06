@@ -67,8 +67,18 @@ MdQuote := [].{
 					$inner = $inner.concat(stripped).append('\n')
 					# Indented text after a paragraph is that paragraph's, not code.
 					starts_code = !$last_was_text and is_code(stripped)
-					ends_text = MdText.is_blank(stripped) or is_block_start($inner, start) or starts_code
-					$in_table = !ends_text and ($in_table or ($last_was_text and MdTable.is_table_at($inner, $prev_start)))
+					ends_text = MdText.is_blank(stripped) or is_block_start(
+						$inner,
+						start,
+					) or starts_code
+					$in_table = !ends_text and (
+						$in_table or (
+							$last_was_text and MdTable.is_table_at(
+								$inner,
+								$prev_start,
+							)
+						)
+					)
 					$last_was_text = !ends_text and !$in_table
 					$prev_start = start
 				}
@@ -115,7 +125,10 @@ without_marker = |line, { marker_end, reading }| {
 	rest = line.drop_first(marker_end)
 	match (rest.first(), reading) {
 		(Ok(' '), _) => rest.drop_first(1)
-		(Ok('\t'), TabStops) => MdIndent.without_columns(rest, { columns: 1, from: marker_end, reading })
+		(Ok('\t'), TabStops) => MdIndent.without_columns(
+			rest,
+			{ columns: 1, from: marker_end, reading },
+		)
 		_ => rest
 	}
 }

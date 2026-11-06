@@ -15,16 +15,10 @@ MdText := [].{
 	## a unit per scan step, and a render whose `spent` passes `ceiling` at a
 	## check is hostile. The parser is linear by its cursors, so ordinary
 	## text stays far under; only a re-parse goes past.
-	Budget : {
-		spent : U64,
-		ceiling : U64,
-	}
+	Budget : { spent : U64, ceiling : U64 }
 
 	## What a render has made so far, and what it has spent.
-	Rendered : {
-		out : List(U8),
-		budget : Budget,
-	}
+	Rendered : { out : List(U8), budget : Budget }
 
 	## What a block's renderer made, and where the source after it starts.
 	Block : {
@@ -117,7 +111,10 @@ MdText := [].{
 		if i + n > s.len() {
 			Bool.False
 		} else {
-			cut(s, { start: i, end: i + n }).map(Ascii.to_lowercase) == prefix.map(Ascii.to_lowercase)
+			cut(
+				s,
+				{ start: i, end: i + n },
+			).map(Ascii.to_lowercase) == prefix.map(Ascii.to_lowercase)
 		}
 	}
 
@@ -161,7 +158,12 @@ MdText := [].{
 
 	## The start of the line after the one ending at `eol`.
 	next_line : List(U8), U64 -> U64
-	next_line = |md, eol| if (eol < md.len()) eol + 1 else md.len()
+	next_line = |md, eol|
+		if eol < md.len() {
+			eol + 1
+		} else {
+			md.len()
+		}
 }
 
 per_byte : U64
@@ -174,11 +176,7 @@ form_feed : U8
 form_feed = 12
 
 line_space : List(U8)
-line_space = [
-	' ',
-	'\t',
-	'\r',
-]
+line_space = [' ', '\t', '\r']
 
 amp : List(U8)
 amp = "&amp;".to_utf8()
@@ -205,10 +203,7 @@ expect MdText.is_prefixed_ignoring_case(
 	"xHTTP://".to_utf8(),
 	{ at: 1, prefix: "http://".to_utf8() },
 )
-expect !MdText.is_prefixed_ignoring_case(
-	"http:/".to_utf8(),
-	{ at: 0, prefix: "http://".to_utf8() },
-)
+expect !MdText.is_prefixed_ignoring_case("http:/".to_utf8(), { at: 0, prefix: "http://".to_utf8() })
 expect MdText.is_same_ignoring_case("ViDeO".to_utf8(), "video".to_utf8())
 expect MdText.is_blank(" \t\r".to_utf8())
 expect !MdText.is_blank(" \u(a0)".to_utf8())

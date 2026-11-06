@@ -81,7 +81,10 @@ MdSafety := [].{
 	is_external_href : List(U8) -> Bool
 	is_external_href = |href| match Bytes.find(href, { needle: MdSafety.scheme_end }) {
 		Ok(p) =>
-			p > 0 and Ascii.is_letter(MdText.at(href, 0)) and MdText.cut(href, { start: 1, end: p }).all(|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-')
+			p > 0 and Ascii.is_letter(MdText.at(href, 0)) and MdText.cut(
+				href,
+				{ start: 1, end: p },
+			).all(|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-')
 		Err(NotFound) => Bool.False
 	}
 
@@ -111,8 +114,16 @@ MdSafety := [].{
 					_ => []
 				},
 			)
-			player = if (kind == Video) video_player else []
-			texts = if (kind == Img) kept(["alt".to_utf8(), "title".to_utf8()], |_| Bool.True) else []
+			player = if kind == Video {
+				video_player
+			} else {
+				[]
+			}
+			texts = if kind == Img {
+				kept(["alt".to_utf8(), "title".to_utf8()], |_| Bool.True)
+			} else {
+				[]
+			}
 			# The src as written, its ends' spaces kept.
 			Ok(
 				[
@@ -201,7 +212,10 @@ has_encoded_separator = |src| {
 	var $i = 0
 	var $found = Bool.False
 	while $i < src.len() and !$found {
-		$found = is_escape_of(src, { at: $i, hex: ['2', 'f'] }) or is_escape_of(src, { at: $i, hex: ['5', 'c'] })
+		$found = is_escape_of(
+			src,
+			{ at: $i, hex: ['2', 'f'] },
+		) or is_escape_of(src, { at: $i, hex: ['5', 'c'] })
 		$i = $i + 1
 	}
 	$found
@@ -215,12 +229,7 @@ video_player = [
 ]
 
 dangerous_schemes : List(Str)
-dangerous_schemes = [
-	"javascript:",
-	"vbscript:",
-	"file:",
-	"data:",
-]
+dangerous_schemes = ["javascript:", "vbscript:", "file:", "data:"]
 
 expect MdSafety.is_dangerous_url("java\tscript:alert(1)".to_utf8())
 expect MdSafety.is_upload_url("/user_uploads/a.png".to_utf8(), user_uploads)

@@ -30,7 +30,11 @@ MdList := [].{
 	## nine digits and `.` or `)`, then a space, a tab or the line's end. One
 	## to four spaces after are the content's indent; more is one, the rest the
 	## content's.
-	list_marker_at : List(U8), { line_start : U64, reading : MdIndent.Reading } -> Try(Marker, [NotAMarker])
+	list_marker_at : List(U8),
+	{
+		line_start : U64,
+		reading : MdIndent.Reading,
+	} -> Try(Marker, [NotAMarker])
 	list_marker_at = |md, { line_start, reading }| {
 		line = MdText.cut(md, { start: line_start, end: MdText.line_end(md, line_start) })
 		n = line.len()
@@ -43,10 +47,16 @@ MdList := [].{
 				if c == '-' or c == '+' or c == '*' {
 					Ok({ kind: Bullet(c), marker_end: indent + 1 })
 				} else if Ascii.is_digit(c) {
-					digits_end = Bytes.count_while(line, { keep: Ascii.is_digit, at: indent }).min(indent + 9)
+					digits_end = Bytes.count_while(
+						line,
+						{ keep: Ascii.is_digit, at: indent },
+					).min(indent + 9)
 					match line.get(digits_end) {
 						Ok(delim) if delim == '.' or delim == ')' => {
-							start = MdText.cut(line, { start: indent, end: digits_end }).fold(0, |acc, d| acc * 10 + (d - '0').to_u64())
+							start = MdText.cut(line, { start: indent, end: digits_end }).fold(
+								0,
+								|acc, d| acc * 10 + (d - '0').to_u64(),
+							)
 							Ok({ kind: Ordered({ start, delim }), marker_end: digits_end + 1 })
 						}
 						_ => Err(NotAMarker)
@@ -157,7 +167,12 @@ MdList := [].{
 							$loose = $loose or $blanks > 0
 							$cur = $cur.concat(List.repeat('\n', $blanks))
 							$blanks = 0
-							$cur = $cur.concat(MdIndent.without_columns(line, { columns: $cur_column, from: 0, reading })).append('\n')
+							$cur = $cur.concat(
+								MdIndent.without_columns(
+									line,
+									{ columns: $cur_column, from: 0, reading },
+								),
+							).append('\n')
 						} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
 							# A lazy continuation of the item's paragraph.
 							$cur = $cur.concat(line).append('\n')
@@ -168,7 +183,11 @@ MdList := [].{
 				$p = next
 			}
 		}
-		items = if ($have_item) $items.append($cur) else $items
+		items = if $have_item {
+			$items.append($cur)
+		} else {
+			$items
+		}
 		open = match first.kind {
 			Ordered(o) => MdHtml.ol_open(o.start)
 			Bullet(_) => MdHtml.ul_open
@@ -178,11 +197,19 @@ MdList := [].{
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
 			# separator sees only its content, not the <li>.
-			lead = if ($loose or is_first_child_block(item, { is_block_start, is_code })) ['\n'] else []
+			lead = if $loose or is_first_child_block(item, { is_block_start, is_code }) {
+				['\n']
+			} else {
+				[]
+			}
 			inner = nested({
 				out: lead,
 				md: item,
-				spacing: if ($loose) Loose else Tight,
+				spacing: if $loose {
+					Loose
+				} else {
+					Tight
+				},
 				budget: $budget,
 			})?
 			# Appended in place, `$out` unique and first: a List.join of it
@@ -215,7 +242,15 @@ spaced_marker = |line, { kind, marker_end }| {
 		{
 			kind,
 			content_column: marker_end + 1,
-			first_line: line.drop_first(marker_end + (if (spaces == 0) 0 else 1)),
+			first_line: line.drop_first(
+				marker_end + (
+					if spaces == 0 {
+						0
+					} else {
+						1
+					}
+				),
+			),
 		}
 	} else {
 		{
@@ -238,13 +273,27 @@ tabbed_marker = |line, { kind, marker_end }| {
 		{
 			kind,
 			content_column: marker_end + 1,
-			first_line: MdIndent.without_columns(rest, { columns: 1, from: marker_end, reading: TabStops }),
+			first_line: MdIndent.without_columns(
+				rest,
+				{
+					columns: 1,
+					from: marker_end,
+					reading: TabStops,
+				},
+			),
 		}
 	} else {
 		{
 			kind,
 			content_column: reached,
-			first_line: MdIndent.without_columns(rest, { columns: reached - marker_end, from: marker_end, reading: TabStops }),
+			first_line: MdIndent.without_columns(
+				rest,
+				{
+					columns: reached - marker_end,
+					from: marker_end,
+					reading: TabStops,
+				},
+			),
 		}
 	}
 }
@@ -262,7 +311,11 @@ is_same_list = |a, b| match (a.kind, b.kind) {
 ## or indented code, not a paragraph: its first line that is not blank starts
 ## a block (`is_block_start`, which asks the first four in that order), a table
 ## or code.
-is_first_child_block : List(U8), { is_block_start : List(U8), U64 -> Bool, is_code : List(U8) -> Bool } -> Bool
+is_first_child_block : List(U8),
+{
+	is_block_start : List(U8), U64 -> Bool,
+	is_code : List(U8) -> Bool,
+} -> Bool
 is_first_child_block = |item, { is_block_start, is_code }| {
 	len = item.len()
 	var $line_start = 0
@@ -270,7 +323,10 @@ is_first_child_block = |item, { is_block_start, is_code }| {
 		eol = MdText.line_end(item, $line_start)
 		line = MdText.cut(item, { start: $line_start, end: eol })
 		if !MdText.is_blank(line) {
-			return is_block_start(item, $line_start) or MdTable.is_table_at(item, $line_start) or is_code(line)
+			return is_block_start(
+				item,
+				$line_start,
+			) or MdTable.is_table_at(item, $line_start) or is_code(line)
 		} else {
 			$line_start = MdText.next_line(item, eol)
 		}

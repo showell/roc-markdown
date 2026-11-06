@@ -12,7 +12,11 @@ Bytes := [].{
 
 	find_byte : List(U8), { byte : U8, at : U64 } -> Try(U64, [NotFound])
 	find_byte = |s, { byte: b, at: i }| match s.get(i) {
-		Ok(c) => if (c == b) Ok(i) else find_byte(s, { byte: b, at: i + 1 })
+		Ok(c) => if c == b {
+			Ok(i)
+		} else {
+			find_byte(s, { byte: b, at: i + 1 })
+		}
 		Err(_) => Err(NotFound)
 	}
 
@@ -38,12 +42,7 @@ Bytes := [].{
 	## The four bytes Zig's `std.mem.trim(u8, s, " \t\r\n")` trims: not
 	## `Ascii.is_whitespace`, which has VT and FF too.
 	zig_spaces : List(U8)
-	zig_spaces = [
-		' ',
-		'\t',
-		'\r',
-		'\n',
-	]
+	zig_spaces = [' ', '\t', '\r', '\n']
 
 }
 

@@ -36,8 +36,26 @@ MdHeading := [].{
 	}
 
 	## An ATX heading, its content's inlines rendered between its tags.
-	heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : MdDialect.Dialect } -> Try(MdText.Block, [Hostile])
-	heading_onto = |out, { level, content, after, budget, uploads, dialect }| {
+	heading_onto : List(U8),
+	{
+		level : U64,
+		content : List(U8),
+		after : U64,
+		budget : MdText.Budget,
+		uploads : MdSafety.Uploads,
+		dialect : MdDialect.Dialect,
+	} -> Try(MdText.Block, [Hostile])
+	heading_onto = |
+		out,
+		{
+			level,
+			content,
+			after,
+			budget,
+			uploads,
+			dialect,
+		},
+	| {
 		heading = MdInline.render_onto({
 			out: out.concat(
 				match dialect {
@@ -50,7 +68,11 @@ MdHeading := [].{
 			budget,
 			uploads,
 		})?
-		Ok({ out: heading.out.concat(MdHtml.heading_close(level)), budget: heading.budget, after })
+		Ok({
+			out: heading.out.concat(MdHtml.heading_close(level)),
+			budget: heading.budget,
+			after,
+		})
 	}
 }
 

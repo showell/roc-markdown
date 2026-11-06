@@ -65,8 +65,16 @@ MdEmphasis := [].{
 		# closes only as `~~`.
 		is_star = c == '*'
 		is_strike = c == '~'
-		can_open = if (is_strike) flank.left and n == 2 else flank.left and (is_star or !flank.right or flank.before_punct)
-		can_close = if (is_strike) flank.right and n == 2 else flank.right and (is_star or !flank.left or flank.after_punct)
+		can_open = if is_strike {
+			flank.left and n == 2
+		} else {
+			flank.left and (is_star or !flank.right or flank.before_punct)
+		}
+		can_close = if is_strike {
+			flank.right and n == 2
+		} else {
+			flank.right and (is_star or !flank.left or flank.after_punct)
+		}
 		{
 			char: c,
 			count: n,
@@ -93,15 +101,27 @@ MdEmphasis := [].{
 		var $runs = runs.map_with_index(
 			|run, k| {
 				..run,
-				below: if (k == 0) Edge else At(k - 1),
-				above: if (k + 1 == n) Edge else At(k + 1),
+				below: if k == 0 {
+					Edge
+				} else {
+					At(k - 1)
+				},
+				above: if k + 1 == n {
+					Edge
+				} else {
+					At(k + 1)
+				},
 			},
 		)
 		var $budget = budget
 		# The lowest opener a closer may look back to, by its floor key: an
 		# edge is the stack's bottom.
 		var $bottoms = List.repeat(Edge, floor_keys)
-		var $closer = if (n == 0) Edge else At(0)
+		var $closer = if n == 0 {
+			Edge
+		} else {
+			At(0)
+		}
 		while $closer != Edge {
 			ci = index_of($closer)
 			$budget = MdText.charge($budget, 1)
@@ -142,7 +162,11 @@ MdEmphasis := [].{
 				if $found {
 					oi = index_of($opener)
 					opener = MdEmphasis.run_at($runs, oi)
-					use = if (opener.count >= 2 and closer.count >= 2) 2 else 1
+					use = if opener.count >= 2 and closer.count >= 2 {
+						2
+					} else {
+						1
+					}
 					# Every run strictly between the two leaves the stack.
 					$runs = set_run(
 						$runs,
@@ -183,7 +207,10 @@ MdEmphasis := [].{
 					# A closer with delimiters left is looked at again.
 				} else {
 					$closer = closer.above
-					$bottoms = $bottoms.set(slot, closer.below) ?? crash "MdEmphasis: a bottom's slot past the floor keys"
+					$bottoms = $bottoms.set(
+						slot,
+						closer.below,
+					) ?? crash "MdEmphasis: a bottom's slot past the floor keys"
 					if !closer.can_open {
 						$runs = unlinked($runs, ci)
 					} else {
@@ -210,13 +237,29 @@ MdEmphasis := [].{
 	run_onto = |out, run| {
 		var $o = out
 		for use in run.closes {
-			$o = $o.concat(if (run.char == '~') MdHtml.del_close else if (use == 2) MdHtml.strong_close else MdHtml.em_close)
+			$o = $o.concat(
+				if run.char == '~' {
+					MdHtml.del_close
+				} else if use == 2 {
+					MdHtml.strong_close
+				} else {
+					MdHtml.em_close
+				},
+			)
 		}
 		$o = $o.concat(List.repeat(run.char, run.count))
 		var $n = run.opens.len()
 		while $n > 0 {
 			$n = $n - 1
-			$o = $o.concat(if (run.char == '~') MdHtml.del_open else if ((run.opens.get($n) ?? 0) == 2) MdHtml.strong_open else MdHtml.em_open)
+			$o = $o.concat(
+				if run.char == '~' {
+					MdHtml.del_open
+				} else if (run.opens.get($n) ?? 0) == 2 {
+					MdHtml.strong_open
+				} else {
+					MdHtml.em_open
+				},
+			)
 		}
 		$o
 	}
@@ -231,8 +274,15 @@ index_of = |link| match link {
 	Edge => crash "MdEmphasis: the stack's edge read as a run"
 }
 
-set_run : List(MdEmphasis.DelimiterRun), { at : U64, delimiters : MdEmphasis.DelimiterRun } -> List(MdEmphasis.DelimiterRun)
-set_run = |runs, { at, delimiters }| runs.set(at, delimiters) ?? crash "MdEmphasis: a run set past the runs"
+set_run : List(MdEmphasis.DelimiterRun),
+{
+	at : U64,
+	delimiters : MdEmphasis.DelimiterRun,
+} -> List(MdEmphasis.DelimiterRun)
+set_run = |
+	runs,
+	{ at, delimiters },
+| runs.set(at, delimiters) ?? crash "MdEmphasis: a run set past the runs"
 
 ## **THE FLOOR'S KEY, COMMONMARK'S** (commonmark.js's `openers_bottom`,
 ## markdown-it's): a closer's character, whether it may also open, and its
@@ -242,8 +292,18 @@ set_run = |runs, { at, delimiters }| runs.set(at, delimiters) ?? crash "MdEmphas
 ## would have matched (`*a**b** c**`'s last `**`).
 floor_key : MdEmphasis.DelimiterRun -> U64
 floor_key = |closer| {
-	opens = if (closer.can_open) 3 else 0
-	character = if (closer.char == '*') 0 else if (closer.char == '_') 1 else 2
+	opens = if closer.can_open {
+		3
+	} else {
+		0
+	}
+	character = if closer.char == '*' {
+		0
+	} else if closer.char == '_' {
+		1
+	} else {
+		2
+	}
 	(opens + closer.orig % 3) * 3 + character
 }
 
@@ -258,11 +318,17 @@ unlinked : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRun)
 unlinked = |runs, k| {
 	run = MdEmphasis.run_at(runs, k)
 	with_below = match run.below {
-		At(b) => set_run(runs, { at: b, delimiters: { ..MdEmphasis.run_at(runs, b), above: run.above } })
+		At(b) => set_run(
+			runs,
+			{ at: b, delimiters: { ..MdEmphasis.run_at(runs, b), above: run.above } },
+		)
 		Edge => runs
 	}
 	match run.above {
-		At(a) => set_run(with_below, { at: a, delimiters: { ..MdEmphasis.run_at(with_below, a), below: run.below } })
+		At(a) => set_run(
+			with_below,
+			{ at: a, delimiters: { ..MdEmphasis.run_at(with_below, a), below: run.below } },
+		)
 		Edge => with_below
 	}
 }
@@ -270,18 +336,23 @@ unlinked = |runs, k| {
 ## CommonMark's left- and right-flanking for the
 ## run `text[start..end]`; the line's ends count as space.
 flanking : List(U8),
-{
-	start : U64,
-	end : U64,
-} -> {
+{ start : U64, end : U64 } -> {
 	left : Bool,
 	right : Bool,
 	before_punct : Bool,
 	after_punct : Bool,
 }
 flanking = |text, { start, end }| {
-	before = if (start == 0) ' ' else MdText.at(text, start - 1)
-	after = if (end >= text.len()) ' ' else MdText.at(text, end)
+	before = if start == 0 {
+		' '
+	} else {
+		MdText.at(text, start - 1)
+	}
+	after = if end >= text.len() {
+		' '
+	} else {
+		MdText.at(text, end)
+	}
 	before_space = MdText.is_space(before)
 	after_space = MdText.is_space(after)
 	before_punct = Ascii.is_punctuation(before)

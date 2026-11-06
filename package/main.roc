@@ -1,9 +1,1 @@
-package
-	[
-		Md,
-		MdDocument,
-		MdFence,
-		MdMedia,
-		MdTable,
-	]
-	{}
+package [Md, MdDocument, MdFence, MdMedia, MdTable] {}

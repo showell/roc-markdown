@@ -40,14 +40,14 @@ MdFence := [].{
 					} else {
 						# The language's backslash escapes are CommonMark's (`foo\+bar`).
 						lang = MdText.unescaped(
-							info.take_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })),
+							info.take_first(
+								Bytes.count_while(
+									info,
+									{ keep: |c| c != ' ' and c != '\t', at: 0 },
+								),
+							),
 						)
-						Ok({
-							char: f,
-							count,
-							indent,
-							lang,
-						})
+						Ok({ char: f, count, indent, lang })
 					}
 				}
 		}
@@ -66,7 +66,10 @@ MdFence := [].{
 	args : List(U8), Open -> List(U8)
 	args = |line, open_line| {
 		info = Bytes.trim(line.drop_first(open_line.indent + open_line.count), info_space)
-		Bytes.trim(info.drop_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })), info_space)
+		Bytes.trim(
+			info.drop_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })),
+			info_space,
+		)
 	}
 
 	## The code block, up to its closing fence or the
@@ -109,12 +112,22 @@ MdFence := [].{
 		}
 		content = MdText.cut(md, { start: body_start, end: $content_end })
 		body = dedented({ content, indent: fence.indent })
-		code = || MdText.escape_onto(MdHtml.code_block_open(fence.lang), body).concat(MdHtml.code_block_close)
+		code = || MdText.escape_onto(
+			MdHtml.code_block_open(fence.lang),
+			body,
+		).concat(MdHtml.code_block_close)
 		block = match dialect {
-			Chat if MdChat.is_quote_fence(fence.lang) => MdText.escape_onto(MdHtml.chat_quote_open, body).concat(MdHtml.chat_quote_close)
+			Chat if MdChat.is_quote_fence(fence.lang) => MdText.escape_onto(
+				MdHtml.chat_quote_open,
+				body,
+			).concat(MdHtml.chat_quote_close)
 			Chat => code()
 			Document(options) =>
-				match (options.fence)({ tag: fence.lang, args: MdFence.args(line, fence), body }) {
+				match (options.fence)({
+					tag: fence.lang,
+					args: MdFence.args(line, fence),
+					body,
+				}) {
 					Html(html) => html
 					Pass => code()
 				}
@@ -148,14 +161,7 @@ MdFence := [].{
 		count : U64,
 		at : U64,
 	} -> U64
-	close_at = |
-		lines,
-		{
-			char,
-			count,
-			at,
-		},
-	| {
+	close_at = |lines, { char, count, at }| {
 		var $j = at
 		while $j < lines.len() and !is_close(lines.get($j) ?? [], { char, count }) {
 			$j = $j + 1
@@ -182,11 +188,7 @@ dedented = |{ content, indent }| {
 }
 
 info_space : List(U8)
-info_space = [
-	' ',
-	'\t',
-	'\r',
-]
+info_space = [' ', '\t', '\r']
 
 # Where a fence opens and closes: its run's length and cap, its indent, its
 # language, and a backtick fence's info string.
@@ -202,8 +204,24 @@ expect MdFence.open("```zig".to_utf8()) == Ok({
 	indent: 0,
 	lang: "zig".to_utf8(),
 })
-expect MdFence.args("  ```widget  big sky ".to_utf8(), { char: '`', count: 3, indent: 2, lang: "widget".to_utf8() }) == "big sky".to_utf8()
-expect MdFence.args("```widget".to_utf8(), { char: '`', count: 3, indent: 0, lang: "widget".to_utf8() }) == []
+expect MdFence.args(
+	"  ```widget  big sky ".to_utf8(),
+	{
+		char: '`',
+		count: 3,
+		indent: 2,
+		lang: "widget".to_utf8(),
+	},
+) == "big sky".to_utf8()
+expect MdFence.args(
+	"```widget".to_utf8(),
+	{
+		char: '`',
+		count: 3,
+		indent: 0,
+		lang: "widget".to_utf8(),
+	},
+) == []
 expect MdFence.open("plain text".to_utf8()) == Err(NotAFence)
 expect MdFence.open("~~ short".to_utf8()) == Err(NotAFence)
 expect MdFence.open("```a`b".to_utf8()) == Err(NotAFence)

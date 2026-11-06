@@ -57,33 +57,37 @@ MdInline := [].{
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
-	render_onto = |
-		{
-			out,
-			text,
-			refs,
-			budget,
-			uploads,
-		},
-	| {
+	render_onto = |{ out, text, refs, budget, uploads }| {
 		len = text.len()
 		is_document = refs != Linked and refs != InLabel
 		reads_links = refs != DocumentLabel(Shown) and refs != DocumentLabel(AsLinks) and refs != DocumentAlt
 		shows_images = refs == Document(Shown) or refs == DocumentLabel(Shown)
 		alt_as_text = refs == DocumentLabel(AsLinks)
-		outside = if (is_document) SameTab else NewTab
+		outside = if is_document {
+			SameTab
+		} else {
+			NewTab
+		}
 		label_refs = match refs {
 			Document(images) => DocumentLabel(images)
 			_ => InLabel
 		}
-		alt_refs = if (is_document) DocumentAlt else label_refs
+		alt_refs = if is_document {
+			DocumentAlt
+		} else {
+			label_refs
+		}
 		var $budget = budget
 		var $pieces = []
 		var $runs = []
 		var $text_start = 0
 		var $i = 0
 		var $next_bracket = MdText.find_or_end(text, { byte: ']', at: 0 })
-		var $brackets = if (is_document) Balanced(Unscanned) else FirstClose
+		var $brackets = if is_document {
+			Balanced(Unscanned)
+		} else {
+			FirstClose
+		}
 		var $closes = Unscanned
 		var $email_dead = 0
 		while $i < len {
@@ -97,7 +101,11 @@ MdInline := [].{
 			# Each byte class's scan says what it found (a `Step`); the step is
 			# taken once, below. The chat's reference (MdChat) is read first,
 			# whole.
-			reference = if (refs == Linked) MdChat.reference_at(text, $i) else Err(NoRef)
+			reference = if refs == Linked {
+				MdChat.reference_at(text, $i)
+			} else {
+				Err(NoRef)
+			}
 			step = match reference {
 				Ok(ref) => Token(Html(ref.html), ref.end)
 				Err(NoRef) =>
@@ -107,8 +115,15 @@ MdInline := [].{
 						match media_at(text, $i, uploads) {
 							Ok(media) => Token(Html(media.html), media.end)
 							Err(NotMedia) =>
-								match if (is_document and reads_links) MdLinks.angle_url_at(text, $i) else Err(NotALink) {
-									Ok(found) => Token(Html(MdLinks.autolink_html(found.url, Url, outside)), found.end)
+								match if is_document and reads_links {
+									MdLinks.angle_url_at(text, $i)
+								} else {
+									Err(NotALink)
+								} {
+									Ok(found) => Token(
+										Html(MdLinks.autolink_html(found.url, Url, outside)),
+										found.end,
+									)
 									Err(NotALink) => Skip($i + 1)
 								}
 						}
@@ -116,7 +131,15 @@ MdInline := [].{
 						scanned = code_span_at(text, { at: $i, budget: $budget })
 						$budget = scanned.budget
 						match scanned.span {
-							Ok(span) => Token(Html(code_html(text, { start: span.content_start, end: span.content_end })), span.end)
+							Ok(span) => Token(
+								Html(
+									code_html(
+										text,
+										{ start: span.content_start, end: span.content_end },
+									),
+								),
+								span.end,
+							)
 							Err(NoClose) => {
 								# No closing run of its length: the whole opening run is
 								# literal, and is skipped, so no shorter run inside it
@@ -146,7 +169,11 @@ MdInline := [].{
 						$budget = linked.budget
 						image = match linked.link {
 							Ok(link) =>
-								match if (is_document) MdLinks.document_dest(link.url) else MdLinks.image_dest(link.url) {
+								match if is_document {
+									MdLinks.document_dest(link.url)
+								} else {
+									MdLinks.image_dest(link.url)
+								} {
 									Ok(dest) => Ok({ link, dest })
 									Err(NotAnImage) => Err(NotAnImage)
 								}
@@ -154,7 +181,10 @@ MdInline := [].{
 						}
 						match image {
 							Ok(found) =>
-								if MdSafety.is_upload_url(found.dest.src, uploads) or ((shows_images or alt_as_text) and !MdSafety.is_dangerous_url(found.dest.src)) {
+								if MdSafety.is_upload_url(
+									found.dest.src,
+									uploads,
+								) or ((shows_images or alt_as_text) and !MdSafety.is_dangerous_url(found.dest.src)) {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.render_onto({
@@ -170,11 +200,23 @@ MdInline := [].{
 										if alt_as_text {
 											Ok(MdText.escape_onto([], text_alt))
 										} else if shows_images {
-											MdLinks.shown_image({ src: found.dest.src, alt: text_alt, title: found.dest.title })
+											MdLinks.shown_image({
+												src: found.dest.src,
+												alt: text_alt,
+												title: found.dest.title,
+											})
 										} else {
-											MdLinks.image({ src: found.dest.src, alt: text_alt, title: found.dest.title, uploads })
+											MdLinks.image({
+												src: found.dest.src,
+												alt: text_alt,
+												title: found.dest.title,
+												uploads,
+											})
 										}
-									Token(Html(html ?? crash "MdInline.render_onto: an image the rules above let through"), found.link.end)
+									Token(
+										Html(html ?? crash "MdInline.render_onto: an image the rules above let through"),
+										found.link.end,
+									)
 								} else if MdSafety.is_dangerous_url(found.dest.src) {
 									# Refused: the whole image's source, `!` and all,
 									# left in the pending text (MdSafety).
@@ -208,7 +250,10 @@ MdInline := [].{
 								# The label is a line of its own, rendered inside the `<a>`.
 								dest = link_dest(link.url, is_document)
 								label = MdInline.render_onto({
-									out: MdLinks.link_open(dest.src, { outside, title: dest.title }),
+									out: MdLinks.link_open(
+										dest.src,
+										{ outside, title: dest.title },
+									),
 									text: MdText.cut(text, link.label),
 									refs: label_refs,
 									budget: $budget,
@@ -238,7 +283,11 @@ MdInline := [].{
 							{
 								at: $i,
 								email_dead: $email_dead,
-								emails: if (is_document) Plain else Linked,
+								emails: if is_document {
+									Plain
+								} else {
+									Linked
+								},
 								budget: $budget,
 							},
 						)
@@ -247,7 +296,13 @@ MdInline := [].{
 						match found.link {
 							Ok(link) =>
 								Token(
-									Html(MdLinks.autolink_html(MdText.cut(text, { start: $i, end: link.end }), link.kind, outside)),
+									Html(
+										MdLinks.autolink_html(
+											MdText.cut(text, { start: $i, end: link.end }),
+											link.kind,
+											outside,
+										),
+									),
 									link.end,
 								)
 							Err(NotALink) => Skip($i + 1)
@@ -260,7 +315,14 @@ MdInline := [].{
 			# before it flushed), the pending text cut, or bytes left in it.
 			match step {
 				Token(piece, end) => {
-					$pieces = with_token($pieces, { text_start: $text_start, at: $i, token: piece })
+					$pieces = with_token(
+						$pieces,
+						{
+							text_start: $text_start,
+							at: $i,
+							token: piece,
+						},
+					)
 					$i = end
 					$text_start = end
 				}
@@ -279,17 +341,7 @@ MdInline := [].{
 		if MdText.is_blown(matched.budget) {
 			Err(Hostile)
 		} else {
-			Ok({
-				out: emit(
-					out,
-					{
-						text,
-						pieces,
-						runs: matched.runs,
-					},
-				),
-				budget: matched.budget,
-			})
+			Ok({ out: emit(out, { text, pieces, runs: matched.runs }), budget: matched.budget })
 		}
 	}
 }
@@ -297,14 +349,21 @@ MdInline := [].{
 ## What a link's destination says. A chat reads it whole, and a document reads a
 ## title and `<a b>` from it, or whole when it is neither.
 link_dest : List(U8), Bool -> { src : List(U8), title : MdHtml.Title }
-link_dest = |url, is_document| match if (is_document) MdLinks.document_dest(url) else Err(NotAnImage) {
+link_dest = |url, is_document| match if is_document {
+	MdLinks.document_dest(url)
+} else {
+	Err(NotAnImage)
+} {
 	Ok(dest) => dest
 	Err(NotAnImage) => { src: url, title: Untitled }
 }
 
 ## A browser would run the destination, as written or as `link_dest` reads it.
 is_refused_link : List(U8), Bool -> Bool
-is_refused_link = |url, is_document| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_dest(url, is_document).src)
+is_refused_link = |
+	url,
+	is_document,
+| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_dest(url, is_document).src)
 
 ## Whether the byte at `i` is ASCII punctuation, which a backslash before it
 ## escapes.
@@ -325,7 +384,12 @@ Piece : [
 
 ## The pending text from `text_start` up to `at`, as a piece when any.
 flushed : List(Piece), { text_start : U64, at : U64 } -> List(Piece)
-flushed = |pieces, { text_start, at }| if (at > text_start) pieces.append(Text(text_start, at)) else pieces
+flushed = |pieces, { text_start, at }|
+	if at > text_start {
+		pieces.append(Text(text_start, at))
+	} else {
+		pieces
+	}
 
 with_token : List(Piece),
 {
@@ -333,14 +397,7 @@ with_token : List(Piece),
 	at : U64,
 	token : Piece,
 } -> List(Piece)
-with_token = |
-	pieces,
-	{
-		text_start,
-		at,
-		token,
-	},
-| flushed(pieces, { text_start, at }).append(token)
+with_token = |pieces, { text_start, at, token }| flushed(pieces, { text_start, at }).append(token)
 
 ## What one byte's scan found: a piece, ending at `end` (the pending text
 ## before it flushed first); the pending text cut at `end` with nothing taken
@@ -366,7 +423,10 @@ media_at = |text, at, uploads|
 ## A code span's html: its content `text[start..end]`, as CommonMark trims
 ## it, escaped.
 code_html : List(U8), { start : U64, end : U64 } -> List(U8)
-code_html = |text, span| MdText.escape_onto(MdHtml.code_open, code_span_content(MdText.cut(text, span))).concat(MdHtml.code_close)
+code_html = |text, span| MdText.escape_onto(
+	MdHtml.code_open,
+	code_span_content(MdText.cut(text, span)),
+).concat(MdHtml.code_close)
 
 ## How many `byte`s run from `at`.
 run_length : List(U8), { byte : U8, at : U64 } -> U64
@@ -380,14 +440,7 @@ emit : List(U8),
 	pieces : List(Piece),
 	runs : List(MdEmphasis.DelimiterRun),
 } -> List(U8)
-emit = |
-	out,
-	{
-		text,
-		pieces,
-		runs,
-	},
-| {
+emit = |out, { text, pieces, runs }| {
 	var $out = out
 	for piece in pieces {
 		$out = match piece {
@@ -404,10 +457,7 @@ emit = |
 ## The backtick run at `at` closed by a run of
 ## exactly its length, its content's span, and the index past the close.
 code_span_at : List(U8),
-{
-	at : U64,
-	budget : MdText.Budget,
-} -> {
+{ at : U64, budget : MdText.Budget } -> {
 	span : Try(
 		{
 			content_start : U64,

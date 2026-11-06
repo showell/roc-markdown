@@ -36,18 +36,42 @@ Md := [].{
 	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
 	render : List(U8), Md.Options -> List(U8)
-	render = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads, dialect: Chat })
+	render = |md, { uploads }| rendered(
+		md,
+		{
+			wrap: HardWrap,
+			budget: MdText.for_input(md),
+			uploads,
+			dialect: Chat,
+		},
+	)
 
 	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
 	render_trusted : List(U8), Md.Options -> List(U8)
-	render_trusted = |md, { uploads }| rendered(md, { wrap: HardWrap, budget: MdText.unlimited, uploads, dialect: Chat })
+	render_trusted = |md, { uploads }| rendered(
+		md,
+		{
+			wrap: HardWrap,
+			budget: MdText.unlimited,
+			uploads,
+			dialect: Chat,
+		},
+	)
 
 	## Server-owned prose, whose source line
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
-	render_trusted_reflow = |md, { uploads }| rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads, dialect: Chat })
+	render_trusted_reflow = |md, { uploads }| rendered(
+		md,
+		{
+			wrap: Reflow,
+			budget: MdText.unlimited,
+			uploads,
+			dialect: Chat,
+		},
+	)
 
 	## See MdDocument.Options.
 	DocumentOptions : MdDocument.Options
@@ -60,7 +84,17 @@ Md := [].{
 	render_document : List(U8), Md.DocumentOptions -> MdDocument.Page
 	render_document = |md, options| {
 		lines = MdDocument.with_plain_line_ends(md)
-		MdDocument.with_heading_ids(rendered(lines, { wrap: Reflow, budget: MdText.unlimited, uploads: no_uploads, dialect: Document(options) }))
+		MdDocument.with_heading_ids(
+			rendered(
+				lines,
+				{
+					wrap: Reflow,
+					budget: MdText.unlimited,
+					uploads: no_uploads,
+					dialect: Document(options),
+				},
+			),
+		)
 	}
 
 	## Text made safe for HTML, an element's content or an attribute's value
@@ -72,7 +106,15 @@ Md := [].{
 	## The work a render of `md` costs, unlimited, the
 	## measure the budget caps.
 	work_units : List(U8), Md.Options -> U64
-	work_units = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.unlimited, uploads, dialect: Chat }) {
+	work_units = |md, { uploads }| match run(
+		md,
+		{
+			wrap: HardWrap,
+			budget: MdText.unlimited,
+			uploads,
+			dialect: Chat,
+		},
+	) {
 		Ok(done) => done.budget.spent
 		Err(Hostile) => crash "Md.work_units: an unlimited budget blown"
 	}
@@ -80,7 +122,15 @@ Md := [].{
 	## Whether `md` would blow its budget, so a POST
 	## refuses it. One render in good faith with the real budget.
 	hostility : List(U8), Md.Options -> [Renderable, TooMuchFormatting]
-	hostility = |md, { uploads }| match run(md, { wrap: HardWrap, budget: MdText.for_input(md), uploads, dialect: Chat }) {
+	hostility = |md, { uploads }| match run(
+		md,
+		{
+			wrap: HardWrap,
+			budget: MdText.for_input(md),
+			uploads,
+			dialect: Chat,
+		},
+	) {
 		Ok(_) => Renderable
 		Err(Hostile) => TooMuchFormatting
 	}
@@ -97,7 +147,13 @@ Md := [].{
 
 ## The one seed every render grows from: `md`'s blocks from the top, as a
 ## document's, in `wrap` and against `budget`.
-run : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : MdDialect.Dialect } -> Try(MdText.Rendered, [Hostile])
+run : List(U8),
+{
+	wrap : [HardWrap, Reflow],
+	budget : MdText.Budget,
+	uploads : MdSafety.Uploads,
+	dialect : MdDialect.Dialect,
+} -> Try(MdText.Rendered, [Hostile])
 run = |md, { wrap, budget, uploads, dialect }| MdBlocks.blocks_onto({
 	out: [],
 	md,
@@ -109,8 +165,17 @@ run = |md, { wrap, budget, uploads, dialect }| MdBlocks.blocks_onto({
 	dialect,
 })
 
-rendered : List(U8), { wrap : [HardWrap, Reflow], budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : MdDialect.Dialect } -> List(U8)
-rendered = |md, { wrap, budget, uploads, dialect }| match run(md, { wrap, budget, uploads, dialect }) {
+rendered : List(U8),
+{
+	wrap : [HardWrap, Reflow],
+	budget : MdText.Budget,
+	uploads : MdSafety.Uploads,
+	dialect : MdDialect.Dialect,
+} -> List(U8)
+rendered = |
+	md,
+	{ wrap, budget, uploads, dialect },
+| match run(md, { wrap, budget, uploads, dialect }) {
 	Ok(done) => done.out
 	Err(Hostile) => Md.malformed_html
 }
@@ -134,7 +199,9 @@ expect Md.escape("Bea <i>x</i> & \"co\" 'q'".to_utf8()) == "Bea &lt;i&gt;x&lt;/i
 expect md("hello\\\nworld") == "<p>hello<br>\nworld</p>\n"
 expect md("hello\\\\\nworld") == "<p>hello\\<br>\nworld</p>\n"
 expect md("hello\\") == "<p>hello\\</p>\n"
-expect Str.from_utf8(Md.render_trusted_reflow("*a\\\nb* c\nd".to_utf8(), chat)) == Ok("<p>*a<br>\nb* c d</p>\n")
+expect Str.from_utf8(
+	Md.render_trusted_reflow("*a\\\nb* c\nd".to_utf8(), chat),
+) == Ok("<p>*a<br>\nb* c d</p>\n")
 expect md("# about MSG_plans_3") == "<h1>about <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></h1>\n"
 expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;b\n</code></pre>\n<p>after</p>\n"
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
@@ -142,7 +209,9 @@ expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
 expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
 expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
-expect Str.from_utf8(Md.render_trusted_reflow("A **bold phrase that\nspans two lines** here.".to_utf8(), chat)) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
+expect Str.from_utf8(
+	Md.render_trusted_reflow("A **bold phrase that\nspans two lines** here.".to_utf8(), chat),
+) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
 expect Md.hostility("some **bold** text and a [link](http://x.com)".to_utf8(), chat) == Renderable
 # GFM's tables.
 expect md("| a | b |\n| :- | -: |\n| c |\n| d | e | f |") == "<table>\n<thead>\n<tr>\n<th align=\"left\">a</th>\n<th align=\"right\">b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align=\"left\">c</td>\n<td align=\"right\"></td>\n</tr>\n<tr>\n<td align=\"left\">d</td>\n<td align=\"right\">e</td>\n</tr>\n</tbody>\n</table>\n"
@@ -171,11 +240,15 @@ widgets = |{ tag, args, body }|
 	}
 
 doc : Str -> Str
-doc = |text| Str.from_utf8(Md.render_document(text.to_utf8(), { fence: widgets, images: AsLinks }).html) ?? "not text"
+doc = |text| Str.from_utf8(
+	Md.render_document(text.to_utf8(), { fence: widgets, images: AsLinks }).html,
+) ?? "not text"
 
 # A document that shows its images, as the essay notes do.
 shown : Str -> Str
-shown = |text| Str.from_utf8(Md.render_document(text.to_utf8(), { fence: widgets, images: Shown }).html) ?? "not text"
+shown = |text| Str.from_utf8(
+	Md.render_document(text.to_utf8(), { fence: widgets, images: Shown }).html,
+) ?? "not text"
 
 # The hook answers with HTML, unescaped, or passes the fence on as code.
 expect doc("```widget sky\n```\n") == "<iframe src=\"/w/sky\"></iframe>\n"
@@ -218,15 +291,39 @@ expect md("<img src=\"/user_uploads/a.png\">") == "<img src=\"/user_uploads/a.pn
 expect doc("## The *sky*") == "<h2 id=\"the-sky\">The <em>sky</em></h2>\n"
 expect doc("## What's a sighting?") == "<h2 id=\"whats-a-sighting\">What&#39;s a sighting?</h2>\n"
 expect md("## The *sky*") == "<h2>The <em>sky</em></h2>\n"
-expect Md.render_document("# A\n\n> ## A\n\n- ## `A`\n".to_utf8(), { fence: widgets, images: AsLinks }).headings == [
-	{ level: 1, id: "a".to_utf8(), text: "A".to_utf8() },
-	{ level: 2, id: "a-2".to_utf8(), text: "A".to_utf8() },
-	{ level: 2, id: "a-3".to_utf8(), text: "A".to_utf8() },
+expect Md.render_document(
+	"# A\n\n> ## A\n\n- ## `A`\n".to_utf8(),
+	{ fence: widgets, images: AsLinks },
+).headings == [
+	{
+		level: 1,
+		id: "a".to_utf8(),
+		text: "A".to_utf8(),
+	},
+	{
+		level: 2,
+		id: "a-2".to_utf8(),
+		text: "A".to_utf8(),
+	},
+	{
+		level: 2,
+		id: "a-3".to_utf8(),
+		text: "A".to_utf8(),
+	},
 ]
 # A heading in a code block is code, and a hook's own stay as the hook wrote them.
-expect Md.render_document("```\n## no\n```".to_utf8(), { fence: widgets, images: AsLinks }).headings == []
-expect Md.render_document("    ## no\n\n    <h2 id=\"\">x</h2>".to_utf8(), { fence: widgets, images: AsLinks }).headings == []
-expect Md.render_document("<h2 id=\"\">x</h2>\n\na <h2 id=\"\">b</h2>".to_utf8(), { fence: widgets, images: AsLinks }).headings == []
+expect Md.render_document(
+	"```\n## no\n```".to_utf8(),
+	{ fence: widgets, images: AsLinks },
+).headings == []
+expect Md.render_document(
+	"    ## no\n\n    <h2 id=\"\">x</h2>".to_utf8(),
+	{ fence: widgets, images: AsLinks },
+).headings == []
+expect Md.render_document(
+	"<h2 id=\"\">x</h2>\n\na <h2 id=\"\">b</h2>".to_utf8(),
+	{ fence: widgets, images: AsLinks },
+).headings == []
 expect doc("```heading\n```\n# mine") == "<h2>mine</h2>\n<h2 id=\"x\">too</h2>\n<h1 id=\"mine\">mine</h1>\n"
 
 # Rules, wherever a block may stand. A chat reads each of these as it always has.
@@ -369,7 +466,9 @@ expect doc("red@red.R0 *red@red.R1*") == "<p>red@red.R0 <em>red@red.R1</em></p>\
 expect doc("| a@b.c |\n| - |") == "<table>\n<thead>\n<tr>\n<th>a@b.c</th>\n</tr>\n</thead>\n</table>\n"
 expect doc("[a](mailto:b@c.d)") == "<p><a href=\"mailto:b@c.d\">a</a></p>\n"
 expect md("mail a.b@c.d now") == "<p>mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a> now</p>\n"
-expect Str.from_utf8(Md.render_trusted_reflow("a.b@c.d".to_utf8(), chat)) == Ok("<p><a href=\"mailto:a.b@c.d\">a.b@c.d</a></p>\n")
+expect Str.from_utf8(
+	Md.render_trusted_reflow("a.b@c.d".to_utf8(), chat),
+) == Ok("<p><a href=\"mailto:a.b@c.d\">a.b@c.d</a></p>\n")
 
 # A tab after a marker is the indent it reaches, in a document. A chat counts it
 # as one space, as ever.
@@ -450,7 +549,16 @@ expect md("-\r\n- b\r\n") == "<p>-</p>\n<ul>\n<li>b</li>\n</ul>\n"
 
 # A heading a hook wrote stays as it wrote it, even with an empty id.
 expect doc("```raw\n```\n# b") == "<h2 id=\"\">x</h2>\n<h1 id=\"b\">b</h1>\n"
-expect Md.render_document("```raw\n```\n# b".to_utf8(), { fence: widgets, images: AsLinks }).headings == [{ level: 1, id: "b".to_utf8(), text: "b".to_utf8() }]
+expect Md.render_document(
+	"```raw\n```\n# b".to_utf8(),
+	{ fence: widgets, images: AsLinks },
+).headings == [
+	{
+		level: 1,
+		id: "b".to_utf8(),
+		text: "b".to_utf8(),
+	},
+]
 
 # The chat's answers for a text with every feature here, in each mode a
 # chat has.
@@ -461,6 +569,10 @@ every_feature_html : Str -> Str
 every_feature_html = |line_join| "<h1>a <a href=\"#msg-x_1\" class=\"msg-ref\">MSG_x_1</a></h1>\n<p>b${line_join}c <a href=\"https://x.org\" target=\"_blank\" rel=\"noopener\">d</a> <a href=\"https://y.org\" target=\"_blank\" rel=\"noopener\">https://y.org</a></p>\n<pre class=\"chat-quote\">e\n</pre>\n<pre><code class=\"language-dot\">f\n</code></pre>\n<table>\n<thead>\n<tr>\n<th>g</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>h</td>\n</tr>\n</tbody>\n</table>\n<p><video controls preload=\"metadata\" src=\"/user_uploads/i.mp4\"></video></p>\n"
 
 expect md(every_feature) == every_feature_html("<br>\n")
-expect Str.from_utf8(Md.render_trusted(every_feature.to_utf8(), chat)) == Ok(every_feature_html("<br>\n"))
-expect Str.from_utf8(Md.render_trusted_reflow(every_feature.to_utf8(), chat)) == Ok(every_feature_html(" "))
+expect Str.from_utf8(
+	Md.render_trusted(every_feature.to_utf8(), chat),
+) == Ok(every_feature_html("<br>\n"))
+expect Str.from_utf8(
+	Md.render_trusted_reflow(every_feature.to_utf8(), chat),
+) == Ok(every_feature_html(" "))
 expect Md.hostility(every_feature.to_utf8(), chat) == Renderable

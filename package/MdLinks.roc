@@ -54,16 +54,7 @@ MdLinks := [].{
 		closes : Closes,
 		budget : MdText.Budget,
 	}
-	link_at = |
-		text,
-		{
-			at,
-			next_bracket,
-			brackets,
-			closes,
-			budget,
-		},
-	| {
+	link_at = |text, { at, next_bracket, brackets, closes, budget }| {
 		len = text.len()
 		label = label_end(text, { at, next_bracket, brackets, budget })
 		var $budget = label.budget
@@ -80,7 +71,17 @@ MdLinks := [].{
 			open_paren = close_bracket + 1
 			(table, scanned) = match closes {
 				Scanned(t) => (t, $budget)
-				Unscanned => (pair_closes(text, { opener: '(', closer: ')', escapes: Unread }), MdText.charge($budget, len))
+				Unscanned => (
+					pair_closes(
+						text,
+						{
+							opener: '(',
+							closer: ')',
+							escapes: Unread,
+						},
+					),
+					MdText.charge($budget, len),
+				)
 			}
 			$budget = scanned
 			close_paren = table.get(open_paren) ?? len
@@ -96,7 +97,9 @@ MdLinks := [].{
 				{
 					link: Ok({
 						label: { start: at + 1, end: close_bracket },
-						url: MdText.unescaped(MdText.cut(text, { start: open_paren + 1, end: close_paren })),
+						url: MdText.unescaped(
+							MdText.cut(text, { start: open_paren + 1, end: close_paren }),
+						),
 						end: close_paren + 1,
 					}),
 					next_bracket: label.next_bracket,
@@ -145,7 +148,12 @@ MdLinks := [].{
 	## `![alt](src "title")`'s tag: the one a member's `<img src alt title>`
 	## is rebuilt as (MdSafety's allowlist), or `NotSafe` where its src is no
 	## upload (`MdSafety.is_upload_url`, the rule `<img>` follows).
-	image : { src : List(U8), alt : List(U8), title : MdHtml.Title, uploads : MdSafety.Uploads } -> Try(List(U8), [NotSafe])
+	image : {
+		src : List(U8),
+		alt : List(U8),
+		title : MdHtml.Title,
+		uploads : MdSafety.Uploads,
+	} -> Try(List(U8), [NotSafe])
 	image = |{ src, alt, title, uploads }| {
 		attrs = MdSafety.media_attrs({
 			kind: Img,
@@ -171,7 +179,11 @@ MdLinks := [].{
 	## uploads rule isn't asked, because a document's src is the host's own. A
 	## dangerous src is still refused, so the sink stays safe whatever its
 	## callers do.
-	shown_image : { src : List(U8), alt : List(U8), title : MdHtml.Title } -> Try(List(U8), [NotSafe])
+	shown_image : {
+		src : List(U8),
+		alt : List(U8),
+		title : MdHtml.Title,
+	} -> Try(List(U8), [NotSafe])
 	shown_image = |{ src, alt, title }|
 		if MdSafety.is_dangerous_url(src) {
 			Err(NotSafe)
@@ -196,8 +208,16 @@ MdLinks := [].{
 	## dropped here, so the sink stays safe whatever its callers do.
 	link_open : List(U8), { outside : [SameTab, NewTab], title : MdHtml.Title } -> List(U8)
 	link_open = |url, { outside, title }| MdHtml.link_open({
-		href: if (MdSafety.is_dangerous_url(url)) [] else url,
-		tab: if (MdSafety.is_external_href(url)) outside else SameTab,
+		href: if MdSafety.is_dangerous_url(url) {
+			[]
+		} else {
+			url
+		},
+		tab: if MdSafety.is_external_href(url) {
+			outside
+		} else {
+			SameTab
+		},
 		title,
 	})
 
@@ -208,9 +228,21 @@ MdLinks := [].{
 	angle_url_at : List(U8), U64 -> Try({ url : List(U8), end : U64 }, [NotALink])
 	angle_url_at = |text, at| {
 		start = at + 1
-		is_prefixed = |prefix| MdText.is_prefixed_ignoring_case(text, { at: start, prefix: prefix.to_utf8() })
-		scheme_len = if (is_prefixed("http://")) 7 else if (is_prefixed("https://")) 8 else 0
-		close = Bytes.count_while(text, { keep: |c| c > ' ' and c != 0x7f and c != '<' and c != '>', at: start })
+		is_prefixed = |prefix| MdText.is_prefixed_ignoring_case(
+			text,
+			{ at: start, prefix: prefix.to_utf8() },
+		)
+		scheme_len = if is_prefixed("http://") {
+			7
+		} else if is_prefixed("https://") {
+			8
+		} else {
+			0
+		}
+		close = Bytes.count_while(
+			text,
+			{ keep: |c| c > ' ' and c != 0x7f and c != '<' and c != '>', at: start },
+		)
 		if scheme_len == 0 or close <= start + scheme_len or text.get(close) != Ok('>') {
 			Err(NotALink)
 		} else {
@@ -240,11 +272,7 @@ MdLinks := [].{
 			MdText.is_space(p) or p == '*' or p == '_' or p == '~' or p == '('
 		}
 
-	AutoKind : [
-		Url,
-		Www,
-		Email,
-	]
+	AutoKind : [Url, Www, Email]
 
 	## A GFM autolink at `at`, and the index past
 	## it. `email_dead` is the floor below which no email can start: when one
@@ -262,15 +290,7 @@ MdLinks := [].{
 		email_dead : U64,
 		budget : MdText.Budget,
 	}
-	autolink_at = |
-		text,
-		{
-			at,
-			email_dead,
-			emails,
-			budget,
-		},
-	| {
+	autolink_at = |text, { at, email_dead, emails, budget }| {
 		starts_with = |prefix| MdText.is_prefixed_ignoring_case(
 			text,
 			{ at, prefix: prefix.to_utf8() },
@@ -301,17 +321,17 @@ MdLinks := [].{
 					j = Bytes.count_while(text, { keep: is_email_local_char, at })
 					{
 						link: Err(NotALink),
-						email_dead: if (j > at) j else at + 1,
+						email_dead: if j > at {
+							j
+						} else {
+							at + 1
+						},
 						budget: MdText.charge(e.budget, j - at),
 					}
 				}
 			}
 		} else {
-			{
-				link: Err(NotALink),
-				email_dead,
-				budget,
-			}
+			{ link: Err(NotALink), email_dead, budget }
 		}
 	}
 
@@ -320,9 +340,21 @@ MdLinks := [].{
 	autolink_html : List(U8), AutoKind, [SameTab, NewTab] -> List(U8)
 	autolink_html = |link, kind, outside| {
 		head = match kind {
-			Url => MdHtml.link_open({ href: link, tab: outside, title: Untitled })
-			Www => MdHtml.link_open({ href: "http://".to_utf8().concat(link), tab: outside, title: Untitled })
-			Email => MdHtml.link_open({ href: "mailto:".to_utf8().concat(link), tab: SameTab, title: Untitled })
+			Url => MdHtml.link_open({
+				href: link,
+				tab: outside,
+				title: Untitled,
+			})
+			Www => MdHtml.link_open({
+				href: "http://".to_utf8().concat(link),
+				tab: outside,
+				title: Untitled,
+			})
+			Email => MdHtml.link_open({
+				href: "mailto:".to_utf8().concat(link),
+				tab: SameTab,
+				title: Untitled,
+			})
 		}
 		MdText.escape_onto(head, link).concat(MdHtml.link_close)
 	}
@@ -366,7 +398,14 @@ label_end = |text, { at, next_bracket, brackets, budget }| {
 			budget,
 		}
 		Balanced(Unscanned) => {
-			table = pair_closes(text, { opener: '[', closer: ']', escapes: Read })
+			table = pair_closes(
+				text,
+				{
+					opener: '[',
+					closer: ']',
+					escapes: Read,
+				},
+			)
 			{
 				close: table.get(at) ?? len,
 				next_bracket,
@@ -380,7 +419,12 @@ label_end = |text, { at, next_bracket, brackets, budget }| {
 ## Each `opener`'s balancing `closer` in the line, by one pass of a stack: its
 ## index, or the line's length for an opener with none and every other byte.
 ## With `escapes` `Read`, a backslashed byte is neither.
-pair_closes : List(U8), { opener : U8, closer : U8, escapes : [Read, Unread] } -> List(U64)
+pair_closes : List(U8),
+{
+	opener : U8,
+	closer : U8,
+	escapes : [Read, Unread],
+} -> List(U64)
 pair_closes = |text, { opener, closer, escapes }| {
 	len = text.len()
 	var $closes = List.repeat(len, len)
@@ -395,7 +439,10 @@ pair_closes = |text, { opener, closer, escapes }| {
 		} else if c == closer {
 			match $open.last() {
 				Ok(j) => {
-					$closes = $closes.set(j, $i) ?? crash "MdLinks.pair_closes: an opener past the line"
+					$closes = $closes.set(
+						j,
+						$i,
+					) ?? crash "MdLinks.pair_closes: an opener past the line"
 					$open = $open.drop_last(1)
 				}
 				Err(ListWasEmpty) => {}
@@ -466,7 +513,14 @@ url_end = |text, { start, budget }| {
 				break
 			}
 		}
-		{ end: if ($end <= start + 4) Err(NotALink) else Ok($end), budget: spent }
+		{
+			end: if $end <= start + 4 {
+				Err(NotALink)
+			} else {
+				Ok($end)
+			},
+			budget: spent,
+		}
 	}
 }
 
@@ -492,15 +546,14 @@ email_end = |text, { start, budget }| {
 			},
 		)
 		spent = MdText.charge(local_spent, domain_end - domain_start)
-		if domain_end == domain_start or !MdText.cut(text, { start: domain_start, end: domain_end }).contains('.') {
+		if domain_end == domain_start or !MdText.cut(
+			text,
+			{ start: domain_start, end: domain_end },
+		).contains('.') {
 			{ end: Err(NotALink), budget: spent }
 		} else {
 			var $j = domain_end
-			while $j > domain_start and [
-				'.',
-				'-',
-				'_',
-			].contains(MdText.at(text, $j - 1)) {
+			while $j > domain_start and ['.', '-', '_'].contains(MdText.at(text, $j - 1)) {
 				$j = $j - 1
 			}
 			{ end: Ok($j), budget: spent }

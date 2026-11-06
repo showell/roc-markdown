@@ -14,17 +14,18 @@ import MdText
 MdMedia := [].{
 
 	## A rebuilt tag, and the index past the source it stood for.
-	Rebuilt : {
-		html : List(U8),
-		end : U64,
-	}
+	Rebuilt : { html : List(U8), end : U64 }
 
 	## The `<img …>` at `raw[start]` rebuilt,
 	## and the index past its `>`.
 	img_at : List(U8), U64, MdSafety.Uploads -> Try(Rebuilt, [NotSafe])
 	img_at = |raw, start, uploads| {
 		tag = scan(raw, { start, name: "img".to_utf8() })?
-		attrs = MdSafety.media_attrs({ kind: Img, value_of: |name| last_of(tag.attrs, name), uploads })?
+		attrs = MdSafety.media_attrs({
+			kind: Img,
+			value_of: |name| last_of(tag.attrs, name),
+			uploads,
+		})?
 		Ok({ html: MdHtml.img(attrs), end: tag.end })
 	}
 
@@ -35,7 +36,11 @@ MdMedia := [].{
 	video_at : List(U8), U64, MdSafety.Uploads -> Try(Rebuilt, [NotSafe])
 	video_at = |raw, start, uploads| {
 		tag = scan(raw, { start, name: "video".to_utf8() })?
-		attrs = MdSafety.media_attrs({ kind: Video, value_of: |name| last_of(tag.attrs, name), uploads })?
+		attrs = MdSafety.media_attrs({
+			kind: Video,
+			value_of: |name| last_of(tag.attrs, name),
+			uploads,
+		})?
 		close = close_tag_end(raw, { at: skip_spaces(raw, tag.end), name: "video".to_utf8() })?
 		Ok({ html: MdHtml.video(attrs), end: close })
 	}
@@ -55,10 +60,7 @@ MdMedia := [].{
 
 ## A start tag's attributes, each name as written, and the index past its
 ## `>`.
-Tag : {
-	attrs : List((List(U8), List(U8))),
-	end : U64,
-}
+Tag : { attrs : List((List(U8), List(U8))), end : U64 }
 
 ## `<name` (any case) at `start`,
 ## then a space, `>` or `/`; then each `name=value` up to the tag's `>`,
@@ -123,15 +125,15 @@ attrs_from = |raw, from| {
 					} else {
 						{}
 					}
-					$attrs = $attrs.append((name, MdText.cut(raw, { start: value_start, end: close })))
+					$attrs = $attrs.append((
+						name,
+						MdText.cut(raw, { start: value_start, end: close }),
+					))
 					$i = close + 1
 				} else {
 					value_start = $i
 					while $i < len and !MdText.is_space(
-						MdText.at(
-							raw,
-							$i,
-						),
+						MdText.at(raw, $i),
 					) and MdText.at(raw, $i) != '>' {
 						$i = $i + 1
 					}
@@ -143,7 +145,11 @@ attrs_from = |raw, from| {
 		}
 	}
 	# A tag ends past its `>`, never at 0: 0 is a walk that ran off the end.
-	if ($end == 0) Err(NotSafe) else Ok({ attrs: $attrs, end: $end })
+	if $end == 0 {
+		Err(NotSafe)
+	} else {
+		Ok({ attrs: $attrs, end: $end })
+	}
 }
 
 skip_spaces : List(U8), U64 -> U64
@@ -169,7 +175,11 @@ close_tag_end = |raw, { at, name }| {
 		Err(NotSafe)
 	} else {
 		i = skip_spaces(raw, at + 2 + n)
-		if (i >= raw.len() or MdText.at(raw, i) != '>') Err(NotSafe) else Ok(i + 1)
+		if i >= raw.len() or MdText.at(raw, i) != '>' {
+			Err(NotSafe)
+		} else {
+			Ok(i + 1)
+		}
 	}
 }
 
@@ -215,18 +225,39 @@ expect video("<video src=\"/\t/evil.example/x.mp4\"></video>") == ""
 expect img("<img src=\" /user_uploads/cat.png \">") == "<img src=\" /user_uploads/cat.png \">"
 # The host's rule decides: none renders no media, and its own path is the
 # only one it lets through.
-expect MdMedia.img_at("<img src=\"/user_uploads/x.png\">".to_utf8(), 0, |_| Bool.False) == Err(NotSafe)
-expect MdMedia.img_at("<img src=\"/files/x.png\">".to_utf8(), 0, MdSafety.under("/files/".to_utf8())).is_ok()
+expect MdMedia.img_at(
+	"<img src=\"/user_uploads/x.png\">".to_utf8(),
+	0,
+	|_| Bool.False,
+) == Err(NotSafe)
+expect MdMedia.img_at(
+	"<img src=\"/files/x.png\">".to_utf8(),
+	0,
+	MdSafety.under("/files/".to_utf8()),
+).is_ok()
 # The Images feed's (SafeImg's, folded here): its plants, escaped values,
 # case-blind names, the last of a name winning, single quotes, a bare name.
 expect MdMedia.rebuild("<img src=x onerror=\"alert(1)\">", user_uploads) == Err(Unsafe)
-expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\" width=\"40\" onload=\"alert(2)\">", user_uploads) == Ok("<img src=\"/user_uploads/a.png\" width=\"40\">")
-expect MdMedia.rebuild("<IMG SRC='/user_uploads/a.png' alt=\"x\" ALT=y&z hidden>", user_uploads) == Ok("<img src=\"/user_uploads/a.png\" alt=\"y&amp;z\">")
-expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\" alt=\"<b>\">", user_uploads) == Ok("<img src=\"/user_uploads/a.png\" alt=\"&lt;b&gt;\">")
+expect MdMedia.rebuild(
+	"<img src=\"/user_uploads/a.png\" width=\"40\" onload=\"alert(2)\">",
+	user_uploads,
+) == Ok("<img src=\"/user_uploads/a.png\" width=\"40\">")
+expect MdMedia.rebuild(
+	"<IMG SRC='/user_uploads/a.png' alt=\"x\" ALT=y&z hidden>",
+	user_uploads,
+) == Ok("<img src=\"/user_uploads/a.png\" alt=\"y&amp;z\">")
+expect MdMedia.rebuild(
+	"<img src=\"/user_uploads/a.png\" alt=\"<b>\">",
+	user_uploads,
+) == Ok("<img src=\"/user_uploads/a.png\" alt=\"&lt;b&gt;\">")
 expect MdMedia.rebuild("<img src=\"/user_uploads/a.png\"", user_uploads) == Err(Unsafe)
 expect MdMedia.rebuild("<img src=\"/a.png>", user_uploads) == Err(Unsafe)
 expect MdMedia.rebuild("<img src=", user_uploads) == Err(Unsafe)
-expect MdMedia.video_at("x<VIDEO src=/user_uploads/v.mp4 >  </Video >y".to_utf8(), 1, user_uploads) == Ok({
+expect MdMedia.video_at(
+	"x<VIDEO src=/user_uploads/v.mp4 >  </Video >y".to_utf8(),
+	1,
+	user_uploads,
+) == Ok({
 	html: "<video controls preload=\"metadata\" src=\"/user_uploads/v.mp4\"></video>".to_utf8(),
 	end: 44,
 })

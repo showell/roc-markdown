@@ -48,7 +48,11 @@ MdBlocks := [].{
 		},
 	|
 		if depth > max_block_depth {
-			start = if (out != [] and out.last() != Ok('\n')) out.append('\n') else out
+			start = if out != [] and out.last() != Ok('\n') {
+				out.append('\n')
+			} else {
+				out
+			}
 			flat = MdInline.render_onto({
 				out: start.concat(MdHtml.p_open),
 				text: md,
@@ -160,21 +164,67 @@ block_at = |
 	if is_code(line) {
 		Ok(MdDocument.indented_code_onto(out, { md, line_start, budget }))
 	} else if is_rule(line) {
-		Ok({ out: out.concat(MdHtml.hr), budget, after: next })
+		Ok({
+			out: out.concat(MdHtml.hr),
+			budget,
+			after: next,
+		})
 	} else {
 		match MdFence.open_at(md, line_start) {
 			Ok(open) => Ok(MdFence.fence_onto(out, { md, open, line, budget, dialect }))
 			Err(NotAFence) =>
 				match MdHeading.atx_heading(line) {
-					Ok(h) => MdHeading.heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads, dialect })
+					Ok(h) => MdHeading.heading_onto(
+						out,
+						{
+							level: h.level,
+							content: h.content,
+							after: next,
+							budget,
+							uploads,
+							dialect,
+						},
+					)
 					Err(NotAHeading) =>
 						match MdList.list_marker_at(md, { line_start, reading }) {
-							Ok(marker) => MdList.list_onto(out, { md, line_start, first: marker, budget, nested, is_block_start: starts_block, is_rule, is_code, reading })
+							Ok(marker) => MdList.list_onto(
+								out,
+								{
+									md,
+									line_start,
+									first: marker,
+									budget,
+									nested,
+									is_block_start: starts_block,
+									is_rule,
+									is_code,
+									reading,
+								},
+							)
 							Err(NotAMarker) =>
 								if MdQuote.is_quote_line(line) {
-									MdQuote.quote_onto(out, { md, line_start, budget, nested, is_block_start: starts_block, is_code, reading })
-								} else if MdRawHtml.is_html_block_start(line) and !MdDialect.is_angle_url_line(dialect, line) {
-									Ok(MdRawHtml.raw_html_onto(out, { md, line_start, budget, uploads }))
+									MdQuote.quote_onto(
+										out,
+										{
+											md,
+											line_start,
+											budget,
+											nested,
+											is_block_start: starts_block,
+											is_code,
+											reading,
+										},
+									)
+								} else if MdRawHtml.is_html_block_start(line) and !MdDialect.is_angle_url_line(
+									dialect,
+									line,
+								) {
+									Ok(
+										MdRawHtml.raw_html_onto(
+											out,
+											{ md, line_start, budget, uploads },
+										),
+									)
 								} else if MdTable.is_table_at(md, line_start) {
 									MdTableBlock.table_onto(
 										out,
@@ -184,11 +234,30 @@ block_at = |
 											budget,
 											uploads,
 											dialect,
-											ends_table: |text, row| starts_block(text, row) or is_code(MdText.cut(text, { start: row, end: MdText.line_end(text, row) })),
+											ends_table: |
+												text,
+												row,
+											| starts_block(text, row) or is_code(
+												MdText.cut(
+													text,
+													{ start: row, end: MdText.line_end(text, row) },
+												),
+											),
 										},
 									)
 								} else {
-									paragraph_onto(out, { md, line_start, spacing, wrap, budget, uploads, dialect })
+									paragraph_onto(
+										out,
+										{
+											md,
+											line_start,
+											spacing,
+											wrap,
+											budget,
+											uploads,
+											dialect,
+										},
+									)
 								}
 						}
 				}
@@ -238,7 +307,10 @@ paragraph_onto = |
 		line = MdText.cut(md, { start: $p, end: eol })
 		is_interrupted = MdFence.open_at(md, $p).is_ok()
 			or MdHeading.atx_heading(line).is_ok()
-			or MdList.is_list_interrupting(md, { line_start: $p, reading: MdDialect.indent_reading(dialect) })
+			or MdList.is_list_interrupting(
+				md,
+				{ line_start: $p, reading: MdDialect.indent_reading(dialect) },
+			)
 			or MdQuote.is_quote_line(line)
 			or ($p > line_start and MdTable.is_table_at(md, $p))
 			or MdDialect.is_rule(dialect, line)
@@ -251,15 +323,31 @@ paragraph_onto = |
 		$p = MdText.next_line(md, eol)
 	}
 	last = $lines.len() - 1
-	var $out = if (spacing == Tight) out else out.concat(MdHtml.p_open)
+	var $out = if spacing == Tight {
+		out
+	} else {
+		out.concat(MdHtml.p_open)
+	}
 	var $budget = budget
 	var $reflow = []
 	var $k = 0
 	for line in $lines {
 		breaks = $k < last and ends_in_hard_break(line)
-		text = MdText.trim_line(if (breaks) line.drop_last(1) else line)
+		text = MdText.trim_line(
+			if breaks {
+				line.drop_last(1)
+			} else {
+				line
+			},
+		)
 		if wrap == Reflow {
-			$reflow = (if ($reflow == []) $reflow else $reflow.append(' ')).concat(text)
+			$reflow = (
+				if $reflow == [] {
+					$reflow
+				} else {
+					$reflow.append(' ')
+				}
+			).concat(text)
 			if breaks {
 				broke = MdInline.render_onto({
 					out: $out,
@@ -276,7 +364,11 @@ paragraph_onto = |
 			}
 		} else {
 			wrapped = MdInline.render_onto({
-				out: if ($k == 0) $out else $out.concat(MdHtml.br),
+				out: if $k == 0 {
+					$out
+				} else {
+					$out.concat(MdHtml.br)
+				},
 				text,
 				refs: MdDialect.inline_refs(dialect),
 				budget: $budget,
@@ -301,7 +393,11 @@ paragraph_onto = |
 		{}
 	}
 	Ok({
-		out: if (spacing == Tight) $out else $out.concat(MdHtml.p_close),
+		out: if spacing == Tight {
+			$out
+		} else {
+			$out.concat(MdHtml.p_close)
+		},
 		budget: $budget,
 		after: $p,
 	})
@@ -315,10 +411,12 @@ ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
 ## Inside a tight list item, a block after a bare
 ## paragraph starts on a line of its own.
 tight_sep : List(U8), [Tight, Loose] -> List(U8)
-tight_sep = |
-	out,
-	spacing,
-| if (spacing == Tight and out != [] and out.last() != Ok('\n')) out.append('\n') else out
+tight_sep = |out, spacing|
+	if spacing == Tight and out != [] and out.last() != Ok('\n') {
+		out.append('\n')
+	} else {
+		out
+	}
 
 # ── block starts ──
 

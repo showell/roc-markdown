@@ -87,7 +87,9 @@ long_topic_end : List(U8), { channel_start : U64, first_end : U64 } -> Try(U64, 
 long_topic_end = |text, { channel_start, first_end }|
 	if first_end >= text.len() or MdText.at(text, first_end) != '.' {
 		Ok(first_end)
-	} else if first_end - channel_start > channel_name_max or !Ascii.is_letter(MdText.at(text, channel_start)) {
+	} else if first_end - channel_start > channel_name_max or !Ascii.is_letter(
+		MdText.at(text, channel_start),
+	) {
 		Err(NoRef)
 	} else {
 		slug_end(text, first_end + 1)
@@ -97,7 +99,11 @@ long_topic_end = |text, { channel_start, first_end }|
 slug_end : List(U8), U64 -> Try(U64, [NoRef])
 slug_end = |text, start| {
 	end = Bytes.count_while(text, { keep: is_slug_char, at: start })
-	if (end == start) Err(NoRef) else Ok(end)
+	if end == start {
+		Err(NoRef)
+	} else {
+		Ok(end)
+	}
 }
 
 ## The longest channel name, in bytes (a channel is a letter, then letters,
@@ -112,12 +118,18 @@ is_slug_char = |c| Ascii.is_alphanumeric(c) or c == '-'
 msg_prefix : List(U8)
 msg_prefix = "MSG_".to_utf8()
 
-expect MdChat.reference_at("MSG_plans_3.".to_utf8(), 0) == Ok({ html: "<a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a>".to_utf8(), end: 11 })
+expect MdChat.reference_at("MSG_plans_3.".to_utf8(), 0) == Ok({
+	html: "<a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a>".to_utf8(),
+	end: 11,
+})
 expect MdChat.reference_at("xMSG_plans_3".to_utf8(), 1) == Err(NoRef)
 expect MdChat.reference_at("MSG_plans_".to_utf8(), 0) == Err(NoRef)
 
 # A channel's reference: its name, a `.`, then the topic's reference.
-expect MdChat.reference_at("MSG_Cobblestone.ChitChat_5.".to_utf8(), 0) == Ok({ html: "<a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>".to_utf8(), end: 26 })
+expect MdChat.reference_at("MSG_Cobblestone.ChitChat_5.".to_utf8(), 0) == Ok({
+	html: "<a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>".to_utf8(),
+	end: 26,
+})
 expect MdChat.reference_at("MSG_a-1-.road-trip_9 x".to_utf8(), 0).map_ok(|r| r.end) == Ok(20)
 expect MdChat.reference_at("MSG_${"a".repeat(40)}.t_1".to_utf8(), 0).map_ok(|r| r.end) == Ok(48)
 # Not one: no number, a name too long, a channel not led by a letter, an
