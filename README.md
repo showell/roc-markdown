@@ -89,7 +89,7 @@ html = Md.render(message, options)
 | `Md.work_units : List(U8), Md.Options -> U64` | what a render costs |
 | `Md.render_trusted : List(U8), Md.Options -> List(U8)` | your own docs, no budget |
 | `Md.render_trusted_reflow : List(U8), Md.Options -> List(U8)` | the same, a newline as a space |
-| `Md.render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered` | a page of a book, with a hook for its fences and a choice about its images (below) |
+| `Md.render_document : List(U8), Md.DocumentOptions -> MdDocument.Page` | a page of a book, with a hook for its fences and a choice about its images (below) |
 | `Md.uploads_under : List(U8) -> (List(U8) -> Bool)` | the rule of one uploads folder: every path under it |
 | `Md.no_uploads : List(U8) -> Bool` | the rule of a host with no uploads |
 | `Md.escape : List(U8) -> List(U8)` | text made safe for HTML, the renderer's own escape, for your pages |
