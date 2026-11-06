@@ -33,6 +33,7 @@ import MdDocument
 import MdFence
 import MdHtml
 import MdInline
+import MdLinks
 import MdList
 import MdMedia
 import MdQuote
@@ -73,15 +74,17 @@ Md := [].{
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
 	render_trusted_reflow = |md, { uploads }| rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads, dialect: Chat })
 
-	## How a document's render treats a fenced block it doesn't know.
-	DocumentOptions : { fence : MdDocument.FenceHook }
+	## How a document's render treats a fenced block it doesn't know, and how
+	## its `![alt](src)` appears. Neither has a default.
+	DocumentOptions : { fence : MdDocument.FenceHook, images : MdSafety.Images }
 
 	## Server-owned prose as a page of a book. It has no budget and no chat
 	## syntax, a newline is a space, a link to another site stays in its tab,
-	## raw HTML is escaped, and each heading has an id. The hook is the one
-	## way in for HTML of the caller's own.
+	## raw HTML is escaped, and each heading has an id. It adds what a chat
+	## doesn't read: rules, indented code and `<http://…>`, and it leaves an
+	## email as text. The hook is the one way in for HTML of the caller's own.
 	render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered
-	render_document = |md, { fence }| MdDocument.named(rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads: no_uploads, dialect: Document(fence) }))
+	render_document = |md, options| MdDocument.named(rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads: no_uploads, dialect: Document(options) }))
 
 	## Text made safe for HTML, an element's content or an attribute's value
 	## (either quote): `&`, `<`, `>`, `"` and `'` as entities, every other
@@ -115,8 +118,16 @@ Md := [].{
 	malformed_html = MdHtml.malformed
 }
 
-## A chat's syntax, or a document's, with the hook its fences go through.
-Dialect : [Chat, Document(MdDocument.FenceHook)]
+## A chat's syntax, or a document's, with that document's options.
+Dialect : [Chat, Document(Md.DocumentOptions)]
+
+## A question only a document asks of a line. A chat's answer is no, which is
+## what keeps every chat answer as it is.
+in_document : Dialect, (List(U8) -> Bool), List(U8) -> Bool
+in_document = |dialect, question, line| match dialect {
+	Chat => Bool.False
+	Document(_) => question(line)
+}
 
 ## The one seed every render grows from: `md`'s blocks from the top, as a
 ## document's, in `wrap` and against `budget`.
@@ -236,9 +247,11 @@ blocks_onto = |
 
 ## The block at `pos` (its line `line`, the line after it at `next`) onto
 ## `out`, already separated from the block before: the dispatcher's one
-## question, its blocks in the order they are asked. A fence, a heading, a
-## list and a quote can each interrupt a paragraph, so each is asked first;
-## then an HTML block and a table; else a paragraph.
+## question, its blocks in the order they are asked. A document's indented code
+## and rule come first: nothing else claims four columns of indent, and `- - -`
+## would read as a list. A fence, a heading, a list and a quote can each
+## interrupt a paragraph, so each is asked next; then an HTML block and a table;
+## else a paragraph.
 block_at : List(U8),
 {
 	md : List(U8),
@@ -266,28 +279,38 @@ block_at = |
 		uploads,
 		dialect,
 	},
-|
-	match MdFence.open_at(md, pos) {
-		Ok(open) => Ok(fence_onto(out, { md, open, line, budget, dialect }))
-		Err(NotAFence) =>
-			match atx_heading(line) {
-				Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads, dialect })
-				Err(NotAHeading) =>
-					match MdList.list_marker_at(md, pos) {
-						Ok(marker) => MdList.list_onto(out, { md, pos, first: marker, budget, nested, is_block_start })
-						Err(NotAMarker) =>
-							if MdQuote.is_quote_line(line) {
-								MdQuote.quote_onto(out, { md, pos, budget, nested, is_block_start })
-							} else if is_html_block_start(line) {
-								Ok(raw_html_onto(out, { md, pos, budget, uploads }))
-							} else if MdTable.is_table_at(md, pos) {
-								table_onto(out, { md, pos, budget, uploads, dialect })
-							} else {
-								paragraph_onto(out, { md, pos, spacing, wrap, budget, uploads, dialect })
-							}
-					}
-			}
+| {
+	is_rule = |text| in_document(dialect, MdDocument.is_rule, text)
+	is_code = |text| in_document(dialect, MdDocument.is_indented_code, text)
+	starts_block = is_block_start(dialect)
+	if is_code(line) {
+		Ok(MdDocument.indented_code_onto(out, { md, pos, budget }))
+	} else if is_rule(line) {
+		Ok({ out: out.concat(MdHtml.hr), budget, after: next })
+	} else {
+		match MdFence.open_at(md, pos) {
+			Ok(open) => Ok(fence_onto(out, { md, open, line, budget, dialect }))
+			Err(NotAFence) =>
+				match atx_heading(line) {
+					Ok(h) => heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads, dialect })
+					Err(NotAHeading) =>
+						match MdList.list_marker_at(md, pos) {
+							Ok(marker) => MdList.list_onto(out, { md, pos, first: marker, budget, nested, is_block_start: starts_block, is_rule, is_code })
+							Err(NotAMarker) =>
+								if MdQuote.is_quote_line(line) {
+									MdQuote.quote_onto(out, { md, pos, budget, nested, is_block_start: starts_block, is_code })
+								} else if is_html_block_start(line) and !in_document(dialect, MdLinks.is_angle_url_line, line) {
+									Ok(raw_html_onto(out, { md, pos, budget, uploads }))
+								} else if MdTable.is_table_at(md, pos) {
+									table_onto(out, { md, pos, budget, uploads, dialect })
+								} else {
+									paragraph_onto(out, { md, pos, spacing, wrap, budget, uploads, dialect })
+								}
+						}
+				}
+		}
 	}
+}
 
 ## An ATX heading, its content's inlines rendered between its tags.
 heading_onto : List(U8), { level : U64, content : List(U8), after : U64, budget : MdText.Budget, uploads : MdSafety.Uploads, dialect : Dialect } -> Try(MdText.Block, [Hostile])
@@ -308,7 +331,8 @@ heading_onto = |out, { level, content, after, budget, uploads, dialect }| {
 }
 
 ## A paragraph: the longest run of lines that are not blank and start no
-## block that may interrupt one. In the hard-wrap dialect each line is
+## block that may interrupt one. Indented code can't, so an indented line after
+## a paragraph's first is that paragraph's. In the hard-wrap dialect each line is
 ## rendered on its own and joined by `<br>`; in reflow the lines join with
 ## a space and render once.
 ##
@@ -352,7 +376,7 @@ paragraph_onto = |
 		).is_ok() or atx_heading(line).is_ok() or MdList.is_list_interrupting(
 			md,
 			$p,
-		) or MdQuote.is_quote_line(line) or ($p > pos and MdTable.is_table_at(md, $p)) {
+		) or MdQuote.is_quote_line(line) or ($p > pos and MdTable.is_table_at(md, $p)) or in_document(dialect, MdDocument.is_rule, line) {
 			break
 		} else {
 			{}
@@ -423,10 +447,10 @@ ends_in_hard_break : List(U8) -> Bool
 ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
 
 ## How the inline pass reads a dialect's text.
-inline_refs : Dialect -> [Linked, InLabel, Document]
+inline_refs : Dialect -> [Linked, InLabel, Document(MdSafety.Images)]
 inline_refs = |dialect| match dialect {
 	Chat => Linked
-	Document(_) => Document
+	Document(options) => Document(options.images)
 }
 
 ## Inside a tight list item, a block after a bare
@@ -483,8 +507,8 @@ fence_onto = |
 	block = match dialect {
 		Chat if MdChat.is_quote_fence(open.lang) => MdText.escape_onto(MdHtml.chat_quote_open, body).concat(MdHtml.chat_quote_close)
 		Chat => code()
-		Document(hook) =>
-			match hook({ tag: open.lang, args: MdFence.args(line, open), body }) {
+		Document(options) =>
+			match (options.fence)({ tag: open.lang, args: MdFence.args(line, open), body }) {
 				Html(html) => html
 				Pass => code()
 			}
@@ -546,14 +570,14 @@ atx_heading = |line| {
 
 ## The line at `pos` starts a block a lazy
 ## continuation may not take in (a blank line, a list item, a quote, a
-## fence, a heading).
-is_block_start : List(U8), U64 -> Bool
-is_block_start = |md, pos| {
+## fence, a heading, and in a document a rule).
+is_block_start : Dialect -> (List(U8), U64 -> Bool)
+is_block_start = |dialect| |md, pos| {
 	line = MdText.cut(md, { start: pos, end: MdText.line_end(md, pos) })
 	MdText.is_blank(line) or MdList.list_marker_at(
 		md,
 		pos,
-	).is_ok() or MdQuote.is_quote_line(line) or MdFence.open_at(md, pos).is_ok() or atx_heading(line).is_ok()
+	).is_ok() or MdQuote.is_quote_line(line) or MdFence.open_at(md, pos).is_ok() or atx_heading(line).is_ok() or in_document(dialect, MdDocument.is_rule, line)
 }
 
 # ── tables ──
@@ -583,7 +607,7 @@ table_onto = |out, { md, pos, budget, uploads, dialect }| match MdTable.table_at
 		var $budget = head.budget
 		var $rows = 0
 		var $p = table.body
-		while $p < len and !is_block_start(md, $p) {
+		while $p < len and !is_block_start(dialect)(md, $p) {
 			eol = MdText.line_end(md, $p)
 			row = row_onto(
 				if ($rows == 0) $out.concat(MdHtml.tbody_open) else $out,
@@ -786,7 +810,11 @@ widgets = |{ tag, args, body }|
 	}
 
 doc : Str -> Str
-doc = |text| Str.from_utf8(Md.render_document(text.to_utf8(), { fence: widgets }).html) ?? "not text"
+doc = |text| Str.from_utf8(Md.render_document(text.to_utf8(), { fence: widgets, images: AsLinks }).html) ?? "not text"
+
+# A document that shows its images, as the essay notes do.
+shown : Str -> Str
+shown = |text| Str.from_utf8(Md.render_document(text.to_utf8(), { fence: widgets, images: Shown }).html) ?? "not text"
 
 # The hook answers with HTML, unescaped, or passes the fence on as code.
 expect doc("```widget sky\n```\n") == "<iframe src=\"/w/sky\"></iframe>\n"
@@ -829,15 +857,158 @@ expect md("<img src=\"/user_uploads/a.png\">") == "<img src=\"/user_uploads/a.pn
 expect doc("## The *sky*") == "<h2 id=\"the-sky\">The <em>sky</em></h2>\n"
 expect doc("## What's a sighting?") == "<h2 id=\"whats-a-sighting\">What&#39;s a sighting?</h2>\n"
 expect md("## The *sky*") == "<h2>The <em>sky</em></h2>\n"
-expect Md.render_document("# A\n\n> ## A\n\n- ## `A`\n".to_utf8(), { fence: widgets }).headings == [
+expect Md.render_document("# A\n\n> ## A\n\n- ## `A`\n".to_utf8(), { fence: widgets, images: AsLinks }).headings == [
 	{ level: 1, id: "a".to_utf8(), text: "A".to_utf8() },
 	{ level: 2, id: "a-2".to_utf8(), text: "A".to_utf8() },
 	{ level: 2, id: "a-3".to_utf8(), text: "A".to_utf8() },
 ]
 # A heading in a code block is code, and a hook's own stay as the hook wrote them.
-expect Md.render_document("```\n## no\n```".to_utf8(), { fence: widgets }).headings == []
-expect Md.render_document("<h2 id=\"\">x</h2>\n\na <h2 id=\"\">b</h2>".to_utf8(), { fence: widgets }).headings == []
+expect Md.render_document("```\n## no\n```".to_utf8(), { fence: widgets, images: AsLinks }).headings == []
+expect Md.render_document("    ## no\n\n    <h2 id=\"\">x</h2>".to_utf8(), { fence: widgets, images: AsLinks }).headings == []
+expect Md.render_document("<h2 id=\"\">x</h2>\n\na <h2 id=\"\">b</h2>".to_utf8(), { fence: widgets, images: AsLinks }).headings == []
 expect doc("```heading\n```\n# mine") == "<h2>mine</h2>\n<h2 id=\"x\">too</h2>\n<h1 id=\"mine\">mine</h1>\n"
+
+# Rules, wherever a block may stand. A chat reads each of these as it always has.
+expect doc("---") == "<hr>\n"
+expect doc("a\n\n---\n\nb") == "<p>a</p>\n<hr>\n<p>b</p>\n"
+expect doc("***\n___\n- - -") == "<hr>\n<hr>\n<hr>\n"
+expect doc("--") == "<p>--</p>\n"
+expect doc("--- x") == "<p>--- x</p>\n"
+expect md("---") == "<p>---</p>\n"
+expect md("a\n\n---\n\nb") == "<p>a</p>\n<p>---</p>\n<p>b</p>\n"
+expect md("***") == "<p>***</p>\n"
+expect md("___") == "<p>___</p>\n"
+expect md("- - -") == "<ul>\n<li>\n<ul>\n<li>\n<ul>\n<li></li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n"
+expect Str.from_utf8(Md.render_trusted_reflow("a\n---".to_utf8(), chat)) == Ok("<p>a ---</p>\n")
+
+# A rule ends a paragraph, as the dialect has no setext heading to read it as.
+expect doc("a\n---\nb") == "<p>a</p>\n<hr>\n<p>b</p>\n"
+expect md("a\n---\nb") == "<p>a<br>\n---<br>\nb</p>\n"
+# A rule ends a list, a quote's lazy lines and a table.
+expect doc("- a\n---\n- b") == "<ul>\n<li>a</li>\n</ul>\n<hr>\n<ul>\n<li>b</li>\n</ul>\n"
+expect doc("- a\n- - -\n- b") == "<ul>\n<li>a</li>\n</ul>\n<hr>\n<ul>\n<li>b</li>\n</ul>\n"
+expect doc("> a\n---") == "<blockquote>\n<p>a</p>\n</blockquote>\n<hr>\n"
+expect doc("| a |\n| - |\n| b |\n---") == "<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>b</td>\n</tr>\n</tbody>\n</table>\n<hr>\n"
+expect md("- a\n---") == "<ul>\n<li>a<br>\n---</li>\n</ul>\n"
+expect md("> a\n---") == "<blockquote>\n<p>a<br>\n---</p>\n</blockquote>\n"
+expect md("| a |\n| - |\n| b |\n---") == "<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>b</td>\n</tr>\n<tr>\n<td>---</td>\n</tr>\n</tbody>\n</table>\n"
+# A rule stands inside a list item and a quote, and is code in a fence.
+expect doc("- ***\n- b") == "<ul>\n<li>\n<hr>\n</li>\n<li>b</li>\n</ul>\n"
+# With every mark the same, the whole line is one rule, not an item.
+expect doc("- ---") == "<hr>\n"
+expect doc("- a\n\n  ---\n") == "<ul>\n<li>\n<p>a</p>\n<hr>\n</li>\n</ul>\n"
+expect doc("> ---") == "<blockquote>\n<hr>\n</blockquote>\n"
+expect doc("```\n---\n```") == "<pre><code>---\n</code></pre>\n"
+# Only a row with a pipe is a table's delimiter.
+expect doc("a | b\n--- | ---") == "<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n</table>\n"
+
+# Indented code, and a chat's reading of the same lines.
+expect doc("    a<b") == "<pre><code>a&lt;b\n</code></pre>\n"
+expect doc("\ta") == "<pre><code>a\n</code></pre>\n"
+expect doc("      a\n    b") == "<pre><code>  a\nb\n</code></pre>\n"
+expect doc("   a") == "<p>a</p>\n"
+expect md("    a<b") == "<p>a&lt;b</p>\n"
+expect md("\ta") == "<p>a</p>\n"
+expect md("x\n\n    a\n    b") == "<p>x</p>\n<p>a<br>\nb</p>\n"
+# Nothing in the block is markup, and the hook isn't asked.
+expect doc("    **a** [b](/c)\n    ---\n    - d\n    ```widget sky") == "<pre><code>**a** [b](/c)\n---\n- d\n```widget sky\n</code></pre>\n"
+# A blank line inside a block stays, and those around it are not its own.
+expect doc("    a\n\n\n    b") == "<pre><code>a\n\n\nb\n</code></pre>\n"
+expect doc("    a\n   \n    b") == "<pre><code>a\n\nb\n</code></pre>\n"
+expect doc("\n    a\n\n\nb") == "<pre><code>a\n</code></pre>\n<p>b</p>\n"
+expect doc("    a\n\n") == "<pre><code>a\n</code></pre>\n"
+# A line with less indent ends the block, blank line or not.
+expect doc("    a\nb") == "<pre><code>a\n</code></pre>\n<p>b</p>\n"
+expect doc("    a\n   b") == "<pre><code>a\n</code></pre>\n<p>b</p>\n"
+# Indented text just after a paragraph stays that paragraph, at any depth of
+# indent. After a blank line it is code.
+expect doc("a\n    b") == "<p>a b</p>\n"
+expect doc("a\n        b\n    c") == "<p>a b c</p>\n"
+expect doc("a\n\n    b") == "<p>a</p>\n<pre><code>b\n</code></pre>\n"
+# After a block that isn't a paragraph, it is code at once.
+expect doc("# a\n    b") == "<h1 id=\"a\">a</h1>\n<pre><code>b\n</code></pre>\n"
+expect doc("---\n    b") == "<hr>\n<pre><code>b\n</code></pre>\n"
+expect doc("```\na\n```\n    b") == "<pre><code>a\n</code></pre>\n<pre><code>b\n</code></pre>\n"
+
+# In a list, four columns past the item's content are code, and less is the
+# item's own text. Each depth counts from its own item. A blank line in a nested
+# item loosens the items around it too, as it does in a chat.
+expect doc("- a\n\n      b") == "<ul>\n<li>\n<p>a</p>\n<pre><code>b\n</code></pre>\n</li>\n</ul>\n"
+expect doc("- a\n\n    b") == "<ul>\n<li>\n<p>a</p>\n<p>b</p>\n</li>\n</ul>\n"
+expect doc("- a\n  - b\n\n        c") == "<ul>\n<li>\n<p>a</p>\n<ul>\n<li>\n<p>b</p>\n<pre><code>c\n</code></pre>\n</li>\n</ul>\n</li>\n</ul>\n"
+expect doc("- a\n  - b\n\n      c") == "<ul>\n<li>\n<p>a</p>\n<ul>\n<li>\n<p>b</p>\n<p>c</p>\n</li>\n</ul>\n</li>\n</ul>\n"
+expect doc("- a\n  - b\n    - c\n\n          d") == "<ul>\n<li>\n<p>a</p>\n<ul>\n<li>\n<p>b</p>\n<ul>\n<li>\n<p>c</p>\n<pre><code>d\n</code></pre>\n</li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n"
+expect doc("- a\n  - b\n    - c\n\n        d") == "<ul>\n<li>\n<p>a</p>\n<ul>\n<li>\n<p>b</p>\n<ul>\n<li>\n<p>c</p>\n<p>d</p>\n</li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n"
+expect doc("1. a\n\n       b") == "<ol>\n<li>\n<p>a</p>\n<pre><code>b\n</code></pre>\n</li>\n</ol>\n"
+expect doc("1. a\n\n      b") == "<ol>\n<li>\n<p>a</p>\n<p>b</p>\n</li>\n</ol>\n"
+# Directly under an item's text it continues the paragraph, at every depth.
+expect doc("- a\n      b") == "<ul>\n<li>a b</li>\n</ul>\n"
+expect doc("- a\n  - b\n          c") == "<ul>\n<li>a\n<ul>\n<li>b c</li>\n</ul>\n</li>\n</ul>\n"
+# A blank line inside a block in an item stays, and the list goes on after it.
+expect doc("- a\n\n      b\n\n      c\n\n- d") == "<ul>\n<li>\n<p>a</p>\n<pre><code>b\n\nc\n</code></pre>\n</li>\n<li>\n<p>d</p>\n</li>\n</ul>\n"
+# An item may open with code, and then it stands on a line of its own.
+expect doc("-     a\n- b") == "<ul>\n<li>\n<pre><code>a\n</code></pre>\n</li>\n<li>b</li>\n</ul>\n"
+# Under a list, text at the left margin ends it, and code after that is the page's.
+expect doc("- a\n\nb\n\n    c") == "<ul>\n<li>a</li>\n</ul>\n<p>b</p>\n<pre><code>c\n</code></pre>\n"
+# A chat's list keeps the same lines as text.
+expect md("- a\n\n      b") == "<ul>\n<li>\n<p>a</p>\n<p>b</p>\n</li>\n</ul>\n"
+expect md("-     a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
+
+# In a quote, code ends at the quote's end, and a lazy line is only a paragraph's.
+expect doc(">     a\n>     b") == "<blockquote>\n<pre><code>a\nb\n</code></pre>\n</blockquote>\n"
+expect doc(">     a\nb") == "<blockquote>\n<pre><code>a\n</code></pre>\n</blockquote>\n<p>b</p>\n"
+expect doc("> a\n>     b\nc") == "<blockquote>\n<p>a b c</p>\n</blockquote>\n"
+expect md(">     a\nb") == "<blockquote>\n<p>a<br>\nb</p>\n</blockquote>\n"
+
+# `Shown` makes an image of any src a browser wouldn't run. `AsLinks` keeps the
+# chat's answer, and neither reaches a chat, whose rule is its uploads.
+expect shown("![a *b*](c.png)") == "<p><img src=\"c.png\" alt=\"a b\"></p>\n"
+expect shown("![a](c.png \"t\")") == "<p><img src=\"c.png\" alt=\"a\" title=\"t\"></p>\n"
+expect shown("![a](https://x.org/i.png)") == "<p><img src=\"https://x.org/i.png\" alt=\"a\"></p>\n"
+expect shown("![a](/user_uploads/i.png)") == "<p><img src=\"/user_uploads/i.png\" alt=\"a\"></p>\n"
+expect shown("![a \"q\"](c\".png)") == "<p><img src=\"c&quot;.png\" alt=\"a &quot;q&quot;\"></p>\n"
+expect shown("![a](javascript:alert(1))") == "<p>![a](javascript:alert(1))</p>\n"
+expect shown("![a](data:text/html,x)") == "<p>![a](data:text/html,x)</p>\n"
+expect shown("![a](c.png bad)") == "<p>!<a href=\"c.png bad\">a</a></p>\n"
+expect shown("<img src=\"c.png\">") == "&lt;img src=&quot;c.png&quot;&gt;"
+expect shown("<video src=\"c.mp4\"></video>") == "<p>&lt;video src=&quot;c.mp4&quot;&gt;&lt;/video&gt;</p>\n"
+expect doc("![a](c.png)") == "<p><a href=\"c.png\">a</a></p>\n"
+expect doc("![a](/user_uploads/i.png)") == "<p><a href=\"/user_uploads/i.png\">a</a></p>\n"
+expect doc("![a](javascript:alert(1))") == "<p>![a](javascript:alert(1))</p>\n"
+expect md("![a](c.png)") == "<p><a href=\"c.png\">a</a></p>\n"
+expect md("![a](/other/i.png)") == "<p><a href=\"/other/i.png\">a</a></p>\n"
+expect md("![a](https://x.org/i.png)") == "<p><a href=\"https://x.org/i.png\" target=\"_blank\" rel=\"noopener\">a</a></p>\n"
+expect md("![a](/user_uploads/i.png)") == "<p><img src=\"/user_uploads/i.png\" alt=\"a\"></p>\n"
+
+# An angle-bracket URL is a link in a document, on a line of its own too.
+expect doc("see <http://a.org/x?y=1&z=2>, now") == "<p>see <a href=\"http://a.org/x?y=1&amp;z=2\">http://a.org/x?y=1&amp;z=2</a>, now</p>\n"
+expect doc("<https://a.org/x>") == "<p><a href=\"https://a.org/x\">https://a.org/x</a></p>\n"
+expect doc("  <https://a.org/x>  ") == "<p><a href=\"https://a.org/x\">https://a.org/x</a></p>\n"
+expect doc("<HTTP://A.org>") == "<p><a href=\"HTTP://A.org\">HTTP://A.org</a></p>\n"
+expect doc("<http://localhost:9100/a_b_c>") == "<p><a href=\"http://localhost:9100/a_b_c\">http://localhost:9100/a_b_c</a></p>\n"
+expect doc("<http://a.org> and <http://b.org>") == "<p><a href=\"http://a.org\">http://a.org</a> and <a href=\"http://b.org\">http://b.org</a></p>\n"
+expect doc("- <http://a.org>\n\n> <http://b.org>") == "<ul>\n<li><a href=\"http://a.org\">http://a.org</a></li>\n</ul>\n<blockquote>\n<p><a href=\"http://b.org\">http://b.org</a></p>\n</blockquote>\n"
+# Anything else in brackets is the text it was.
+expect doc("a <http://a b> c") == "<p>a &lt;http://a b&gt; c</p>\n"
+expect doc("a <http://> c") == "<p>a &lt;http://&gt; c</p>\n"
+expect doc("a <http://a.org c") == "<p>a &lt;http://a.org c</p>\n"
+expect doc("a <ftp://a.org> c") == "<p>a &lt;ftp://a.org&gt; c</p>\n"
+expect doc("a <javascript:alert(1)> c") == "<p>a &lt;javascript:alert(1)&gt; c</p>\n"
+expect doc("a <name's place> c") == "<p>a &lt;name&#39;s place&gt; c</p>\n"
+expect doc("<div>") == "&lt;div&gt;"
+expect doc("a \\<http://a.org> c") == "<p>a &lt;http://a.org&gt; c</p>\n"
+expect doc("`<http://a.org>`") == "<p><code>&lt;http://a.org&gt;</code></p>\n"
+# A chat keeps these as text, and a line of its own as an HTML block.
+expect md("see <http://a.org/x> now") == "<p>see &lt;http://a.org/x&gt; now</p>\n"
+expect md("<http://a.org>") == "&lt;http://a.org&gt;"
+
+# An email is text in a document, however it stands, and a link in a chat.
+expect doc("mail a.b@c.d now") == "<p>mail a.b@c.d now</p>\n"
+expect doc("red@red.R0 *red@red.R1*") == "<p>red@red.R0 <em>red@red.R1</em></p>\n"
+expect doc("| a@b.c |\n| - |") == "<table>\n<thead>\n<tr>\n<th>a@b.c</th>\n</tr>\n</thead>\n</table>\n"
+expect doc("[a](mailto:b@c.d)") == "<p><a href=\"mailto:b@c.d\">a</a></p>\n"
+expect md("mail a.b@c.d now") == "<p>mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a> now</p>\n"
+expect Str.from_utf8(Md.render_trusted_reflow("a.b@c.d".to_utf8(), chat)) == Ok("<p><a href=\"mailto:a.b@c.d\">a.b@c.d</a></p>\n")
 
 # The chat's answers for a text with every feature here, in each mode a
 # chat has.

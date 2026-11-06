@@ -161,6 +161,29 @@ MdLinks := [].{
 		Ok(MdHtml.img(attrs))
 	}
 
+	## A document's `![alt](src "title")`, the same tag `image` writes. The
+	## uploads rule isn't asked, because a document's src is the host's own. A
+	## dangerous src is still refused, so the sink stays safe whatever its
+	## callers do.
+	shown_image : { src : List(U8), alt : List(U8), title : [None, Some(List(U8))] } -> Try(List(U8), [NotSafe])
+	shown_image = |{ src, alt, title }|
+		if MdSafety.is_dangerous_url(src) {
+			Err(NotSafe)
+		} else {
+			named = [
+				{ name: "src".to_utf8(), value: Is(src) },
+				{ name: "alt".to_utf8(), value: Is(alt) },
+			]
+			Ok(
+				MdHtml.img(
+					match title {
+						Some(t) => named.append({ name: "title".to_utf8(), value: Is(t) })
+						None => named
+					},
+				),
+			)
+		}
+
 	## A `[label](url)` link's opening tag, `outside` saying how a link to
 	## another site opens (MdSafety's rule). MdInline never asks it of a
 	## dangerous url (such a link is shown as its source); the href is still
@@ -170,6 +193,34 @@ MdLinks := [].{
 		href: if (MdSafety.is_dangerous_url(url)) [] else url,
 		tab: if (MdSafety.is_external_href(url)) outside else SameTab,
 	})
+
+	## `<http://…>` or `<https://…>` at `at`: its URL, and the index past its
+	## `>`. The brackets say where it starts and ends, so no boundary rule or
+	## host rule applies, and `localhost` is a host here. A space or a control
+	## byte inside makes it text, as does nothing after the `://`.
+	angle_url_at : List(U8), U64 -> Try({ url : List(U8), end : U64 }, [NotALink])
+	angle_url_at = |text, at| {
+		start = at + 1
+		is_prefixed = |prefix| MdText.is_prefixed_ignoring_case(text, { at: start, prefix: prefix.to_utf8() })
+		scheme_len = if (is_prefixed("http://")) 7 else if (is_prefixed("https://")) 8 else 0
+		close = Bytes.count_while(text, { keep: |c| c > ' ' and c != 0x7f and c != '<' and c != '>', at: start })
+		if scheme_len == 0 or close <= start + scheme_len or text.get(close) != Ok('>') {
+			Err(NotALink)
+		} else {
+			Ok({ url: MdText.cut(text, { start, end: close }), end: close + 1 })
+		}
+	}
+
+	## The line is one angle-bracket URL and nothing else, which the dispatcher
+	## would otherwise take for an HTML tag.
+	is_angle_url_line : List(U8) -> Bool
+	is_angle_url_line = |line| {
+		t = MdText.trim_line(line)
+		match angle_url_at(t, 0) {
+			Ok(found) => found.end == t.len()
+			Err(NotALink) => Bool.False
+		}
+	}
 
 	## An autolink starts only at the line's
 	## start, or after a space or one of `*`, `_`, `~` and `(`.
@@ -191,11 +242,13 @@ MdLinks := [].{
 	## A GFM autolink at `at`, and the index past
 	## it. `email_dead` is the floor below which no email can start: when one
 	## fails, every position in its local part fails the same way, so the floor
-	## moves past it (without it, `a_b_a_b…` is quadratic).
+	## moves past it (without it, `a_b_a_b…` is quadratic). `Plain` emails stay
+	## text, for a document whose `a@b.c` is rarely an address.
 	autolink_at : List(U8),
 	{
 		at : U64,
 		email_dead : U64,
+		emails : [Linked, Plain],
 		budget : MdText.Budget,
 	} -> {
 		link : Try({ end : U64, kind : AutoKind }, [NotALink]),
@@ -207,6 +260,7 @@ MdLinks := [].{
 		{
 			at,
 			email_dead,
+			emails,
 			budget,
 		},
 	| {
@@ -228,7 +282,7 @@ MdLinks := [].{
 				email_dead,
 				budget: u.budget,
 			}
-		} else if at >= email_dead {
+		} else if emails == Linked and at >= email_dead {
 			e = email_end(text, { start: at, budget })
 			match e.end {
 				Ok(end) => {

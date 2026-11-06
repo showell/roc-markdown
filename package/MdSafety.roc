@@ -25,6 +25,8 @@
 ##     still says where the image is and lets a reader choose to open it,
 ##     while the page fetches nothing from another site (no tracking pixel,
 ##     no hotlink); and the markup as written would be noise.
+##   - **A document's images** are the host's own prose, so its `Images`
+##     option may show any src a browser wouldn't run. A chat never asks this.
 ##
 ## The other safety rule has its own home: every byte a member wrote is
 ## escaped (MdText). Pure.
@@ -34,6 +36,10 @@ import MdHtml
 import MdText
 
 MdSafety := [].{
+
+	## How a document's `![alt](src)` appears: as an image, or as a link to it,
+	## which is what a chat makes of a src that is no upload.
+	Images : [Shown, AsLinks]
 
 	## `javascript:`, `vbscript:`, `file:`,
 	## and `data:` but for an image's, **READ AS A BROWSER READS IT**: its ends' control bytes and spaces dropped, and every tab

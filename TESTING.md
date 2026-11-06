@@ -143,7 +143,7 @@ as its uploads rule, as roc-chat does).
 | `package/MdHtml.roc` | every tag and attribute the renderer writes |
 | `package/MdSafety.roc` | the URL and attribute rules |
 | `package/MdChat.roc` | the chat's own extensions |
-| `package/MdDocument.roc` | a document's fence hook and heading ids |
+| `package/MdDocument.roc` | a document's fence hook, heading ids, rules and indented code |
 | `package/MdText.roc` | lines, escaping and the work budget |
 | `package/Ascii.roc`, `Bytes.roc` | the byte checks and scans the rest share |
 | `judge/` | the judge, its side of the Roc, the REPL, and `data/` |

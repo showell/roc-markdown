@@ -24,6 +24,10 @@ MdHtml := [].{
 	br : List(U8)
 	br = "<br>\n".to_utf8()
 
+	## A document's rule.
+	hr : List(U8)
+	hr = "<hr>\n".to_utf8()
+
 	## `<h1>` to `<h6>`, by the heading's level.
 	heading_open : U64 -> List(U8)
 	heading_open = |level| ['<', 'h', heading_digit(level), '>']

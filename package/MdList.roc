@@ -6,10 +6,11 @@
 ## **A CONTAINER, SO Md HANDS IN WHAT IT ASKS OF THE DISPATCHER**: Md
 ## dispatches to a list, and an item's content is blocks again, so an
 ## import of Md here would be a cycle, which Roc refuses. `list_onto` takes
-## the two things it needs from Md as arguments instead: `nested` (an item's
-## content as blocks, one level deeper: the depth and the wrap are Md's,
-## captured there) and `is_block_start` (the lines a lazy one may not be).
-## Md stays the one home of each, and a list reads in one module.
+## what it needs from Md as arguments instead: `nested` (an item's content as
+## blocks, one level deeper: the depth and the wrap are Md's, captured there),
+## `is_block_start` (the lines a lazy one may not be), and the two questions
+## only a document answers yes to, `is_rule` and `is_code`. Md stays the one
+## home of each, and a list reads in one module.
 import Ascii
 import Bytes
 import MdHtml
@@ -110,6 +111,8 @@ MdList := [].{
 		budget : MdText.Budget,
 		nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
 		is_block_start : List(U8), U64 -> Bool,
+		is_rule : List(U8) -> Bool,
+		is_code : List(U8) -> Bool,
 	} -> Try(MdText.Block, [Hostile])
 	list_onto = |
 		out,
@@ -120,6 +123,8 @@ MdList := [].{
 			budget,
 			nested,
 			is_block_start,
+			is_rule,
+			is_code,
 		},
 	| {
 		len = md.len()
@@ -142,7 +147,8 @@ MdList := [].{
 				marker = list_marker_at(md, $p)
 				match marker {
 					Ok(m) if indent < $cur_col => {
-						if !is_same_list(m, first) {
+						# `- - -` reads as a marker too, and a rule outranks one.
+						if !is_same_list(m, first) or is_rule(line) {
 							break
 						} else {
 							{}
@@ -187,7 +193,7 @@ MdList := [].{
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
 			# separator sees only its content, not the <li>.
-			lead = if ($loose or is_first_child_block(item, is_block_start)) ['\n'] else []
+			lead = if ($loose or is_first_child_block(item, { is_block_start, is_code })) ['\n'] else []
 			inner = nested({
 				out: lead,
 				md: item,
@@ -222,18 +228,19 @@ is_same_list = |a, b| match (a.kind, b.kind) {
 }
 
 ## A tight item starts on a line of its
-## own when its first child is a list, a quote, a fence, a heading or a
-## table, not a paragraph: its first line that is not blank starts a block
-## (`is_block_start`, which asks the first four in that order) or a table.
-is_first_child_block : List(U8), (List(U8), U64 -> Bool) -> Bool
-is_first_child_block = |item, is_block_start| {
+## own when its first child is a list, a quote, a fence, a heading, a table
+## or indented code, not a paragraph: its first line that is not blank starts
+## a block (`is_block_start`, which asks the first four in that order), a table
+## or code.
+is_first_child_block : List(U8), { is_block_start : List(U8), U64 -> Bool, is_code : List(U8) -> Bool } -> Bool
+is_first_child_block = |item, { is_block_start, is_code }| {
 	len = item.len()
 	var $pos = 0
 	while $pos < len {
 		eol = MdText.line_end(item, $pos)
 		line = MdText.cut(item, { start: $pos, end: eol })
 		if !MdText.is_blank(line) {
-			return is_block_start(item, $pos) or MdTable.is_table_at(item, $pos)
+			return is_block_start(item, $pos) or MdTable.is_table_at(item, $pos) or is_code(line)
 		} else {
 			$pos = MdText.next_line(item, eol)
 		}

@@ -35,11 +35,12 @@ MdInline := [].{
 	## turns the chat's `MSG_` reference (MdChat) into its link; `InLabel` leaves it text, as a
 	## link's label must be, being inside an `<a>` already. `Document` has no
 	## reference, in or out of a label, and its links to other sites stay in
-	## their tab.
+	## their tab. A document also reads `<http://…>`, leaves an email as text,
+	## and shows its images as its option says.
 	render_onto : {
 		out : List(U8),
 		text : List(U8),
-		refs : [Linked, InLabel, Document],
+		refs : [Linked, InLabel, Document(MdSafety.Images)],
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
@@ -53,8 +54,13 @@ MdInline := [].{
 		},
 	| {
 		len = text.len()
-		outside = if (refs == Document) SameTab else NewTab
-		label_refs = if (refs == Document) Document else InLabel
+		is_document = match refs {
+			Document(_) => Bool.True
+			_ => Bool.False
+		}
+		shows_images = refs == Document(Shown)
+		outside = if (is_document) SameTab else NewTab
+		label_refs = if (is_document) refs else InLabel
 		var $budget = budget
 		var $pieces = []
 		var $runs = []
@@ -83,7 +89,11 @@ MdInline := [].{
 					} else if c == '<' {
 						match media_at(text, $i, uploads) {
 							Ok(media) => Token(Html(media.html), media.end)
-							Err(NotMedia) => Skip($i + 1)
+							Err(NotMedia) =>
+								match if (is_document) MdLinks.angle_url_at(text, $i) else Err(NotALink) {
+									Ok(found) => Token(Html(MdLinks.autolink_html(found.url, Url, outside)), found.end)
+									Err(NotALink) => Skip($i + 1)
+								}
 						}
 					} else if c == '`' {
 						scanned = code_span_at(text, { at: $i, budget: $budget })
@@ -125,7 +135,7 @@ MdInline := [].{
 						}
 						match image {
 							Ok(found) =>
-								if MdSafety.is_upload_url(found.dest.src, uploads) {
+								if MdSafety.is_upload_url(found.dest.src, uploads) or (shows_images and !MdSafety.is_dangerous_url(found.dest.src)) {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.render_onto({
@@ -136,8 +146,14 @@ MdInline := [].{
 										uploads,
 									})?
 									$budget = alt.budget
-									html = MdLinks.image({ src: found.dest.src, alt: MdHtml.plain_text(alt.out), title: found.dest.title, uploads }) ?? []
-									Token(Html(html), found.link.end)
+									text_alt = MdHtml.plain_text(alt.out)
+									html =
+										if shows_images {
+											MdLinks.shown_image({ src: found.dest.src, alt: text_alt, title: found.dest.title })
+										} else {
+											MdLinks.image({ src: found.dest.src, alt: text_alt, title: found.dest.title, uploads })
+										}
+									Token(Html(html ?? []), found.link.end)
 								} else if MdSafety.is_dangerous_url(found.dest.src) {
 									# Refused: the whole image's source, `!` and all,
 									# left in the pending text (MdSafety).
@@ -199,6 +215,7 @@ MdInline := [].{
 							{
 								at: $i,
 								email_dead: $email_dead,
+								emails: if (is_document) Plain else Linked,
 								budget: $budget,
 							},
 						)

@@ -6,10 +6,11 @@
 ## **A CONTAINER, SO Md HANDS IN WHAT IT ASKS OF THE DISPATCHER**: Md
 ## dispatches to a quote, and a quote's content is blocks again, so an
 ## import of Md here would be a cycle, which Roc refuses. `quote_onto` takes
-## the two things it needs from Md as arguments instead: `nested` (its
-## content as blocks, one level deeper: the depth and the wrap are Md's,
-## captured there) and `is_block_start` (the lines a lazy one may not be).
-## Md stays the one home of each, and a quote reads in one module.
+## what it needs from Md as arguments instead: `nested` (its content as
+## blocks, one level deeper: the depth and the wrap are Md's, captured there),
+## `is_block_start` (the lines a lazy one may not be), and `is_code`, which
+## only a document answers yes to. Md stays the one home of each, and a quote
+## reads in one module.
 import Bytes
 import MdHtml
 import MdTable
@@ -31,6 +32,7 @@ MdQuote := [].{
 		budget : MdText.Budget,
 		nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
 		is_block_start : List(U8), U64 -> Bool,
+		is_code : List(U8) -> Bool,
 	} -> Try(MdText.Block, [Hostile])
 	quote_onto = |
 		out,
@@ -40,6 +42,7 @@ MdQuote := [].{
 			budget,
 			nested,
 			is_block_start,
+			is_code,
 		},
 	| {
 		len = md.len()
@@ -63,7 +66,9 @@ MdQuote := [].{
 					stripped = line.drop_first(strip)
 					start = $inner.len()
 					$inner = $inner.concat(stripped).append('\n')
-					ends_text = MdText.is_blank(stripped) or is_block_start(md, $p + strip)
+					# Indented text after a paragraph is that paragraph's, not code.
+					starts_code = !$last_was_text and is_code(stripped)
+					ends_text = MdText.is_blank(stripped) or is_block_start(md, $p + strip) or starts_code
 					$in_table = !ends_text and ($in_table or ($last_was_text and MdTable.is_table_at($inner, $prev_start)))
 					$last_was_text = !ends_text and !$in_table
 					$prev_start = start

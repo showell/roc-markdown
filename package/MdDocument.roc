@@ -1,8 +1,8 @@
 ## What a trusted document has and a chat message doesn't: a caller's hook for
-## its fences, and ids on its headings. Md's dispatcher asks the hook and
-## marks each heading; this module names the marked ones when the render is
-## done, since a name depends on every heading before it, and a list's items
-## render apart. Pure.
+## its fences, ids on its headings, rules and indented code. Md's dispatcher
+## asks the hook and marks each heading; this module names the marked ones when
+## the render is done, since a name depends on every heading before it, and a
+## list's items render apart. Pure.
 import Ascii
 import Bytes
 import MdHtml
@@ -34,6 +34,57 @@ MdDocument := [].{
 		headings : List(Heading),
 	}
 
+	## CommonMark's thematic break: up to three spaces, then three or more of
+	## `-`, `*` or `_`, with only spaces and tabs among them.
+	is_rule : List(U8) -> Bool
+	is_rule = |line| {
+		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 })
+		match line.get(indent) {
+			Ok(mark) if indent < 4 and (mark == '-' or mark == '*' or mark == '_') => {
+				body = MdText.trim_line(line)
+				body.count_if(|c| c == mark) >= 3 and body.all(|c| c == mark or c == ' ' or c == '\t')
+			}
+			_ => Bool.False
+		}
+	}
+
+	## The line opens or continues an indented code block, where the dispatcher
+	## is at a block's start. It can't interrupt a paragraph, so a paragraph
+	## never asks this.
+	is_indented_code : List(U8) -> Bool
+	is_indented_code = |line| code_line(line).is_ok()
+
+	## The indented code block at `pos`, up to the first line that isn't
+	## indented. Blank lines inside it stay, and those after it are not its own.
+	indented_code_onto : List(U8), { md : List(U8), pos : U64, budget : MdText.Budget } -> MdText.Block
+	indented_code_onto = |out, { md, pos, budget }| {
+		len = md.len()
+		var $body = []
+		var $blanks = 0
+		var $p = pos
+		while $p < len {
+			eol = MdText.line_end(md, $p)
+			line = MdText.cut(md, { start: $p, end: eol })
+			if MdText.is_blank(line) {
+				$blanks = $blanks + 1
+			} else {
+				match code_line(line) {
+					Ok(code) => {
+						$body = $body.concat(List.repeat('\n', $blanks)).concat(code).append('\n')
+						$blanks = 0
+					}
+					Err(NotCode) => break
+				}
+			}
+			$p = MdText.next_line(md, eol)
+		}
+		{
+			out: MdText.escape_onto(out.concat(MdHtml.code_block_open([])), $body).concat(MdHtml.code_block_close),
+			budget: MdText.charge(budget, $body.len()),
+			after: $p,
+		}
+	}
+
 	## The render's `html` with every marked heading given its id.
 	named : List(U8) -> Rendered
 	named = |html| {
@@ -60,6 +111,22 @@ MdDocument := [].{
 			}
 		}
 		{ html: $out.concat(html.drop_first($copied)), headings: $headings }
+	}
+}
+
+## The line less its first four columns of indent. A tab reaches the next
+## multiple of four, so spaces before a tab go with it. A blank line is no code.
+code_line : List(U8) -> Try(List(U8), [NotCode])
+code_line = |line| {
+	spaces = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+	if MdText.is_blank(line) {
+		Err(NotCode)
+	} else if spaces == 4 {
+		Ok(line.drop_first(4))
+	} else if line.get(spaces) == Ok('\t') {
+		Ok(line.drop_first(spaces + 1))
+	} else {
+		Err(NotCode)
 	}
 }
 
@@ -112,6 +179,36 @@ numbered = |id, n| id.concat("-${n.to_str()}".to_utf8())
 
 mark : U64, Str -> List(U8)
 mark = |level, text| MdHtml.heading_open_with_id(level, []).concat(text.to_utf8()).concat(MdHtml.heading_close(level))
+
+# Rules: each mark, at and around its limits of length and indent.
+expect MdDocument.is_rule("---".to_utf8())
+expect MdDocument.is_rule("***".to_utf8())
+expect MdDocument.is_rule("___".to_utf8())
+expect MdDocument.is_rule("-----".to_utf8())
+expect MdDocument.is_rule("   ---".to_utf8())
+expect MdDocument.is_rule("- - -".to_utf8())
+expect MdDocument.is_rule("*\t*\t*  ".to_utf8())
+expect MdDocument.is_rule("---\r".to_utf8())
+expect !MdDocument.is_rule("--".to_utf8())
+expect !MdDocument.is_rule("    ---".to_utf8())
+expect !MdDocument.is_rule("\t---".to_utf8())
+expect !MdDocument.is_rule("---x".to_utf8())
+expect !MdDocument.is_rule("--*".to_utf8())
+expect !MdDocument.is_rule("===".to_utf8())
+expect !MdDocument.is_rule("".to_utf8())
+expect !MdDocument.is_rule("   ".to_utf8())
+
+# Four columns of indent, in each way of writing them, and three.
+expect code_line("    a".to_utf8()) == Ok("a".to_utf8())
+expect code_line("      a".to_utf8()) == Ok("  a".to_utf8())
+expect code_line("\ta".to_utf8()) == Ok("a".to_utf8())
+expect code_line("  \ta".to_utf8()) == Ok("a".to_utf8())
+expect code_line("   \t\ta".to_utf8()) == Ok("\ta".to_utf8())
+expect code_line("    \ta".to_utf8()) == Ok("\ta".to_utf8())
+expect code_line("   a".to_utf8()) == Err(NotCode)
+expect code_line("a".to_utf8()) == Err(NotCode)
+expect code_line("     ".to_utf8()) == Err(NotCode)
+expect code_line("\t".to_utf8()) == Err(NotCode)
 
 expect slug("The sky".to_utf8()) == "the-sky".to_utf8()
 expect slug("  What's a *sighting*?".to_utf8()) == "whats-a-sighting".to_utf8()

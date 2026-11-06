@@ -89,7 +89,7 @@ html = Md.render(message, options)
 | `Md.work_units : List(U8), Md.Options -> U64` | what a render costs |
 | `Md.render_trusted : List(U8), Md.Options -> List(U8)` | your own docs, no budget |
 | `Md.render_trusted_reflow : List(U8), Md.Options -> List(U8)` | the same, a newline as a space |
-| `Md.render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered` | a page of a book, with a hook for its fences (below) |
+| `Md.render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered` | a page of a book, with a hook for its fences and a choice about its images (below) |
 | `Md.uploads_under : List(U8) -> (List(U8) -> Bool)` | the rule of one uploads folder: every path under it |
 | `Md.no_uploads : List(U8) -> Bool` | the rule of a host with no uploads |
 | `Md.escape : List(U8) -> List(U8)` | text made safe for HTML, the renderer's own escape, for your pages |
@@ -103,10 +103,27 @@ by the media rule (`MdMedia.rebuild`, a feed of images), a table row's cells.
 
 `Md.render_document` renders your own prose as a page. Chat syntax is off
 (`MSG_` is text and ```` ```quote ```` is code), a newline is a space, a
-link to another site stays in its tab, and raw HTML and media stay escaped.
-It answers `{ html, headings }`: each heading has an `id` made from its text
-(`whats-a-sighting`, then `whats-a-sighting-2`), and `headings` lists
-`{ level, id, text }` for a table of contents.
+link to another site stays in its tab, and raw HTML and `<img>` or `<video>`
+tags stay escaped. It answers `{ html, headings }`: each heading has an `id`
+made from its text (`whats-a-sighting`, then `whats-a-sighting-2`), and
+`headings` lists `{ level, id, text }` for a table of contents.
+
+A document reads some markdown a chat doesn't, because a chat's answers are
+frozen and a page's prose isn't a message:
+
+- `---`, `***` and `___` are a rule, `<hr>`. There are no setext headings, so
+  `---` under a line of text ends that paragraph and is a rule.
+- A line indented four columns (a tab is up to four) is code, as in CommonMark:
+  it can't interrupt a paragraph, and in a list the four columns count from the
+  item's content.
+- `<http://...>` and `<https://...>` are links.
+- `a@b.c` is text, since a page's `a@b.c` is rarely an address. A written
+  `[a](mailto:b@c.d)` stays a link.
+
+The `images` option says what `![alt](src)` becomes, and it has no default.
+`Shown` is an `<img>` from any src a browser wouldn't run, relative paths and
+other sites included, since the prose is your own. `AsLinks` is a link to the
+src. A chat's images are neither: they follow its `uploads` rule.
 
 The one way in for your own HTML is the `fence` option, a function from
 `{ tag, args, body }` to `Html(bytes)` or `Pass`. For a ```` ```widget sky ````
@@ -124,7 +141,7 @@ fence = |{ tag, args, body }|
 		Pass
 	}
 
-page = Md.render_document(chapter, { fence })
+page = Md.render_document(chapter, { fence: fence, images: Shown })
 ```
 
 ## Changing it
