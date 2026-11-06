@@ -1,5 +1,5 @@
-## **WHAT A MEMBER'S LINK OR MEDIA MAY BECOME**: the one home of the renderer's URL and attribute rules, for an audit to read
-## alone.
+## What a member's link or media may become: the one home of the renderer's URL
+## and attribute rules, for an audit to read alone.
 ##
 ## **WHAT WE WON'T RUN, WE SHOW**: anything refused below is shown as its
 ## source, escaped, never as a defanged version of itself that still looks
@@ -41,9 +41,9 @@ MdSafety := [].{
 	## which is what a chat makes of a src that is no upload.
 	Images : [Shown, AsLinks]
 
-	## `javascript:`, `vbscript:`, `file:`,
-	## and `data:` but for an image's, **READ AS A BROWSER READS IT**: its ends' control bytes and spaces dropped, and every tab
-	## and newline inside, before the scheme is looked for. Only its first 32
+	## `javascript:`, `vbscript:`, `file:`, and `data:` but for an image's, read
+	## as a browser reads it: its ends' control bytes and spaces dropped, and every
+	## tab and newline inside, before the scheme is looked for. Only its first 32
 	## bytes so read count.
 	is_dangerous_url : List(U8) -> Bool
 	is_dangerous_url = |raw| {
@@ -110,7 +110,7 @@ MdSafety := [].{
 		} else {
 			kept = |names, keep| names.join_map(
 				|name| match value_of(name) {
-					Ok(v) if keep(v) => [{ name, value: Is(v) }]
+					Ok(v) if keep(v) => [{ name, attr_value: Is(v) }]
 					_ => []
 				},
 			)
@@ -128,7 +128,7 @@ MdSafety := [].{
 			Ok(
 				[
 					player,
-					[{ name: "src".to_utf8(), value: Is(src) }],
+					[{ name: "src".to_utf8(), attr_value: Is(src) }],
 					texts,
 					kept(["width".to_utf8(), "height".to_utf8()], MdText.is_all_digits),
 				].join(),
@@ -224,8 +224,8 @@ has_encoded_separator = |src| {
 ## A video is a player the reader starts: never autoplay.
 video_player : List(MdHtml.Attr)
 video_player = [
-	{ name: "controls".to_utf8(), value: Bare },
-	{ name: "preload".to_utf8(), value: Is("metadata".to_utf8()) },
+	{ name: "controls".to_utf8(), attr_value: Bare },
+	{ name: "preload".to_utf8(), attr_value: Is("metadata".to_utf8()) },
 ]
 
 dangerous_schemes : List(Str)

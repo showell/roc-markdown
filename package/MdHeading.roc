@@ -25,8 +25,11 @@ MdHeading := [].{
 		} else {
 			content = Bytes.trim(line.drop_first(level_end), heading_space)
 			h = content.len() - Bytes.count_back(content, |c| c == '#')
+			follows_space = h == 0
+				or content.get(h - 1) == Ok(' ')
+				or content.get(h - 1) == Ok('\t')
 			closed =
-				if h < content.len() and (h == 0 or content.get(h - 1) == Ok(' ') or content.get(h - 1) == Ok('\t')) {
+				if h < content.len() and follows_space {
 					Bytes.trim(content.take_first(h), heading_space)
 				} else {
 					content

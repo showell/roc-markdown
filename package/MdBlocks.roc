@@ -65,7 +65,7 @@ MdBlocks := [].{
 			len = md.len()
 			# A container's content is blocks one level deeper, in this render's
 			# wrap: the recursion MdList and MdQuote are handed, so they need no
-			# import of Md (a cycle) and the depth stays this module's.
+			# import of this module (a cycle) and the depth stays here.
 			nested = |inner| blocks_onto({
 				out: inner.out,
 				md: inner.md,
@@ -161,6 +161,10 @@ block_at = |
 	is_code = |text| MdDialect.is_code(dialect, text)
 	starts_block = |text, start| is_block_start(dialect, { md: text, line_start: start })
 	reading = MdDialect.indent_reading(dialect)
+	is_raw_html = MdRawHtml.is_html_block_start(line) and !MdDialect.is_angle_url_line(
+		dialect,
+		line,
+	)
 	if is_code(line) {
 		Ok(MdDocument.indented_code_onto(out, { md, line_start, budget }))
 	} else if is_rule(line) {
@@ -215,10 +219,7 @@ block_at = |
 											reading,
 										},
 									)
-								} else if MdRawHtml.is_html_block_start(line) and !MdDialect.is_angle_url_line(
-									dialect,
-									line,
-								) {
+								} else if is_raw_html {
 									Ok(
 										MdRawHtml.raw_html_onto(
 											out,

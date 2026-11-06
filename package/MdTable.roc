@@ -1,7 +1,7 @@
 ## **GFM'S PIPE TABLES, A LINE AT A TIME**: where a
 ## table stands, a row's cells and the delimiter row's alignments, as the GFM
-## spec's "Tables (extension)" reads them. Md's dispatcher, MdList and
-## MdQuote ask here where a table opens; Md renders it. Pure.
+## spec's "Tables (extension)" reads them. MdBlocks' dispatcher, MdList
+## and MdQuote ask here where a table opens, and MdTableBlock renders it. Pure.
 import MdText
 
 MdTable := [].{
@@ -137,7 +137,7 @@ delimiter_cell = |cell| {
 }
 
 cells_of : Str -> List(Str)
-cells_of = |line| MdTable.cells(line.to_utf8()).map(|c| Str.from_utf8(c) ?? "not text")
+cells_of = |line| MdTable.cells(line.to_utf8()).map(|c| Str.from_utf8(c) ?? crash "a test's text is UTF-8")
 
 expect cells_of("| a | b |") == ["a", "b"]
 expect cells_of("a | b") == ["a", "b"]

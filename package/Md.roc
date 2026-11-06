@@ -36,7 +36,7 @@ Md := [].{
 	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
 	render : List(U8), Md.Options -> List(U8)
-	render = |md, { uploads }| rendered(
+	render = |md, { uploads }| render_html(
 		md,
 		{
 			wrap: HardWrap,
@@ -49,7 +49,7 @@ Md := [].{
 	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
 	render_trusted : List(U8), Md.Options -> List(U8)
-	render_trusted = |md, { uploads }| rendered(
+	render_trusted = |md, { uploads }| render_html(
 		md,
 		{
 			wrap: HardWrap,
@@ -63,7 +63,7 @@ Md := [].{
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
-	render_trusted_reflow = |md, { uploads }| rendered(
+	render_trusted_reflow = |md, { uploads }| render_html(
 		md,
 		{
 			wrap: Reflow,
@@ -73,8 +73,8 @@ Md := [].{
 		},
 	)
 
-	## See MdDocument.Options.
-	DocumentOptions : MdDocument.Options
+	## See MdDocument.PageOptions.
+	DocumentOptions : MdDocument.PageOptions
 
 	## Server-owned prose as a page of a book. It has no budget and no chat
 	## syntax, a newline is a space, a link to another site stays in its tab,
@@ -85,7 +85,7 @@ Md := [].{
 	render_document = |md, options| {
 		lines = MdDocument.with_plain_line_ends(md)
 		MdDocument.with_heading_ids(
-			rendered(
+			render_html(
 				lines,
 				{
 					wrap: Reflow,
@@ -165,14 +165,14 @@ run = |md, { wrap, budget, uploads, dialect }| MdBlocks.blocks_onto({
 	dialect,
 })
 
-rendered : List(U8),
+render_html : List(U8),
 {
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
 	uploads : MdSafety.Uploads,
 	dialect : MdDialect.Dialect,
 } -> List(U8)
-rendered = |
+render_html = |
 	md,
 	{ wrap, budget, uploads, dialect },
 | match run(md, { wrap, budget, uploads, dialect }) {
@@ -186,7 +186,7 @@ chat = { uploads: Md.uploads_under("/user_uploads/".to_utf8()) }
 
 md : Str -> Str
 
-md = |text| Str.from_utf8(Md.render(text.to_utf8(), chat)) ?? "not text"
+md = |text| Str.from_utf8(Md.render(text.to_utf8(), chat)) ?? crash "a test's text is UTF-8"
 
 # Whole messages, block by block: the media rule, hard wraps and their
 # backslash, fences, lists, quotes and headings as the dialect renders them.
@@ -213,6 +213,8 @@ expect Str.from_utf8(
 	Md.render_trusted_reflow("A **bold phrase that\nspans two lines** here.".to_utf8(), chat),
 ) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
 expect Md.hostility("some **bold** text and a [link](http://x.com)".to_utf8(), chat) == Renderable
+# A render's cost grows with what it reads. The judge freezes the exact units.
+expect Md.work_units("a".to_utf8(), chat) < Md.work_units("**a** b".to_utf8(), chat)
 # GFM's tables.
 expect md("| a | b |\n| :- | -: |\n| c |\n| d | e | f |") == "<table>\n<thead>\n<tr>\n<th align=\"left\">a</th>\n<th align=\"right\">b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align=\"left\">c</td>\n<td align=\"right\"></td>\n</tr>\n<tr>\n<td align=\"left\">d</td>\n<td align=\"right\">e</td>\n</tr>\n</tbody>\n</table>\n"
 expect md("see:\n| a |\n| - |\n\nafter") == "<p>see:</p>\n<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n</table>\n<p>after</p>\n"
@@ -242,13 +244,13 @@ widgets = |{ tag, args, body }|
 doc : Str -> Str
 doc = |text| Str.from_utf8(
 	Md.render_document(text.to_utf8(), { fence: widgets, images: AsLinks }).html,
-) ?? "not text"
+) ?? crash "a test's text is UTF-8"
 
 # A document that shows its images, as the essay notes do.
-shown : Str -> Str
-shown = |text| Str.from_utf8(
+page_with_images : Str -> Str
+page_with_images = |text| Str.from_utf8(
 	Md.render_document(text.to_utf8(), { fence: widgets, images: Shown }).html,
-) ?? "not text"
+) ?? crash "a test's text is UTF-8"
 
 # The hook answers with HTML, unescaped, or passes the fence on as code.
 expect doc("```widget sky\n```\n") == "<iframe src=\"/w/sky\"></iframe>\n"
@@ -420,16 +422,16 @@ expect md(">     a\nb") == "<blockquote>\n<p>a<br>\nb</p>\n</blockquote>\n"
 
 # `Shown` makes an image of any src a browser wouldn't run. `AsLinks` keeps the
 # chat's answer, and neither reaches a chat, whose rule is its uploads.
-expect shown("![a *b*](c.png)") == "<p><img src=\"c.png\" alt=\"a b\"></p>\n"
-expect shown("![a](c.png \"t\")") == "<p><img src=\"c.png\" alt=\"a\" title=\"t\"></p>\n"
-expect shown("![a](https://x.org/i.png)") == "<p><img src=\"https://x.org/i.png\" alt=\"a\"></p>\n"
-expect shown("![a](/user_uploads/i.png)") == "<p><img src=\"/user_uploads/i.png\" alt=\"a\"></p>\n"
-expect shown("![a \"q\"](c\".png)") == "<p><img src=\"c&quot;.png\" alt=\"a &quot;q&quot;\"></p>\n"
-expect shown("![a](javascript:alert(1))") == "<p>![a](javascript:alert(1))</p>\n"
-expect shown("![a](data:text/html,x)") == "<p>![a](data:text/html,x)</p>\n"
-expect shown("![a](c.png bad)") == "<p>!<a href=\"c.png bad\">a</a></p>\n"
-expect shown("<img src=\"c.png\">") == "&lt;img src=&quot;c.png&quot;&gt;"
-expect shown("<video src=\"c.mp4\"></video>") == "<p>&lt;video src=&quot;c.mp4&quot;&gt;&lt;/video&gt;</p>\n"
+expect page_with_images("![a *b*](c.png)") == "<p><img src=\"c.png\" alt=\"a b\"></p>\n"
+expect page_with_images("![a](c.png \"t\")") == "<p><img src=\"c.png\" alt=\"a\" title=\"t\"></p>\n"
+expect page_with_images("![a](https://x.org/i.png)") == "<p><img src=\"https://x.org/i.png\" alt=\"a\"></p>\n"
+expect page_with_images("![a](/user_uploads/i.png)") == "<p><img src=\"/user_uploads/i.png\" alt=\"a\"></p>\n"
+expect page_with_images("![a \"q\"](c\".png)") == "<p><img src=\"c&quot;.png\" alt=\"a &quot;q&quot;\"></p>\n"
+expect page_with_images("![a](javascript:alert(1))") == "<p>![a](javascript:alert(1))</p>\n"
+expect page_with_images("![a](data:text/html,x)") == "<p>![a](data:text/html,x)</p>\n"
+expect page_with_images("![a](c.png bad)") == "<p>!<a href=\"c.png bad\">a</a></p>\n"
+expect page_with_images("<img src=\"c.png\">") == "&lt;img src=&quot;c.png&quot;&gt;"
+expect page_with_images("<video src=\"c.mp4\"></video>") == "<p>&lt;video src=&quot;c.mp4&quot;&gt;&lt;/video&gt;</p>\n"
 expect doc("![a](c.png)") == "<p><a href=\"c.png\">a</a></p>\n"
 expect doc("![a](/user_uploads/i.png)") == "<p><a href=\"/user_uploads/i.png\">a</a></p>\n"
 expect doc("![a](javascript:alert(1))") == "<p>![a](javascript:alert(1))</p>\n"
@@ -508,7 +510,7 @@ expect md("| a |\n| - |\n    b") == "<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n
 
 # A document's label ends at its balancing `]`, so a link may wrap an image. An
 # image that would be a link is its alt there, as an `<a>` can't hold an `<a>`.
-expect shown("[![a](i.png)](/x)") == "<p><a href=\"/x\"><img src=\"i.png\" alt=\"a\"></a></p>\n"
+expect page_with_images("[![a](i.png)](/x)") == "<p><a href=\"/x\"><img src=\"i.png\" alt=\"a\"></a></p>\n"
 expect doc("[![a](i.png)](/x)") == "<p><a href=\"/x\">a</a></p>\n"
 expect md("[![a](i.png)](/x)") == "<p><a href=\"i.png\">![a</a>](/x)</p>\n"
 expect doc("[a\\]b](c) [a\\[b](c)") == "<p><a href=\"c\">a]b</a> <a href=\"c\">a[b</a></p>\n"
@@ -520,11 +522,11 @@ expect doc("[<http://x.org>](/y)") == "<p><a href=\"/y\">&lt;http://x.org&gt;</a
 expect doc("[[a](b)](c)") == "<p><a href=\"c\">[a](b)</a></p>\n"
 expect md("[https://x.org](/y)") == "<p><a href=\"/y\"><a href=\"https://x.org\" target=\"_blank\" rel=\"noopener\">https://x.org</a></a></p>\n"
 # An image's alt reads neither links nor images, however the brackets nest.
-expect shown("![![a](b)](c)") == "<p><img src=\"c\" alt=\"![a](b)\"></p>\n"
-expect shown("[![![a](b)](c)](d)") == "<p><a href=\"d\"><img src=\"c\" alt=\"![a](b)\"></a></p>\n"
+expect page_with_images("![![a](b)](c)") == "<p><img src=\"c\" alt=\"![a](b)\"></p>\n"
+expect page_with_images("[![![a](b)](c)](d)") == "<p><a href=\"d\"><img src=\"c\" alt=\"![a](b)\"></a></p>\n"
 # What a browser would run stays source, inside a label too.
-expect shown("[![a](javascript:x)](/y)") == "<p><a href=\"/y\">![a](javascript:x)</a></p>\n"
-expect shown("[a](/y)[b](javascript:x)") == "<p><a href=\"/y\">a</a>[b](javascript:x)</p>\n"
+expect page_with_images("[![a](javascript:x)](/y)") == "<p><a href=\"/y\">![a](javascript:x)</a></p>\n"
+expect page_with_images("[a](/y)[b](javascript:x)") == "<p><a href=\"/y\">a</a>[b](javascript:x)</p>\n"
 
 # A document's link reads a title and `<a b>`, as its image does. A chat's reads
 # neither, so its href holds them.
@@ -534,13 +536,13 @@ expect doc("[a](<b c> 't')") == "<p><a href=\"b c\" title=\"t\">a</a></p>\n"
 expect doc("[a](b c)") == "<p><a href=\"b c\">a</a></p>\n"
 expect doc("[a](<b)") == "<p><a href=\"&lt;b\">a</a></p>\n"
 expect doc("![a](c.png \"t\")") == "<p><a href=\"c.png\" title=\"t\">a</a></p>\n"
-expect shown("![a](<b c.png> 't')") == "<p><img src=\"b c.png\" alt=\"a\" title=\"t\"></p>\n"
+expect page_with_images("![a](<b c.png> 't')") == "<p><img src=\"b c.png\" alt=\"a\" title=\"t\"></p>\n"
 expect md("[a](/b \"t\")") == "<p><a href=\"/b &quot;t&quot;\">a</a></p>\n"
 expect md("[a](<b c>)") == "<p><a href=\"&lt;b c&gt;\">a</a></p>\n"
 # Brackets hide nothing from the safety rule.
 expect doc("[a](<javascript:x>)") == "<p>[a](&lt;javascript:x&gt;)</p>\n"
 expect doc("[a]( <JavaScript:x> \"t\")") == "<p>[a]( &lt;JavaScript:x&gt; &quot;t&quot;)</p>\n"
-expect shown("![a](<java\tscript:x>)") == "<p>![a](&lt;java\tscript:x&gt;)</p>\n"
+expect page_with_images("![a](<java\tscript:x>)") == "<p>![a](&lt;java\tscript:x&gt;)</p>\n"
 
 # A document's `\r\n` is a line's end to every block and to the hook.
 expect doc("-\r\n- b\r\n") == "<ul>\n<li></li>\n<li>b</li>\n</ul>\n"

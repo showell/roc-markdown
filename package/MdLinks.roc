@@ -97,7 +97,7 @@ MdLinks := [].{
 				{
 					link: Ok({
 						label: { start: at + 1, end: close_bracket },
-						url: MdText.unescaped(
+						url: MdText.without_escapes(
 							MdText.cut(text, { start: open_paren + 1, end: close_paren }),
 						),
 						end: close_paren + 1,
@@ -189,13 +189,13 @@ MdLinks := [].{
 			Err(NotSafe)
 		} else {
 			named = [
-				{ name: "src".to_utf8(), value: Is(src) },
-				{ name: "alt".to_utf8(), value: Is(alt) },
+				{ name: "src".to_utf8(), attr_value: Is(src) },
+				{ name: "alt".to_utf8(), attr_value: Is(alt) },
 			]
 			Ok(
 				MdHtml.img(
 					match title {
-						Titled(t) => named.append({ name: "title".to_utf8(), value: Is(t) })
+						Titled(t) => named.append({ name: "title".to_utf8(), attr_value: Is(t) })
 						Untitled => named
 					},
 				),
@@ -337,8 +337,8 @@ MdLinks := [].{
 
 	## The link, a URL's and a `www.`'s opening
 	## as `outside` says, an email's as `mailto:`.
-	autolink_html : List(U8), AutoKind, [SameTab, NewTab] -> List(U8)
-	autolink_html = |link, kind, outside| {
+	autolink_html : List(U8), { kind : AutoKind, outside : [SameTab, NewTab] } -> List(U8)
+	autolink_html = |link, { kind, outside }| {
 		head = match kind {
 			Url => MdHtml.link_open({
 				href: link,
@@ -466,7 +466,9 @@ titled_dest = |src, after| {
 	} else {
 		first = MdText.at(rest, 0)
 		last = MdText.at(rest, n - 1)
-		quoted = (first == '"' and last == '"') or (first == '\'' and last == '\'') or (first == '(' and last == ')')
+		quoted = (first == '"' and last == '"')
+			or (first == '\'' and last == '\'')
+			or (first == '(' and last == ')')
 		if n >= 2 and quoted {
 			Ok({ src, title: Titled(MdText.cut(rest, { start: 1, end: n - 1 })) })
 		} else {

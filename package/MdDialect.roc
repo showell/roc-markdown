@@ -8,7 +8,7 @@ import MdLinks
 
 MdDialect := [].{
 
-	Dialect : [Chat, Document(MdDocument.Options)]
+	Dialect : [Chat, Document(MdDocument.PageOptions)]
 
 	## How the inline pass reads a dialect's text.
 	inline_refs : Dialect -> MdInline.Refs

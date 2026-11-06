@@ -150,7 +150,10 @@ MdEmphasis := [].{
 					# another only when their lengths' sum is no multiple of 3,
 					# unless both are.
 					is_both = closer.can_open or opener.can_close
-					odd = closer.char != '~' and is_both and closer.orig % 3 != 0 and (opener.orig + closer.orig) % 3 == 0
+					odd = closer.char != '~'
+						and is_both
+						and closer.orig % 3 != 0
+						and (opener.orig + closer.orig) % 3 == 0
 					if opener.can_open and opener.char == closer.char and !odd {
 						$found = Bool.True
 						break
@@ -193,13 +196,13 @@ MdEmphasis := [].{
 						},
 					)
 					if opener.count == use {
-						$runs = unlinked($runs, oi)
+						$runs = runs_without($runs, oi)
 					} else {
 						{}
 					}
 					if closer.count == use {
 						above = MdEmphasis.run_at($runs, ci).above
-						$runs = unlinked($runs, ci)
+						$runs = runs_without($runs, ci)
 						$closer = above
 					} else {
 						{}
@@ -212,7 +215,7 @@ MdEmphasis := [].{
 						closer.below,
 					) ?? crash "MdEmphasis: a bottom's slot past the floor keys"
 					if !closer.can_open {
-						$runs = unlinked($runs, ci)
+						$runs = runs_without($runs, ci)
 					} else {
 						{}
 					}
@@ -254,7 +257,7 @@ MdEmphasis := [].{
 			$o = $o.concat(
 				if run.char == '~' {
 					MdHtml.del_open
-				} else if (run.opens.get($n) ?? 0) == 2 {
+				} else if run.opens.get($n) == Ok(2) {
 					MdHtml.strong_open
 				} else {
 					MdHtml.em_open
@@ -314,8 +317,8 @@ floor_keys = 18
 
 ## Run `k` off the stack; its place among the
 ## pieces, and its delimiters left, stay.
-unlinked : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRun)
-unlinked = |runs, k| {
+runs_without : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRun)
+runs_without = |runs, k| {
 	run = MdEmphasis.run_at(runs, k)
 	with_below = match run.below {
 		At(b) => set_run(
@@ -401,7 +404,9 @@ em = |line| {
 		$out = MdEmphasis.run_onto($out.concat($texts.get($k) ?? []), run)
 		$k = $k + 1
 	}
-	Str.from_utf8($out.concat(MdText.cut(text, { start: $text_start, end: len }))) ?? "not text"
+	Str.from_utf8(
+		$out.concat(MdText.cut(text, { start: $text_start, end: len })),
+	) ?? crash "a test's text is UTF-8"
 }
 
 # The nearest opener wins, and two from each side is `<strong>`.

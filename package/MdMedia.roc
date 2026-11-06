@@ -4,7 +4,7 @@
 ## and REBUILT from MdSafety's allowlist (`media_attrs`, which also holds the
 ## uploads rule), each value escaped (MdHtml). A tag that does not parse cleanly, or that
 ## MdSafety refuses, is refused whole; the caller escapes it as text. Pure,
-## over bytes: the renderer (Md, MdInline) asks it, and it is exposed, so a
+## over bytes: the renderer (MdRawHtml, MdInline) asks it, and it is exposed, so a
 ## host that shows a stored tag outside a render (a feed of images) rebuilds
 ## it by the same rule (`rebuild`).
 import MdHtml
@@ -18,8 +18,8 @@ MdMedia := [].{
 
 	## The `<img …>` at `raw[start]` rebuilt,
 	## and the index past its `>`.
-	img_at : List(U8), U64, MdSafety.Uploads -> Try(Rebuilt, [NotSafe])
-	img_at = |raw, start, uploads| {
+	img_at : List(U8), { start : U64, uploads : MdSafety.Uploads } -> Try(Rebuilt, [NotSafe])
+	img_at = |raw, { start, uploads }| {
 		tag = scan(raw, { start, name: "img".to_utf8() })?
 		attrs = MdSafety.media_attrs({
 			kind: Img,
@@ -33,8 +33,8 @@ MdMedia := [].{
 	## `raw[start]` rebuilt as a locked player, and the index past its
 	## `</video>`. Only whitespace may stand between the two tags: no
 	## fallback content is carried through.
-	video_at : List(U8), U64, MdSafety.Uploads -> Try(Rebuilt, [NotSafe])
-	video_at = |raw, start, uploads| {
+	video_at : List(U8), { start : U64, uploads : MdSafety.Uploads } -> Try(Rebuilt, [NotSafe])
+	video_at = |raw, { start, uploads }| {
 		tag = scan(raw, { start, name: "video".to_utf8() })?
 		attrs = MdSafety.media_attrs({
 			kind: Video,
@@ -48,7 +48,7 @@ MdMedia := [].{
 	## The image tag `tag` (`<img …>`, from its `<`) rebuilt, or `Unsafe`:
 	## the Images feed's door, `img_at` at the tag's start.
 	rebuild : Str, MdSafety.Uploads -> Try(Str, [Unsafe])
-	rebuild = |tag, uploads| match img_at(tag.to_utf8(), 0, uploads) {
+	rebuild = |tag, uploads| match img_at(tag.to_utf8(), { start: 0, uploads }) {
 		Ok(rebuilt) =>
 			match Str.from_utf8(rebuilt.html) {
 				Ok(text) => Ok(text)
@@ -196,14 +196,14 @@ user_uploads : MdSafety.Uploads
 user_uploads = MdSafety.under("/user_uploads/".to_utf8())
 
 img : Str -> Str
-img = |raw| match MdMedia.img_at(raw.to_utf8(), 0, user_uploads) {
-	Ok(r) => Str.from_utf8(r.html) ?? "not text"
+img = |raw| match MdMedia.img_at(raw.to_utf8(), { start: 0, uploads: user_uploads }) {
+	Ok(r) => Str.from_utf8(r.html) ?? crash "a test's text is UTF-8"
 	Err(NotSafe) => ""
 }
 
 video : Str -> Str
-video = |raw| match MdMedia.video_at(raw.to_utf8(), 0, user_uploads) {
-	Ok(r) => Str.from_utf8(r.html) ?? "not text"
+video = |raw| match MdMedia.video_at(raw.to_utf8(), { start: 0, uploads: user_uploads }) {
+	Ok(r) => Str.from_utf8(r.html) ?? crash "a test's text is UTF-8"
 	Err(NotSafe) => ""
 }
 
@@ -227,13 +227,11 @@ expect img("<img src=\" /user_uploads/cat.png \">") == "<img src=\" /user_upload
 # only one it lets through.
 expect MdMedia.img_at(
 	"<img src=\"/user_uploads/x.png\">".to_utf8(),
-	0,
-	|_| Bool.False,
+	{ start: 0, uploads: |_| Bool.False },
 ) == Err(NotSafe)
 expect MdMedia.img_at(
 	"<img src=\"/files/x.png\">".to_utf8(),
-	0,
-	MdSafety.under("/files/".to_utf8()),
+	{ start: 0, uploads: MdSafety.under("/files/".to_utf8()) },
 ).is_ok()
 # The Images feed's (SafeImg's, folded here): its plants, escaped values,
 # case-blind names, the last of a name winning, single quotes, a bare name.
@@ -255,8 +253,7 @@ expect MdMedia.rebuild("<img src=\"/a.png>", user_uploads) == Err(Unsafe)
 expect MdMedia.rebuild("<img src=", user_uploads) == Err(Unsafe)
 expect MdMedia.video_at(
 	"x<VIDEO src=/user_uploads/v.mp4 >  </Video >y".to_utf8(),
-	1,
-	user_uploads,
+	{ start: 1, uploads: user_uploads },
 ) == Ok({
 	html: "<video controls preload=\"metadata\" src=\"/user_uploads/v.mp4\"></video>".to_utf8(),
 	end: 44,

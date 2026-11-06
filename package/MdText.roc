@@ -27,7 +27,7 @@ MdText := [].{
 		after : U64,
 	}
 
-	## A container's content (a list item's, a quote's), handed back to Md's
+	## A container's content (a list item's, a quote's), handed back to MdBlocks'
 	## dispatcher to render as blocks one level deeper (MdList, MdQuote).
 	## `Tight` is a tight list item's: its paragraphs have no `<p>`.
 	Nested : {
@@ -118,8 +118,7 @@ MdText := [].{
 		}
 	}
 
-	## The first `byte` at `at` or after, or the end: `indexOfScalarPos`
-	## orelse `len`.
+	## The first `byte` at `at` or after, or the end.
 	find_or_end : List(U8), { byte : U8, at : U64 } -> U64
 	find_or_end = |s, wanted| Bytes.find_byte(s, wanted) ?? s.len()
 
@@ -130,8 +129,8 @@ MdText := [].{
 	## CommonMark's backslash escapes taken out of `text`: a backslash before
 	## ASCII punctuation is dropped and the punctuation kept; any other is a
 	## backslash. For text no inline pass reads (a fence's info string).
-	unescaped : List(U8) -> List(U8)
-	unescaped = |text| {
+	without_escapes : List(U8) -> List(U8)
+	without_escapes = |text| {
 		len = text.len()
 		var $out = []
 		var $i = 0

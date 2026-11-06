@@ -1,5 +1,5 @@
 ## What a trusted document has and a chat message doesn't: a caller's hook for
-## its fences, ids on its headings, rules and indented code. Md's dispatcher
+## its fences, ids on its headings, rules and indented code. MdBlocks' dispatcher
 ## asks the hook and marks each heading; this module names the marked ones when
 ## the render is done, since a name depends on every heading before it, and a
 ## list's items render apart. Pure.
@@ -25,7 +25,7 @@ MdDocument := [].{
 
 	## How a document's render treats a fenced block it doesn't know, and how
 	## its `![alt](src)` appears. Neither has a default.
-	Options : { fence : FenceHook, images : MdSafety.Images }
+	PageOptions : { fence : FenceHook, images : MdSafety.Images }
 
 	## A heading, for a table of contents. Its `text` is plain and unescaped.
 	Heading : {
@@ -64,7 +64,8 @@ MdDocument := [].{
 		match line.get(indent) {
 			Ok(mark) if indent < 4 and (mark == '-' or mark == '*' or mark == '_') => {
 				body = MdText.trim_line(line)
-				body.count_if(|c| c == mark) >= 3 and body.all(|c| c == mark or c == ' ' or c == '\t')
+				body.count_if(|c| c == mark) >= 3
+					and body.all(|c| c == mark or c == ' ' or c == '\t')
 			}
 			_ => Bool.False
 		}

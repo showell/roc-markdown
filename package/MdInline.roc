@@ -1,16 +1,16 @@
-## **THE INLINE PASS**: one line of inline content to HTML. The line is cut into pieces (text to escape; html made here, for a
-## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link,
-## a same-origin `![alt](src)` image or an autolink (MdLinks), or the chat's `MSG_` reference (MdChat); and
-## `*`/`_`/`~` runs), the
-## runs are matched into `<em>`, `<strong>` and `<del>` (MdEmphasis), and
-## the pieces are written out. Pure.
+## The inline pass: one line of inline content to HTML. The line is cut into
+## pieces, which are text to escape, `*`/`_`/`~` runs, and html made here for a
+## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link, a
+## same-origin `![alt](src)` image or an autolink (MdLinks), or the chat's `MSG_`
+## reference (MdChat). The runs are matched into `<em>`, `<strong>` and `<del>`
+## (MdEmphasis), and the pieces are written out. Pure.
 ##
 ## **A BACKSLASH BEFORE ASCII PUNCTUATION MAKES IT TEXT** (CommonMark's
 ## backslash escapes): the backslash goes, and the character after it is a
 ## piece of text, so it opens no emphasis, link, code span or tag. Before
 ## anything else a backslash is itself. A code span's content is read raw,
 ## so a backslash inside one stays (the span is scanned from its backtick,
-## never through this pass); so is a fence's (Md).
+## never through this pass); so is a fence's (MdFence).
 ##
 ## **LINEAR BY ITS CURSORS, AND CHARGED FOR EVERY STEP**: the walk holds
 ## MdLinks's cursors (the first `]` and `)` ahead, and the floor below which
@@ -60,7 +60,11 @@ MdInline := [].{
 	render_onto = |{ out, text, refs, budget, uploads }| {
 		len = text.len()
 		is_document = refs != Linked and refs != InLabel
-		reads_links = refs != DocumentLabel(Shown) and refs != DocumentLabel(AsLinks) and refs != DocumentAlt
+		reads_links = match refs {
+			DocumentLabel(_) => Bool.False
+			DocumentAlt => Bool.False
+			_ => Bool.True
+		}
 		shows_images = refs == Document(Shown) or refs == DocumentLabel(Shown)
 		alt_as_text = refs == DocumentLabel(AsLinks)
 		outside = if is_document {
@@ -112,7 +116,7 @@ MdInline := [].{
 					if c == '\\' and is_escapable(text, $i + 1) {
 						Token(Text($i + 1, $i + 2), $i + 2)
 					} else if c == '<' {
-						match media_at(text, $i, uploads) {
+						match media_at(text, { start: $i, uploads }) {
 							Ok(media) => Token(Html(media.html), media.end)
 							Err(NotMedia) =>
 								match if is_document and reads_links {
@@ -121,7 +125,12 @@ MdInline := [].{
 									Err(NotALink)
 								} {
 									Ok(found) => Token(
-										Html(MdLinks.autolink_html(found.url, Url, outside)),
+										Html(
+											MdLinks.autolink_html(
+												found.url,
+												{ kind: Url, outside },
+											),
+										),
 										found.end,
 									)
 									Err(NotALink) => Skip($i + 1)
@@ -180,11 +189,10 @@ MdInline := [].{
 							Err(NotALink) => Err(NotAnImage)
 						}
 						match image {
-							Ok(found) =>
-								if MdSafety.is_upload_url(
-									found.dest.src,
-									uploads,
-								) or ((shows_images or alt_as_text) and !MdSafety.is_dangerous_url(found.dest.src)) {
+							Ok(found) => {
+								is_safe = !MdSafety.is_dangerous_url(found.dest.src)
+								is_shown = (shows_images or alt_as_text) and is_safe
+								if MdSafety.is_upload_url(found.dest.src, uploads) or is_shown {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.render_onto({
@@ -224,6 +232,7 @@ MdInline := [].{
 								} else {
 									Cut($i + 1)
 								}
+							}
 							Err(NotAnImage) => Skip($i + 1)
 						}
 					} else if c == '[' and reads_links {
@@ -299,8 +308,8 @@ MdInline := [].{
 									Html(
 										MdLinks.autolink_html(
 											MdText.cut(text, { start: $i, end: link.end }),
-											link.kind,
-											outside,
+											{ kind: link.kind, outside },
+
 										),
 									),
 									link.end,
@@ -315,19 +324,15 @@ MdInline := [].{
 			# before it flushed), the pending text cut, or bytes left in it.
 			match step {
 				Token(piece, end) => {
-					$pieces = with_token(
+					$pieces = with_pending_text(
 						$pieces,
-						{
-							text_start: $text_start,
-							at: $i,
-							token: piece,
-						},
-					)
+						{ text_start: $text_start, at: $i },
+					).append(piece)
 					$i = end
 					$text_start = end
 				}
 				Cut(end) => {
-					$pieces = flushed($pieces, { text_start: $text_start, at: $i })
+					$pieces = with_pending_text($pieces, { text_start: $text_start, at: $i })
 					$i = end
 					$text_start = end
 				}
@@ -336,7 +341,7 @@ MdInline := [].{
 				}
 			}
 		}
-		pieces = flushed($pieces, { text_start: $text_start, at: len })
+		pieces = with_pending_text($pieces, { text_start: $text_start, at: len })
 		matched = MdEmphasis.emphasis({ runs: $runs, budget: $budget })?
 		if MdText.is_blown(matched.budget) {
 			Err(Hostile)
@@ -383,21 +388,13 @@ Piece : [
 ]
 
 ## The pending text from `text_start` up to `at`, as a piece when any.
-flushed : List(Piece), { text_start : U64, at : U64 } -> List(Piece)
-flushed = |pieces, { text_start, at }|
+with_pending_text : List(Piece), { text_start : U64, at : U64 } -> List(Piece)
+with_pending_text = |pieces, { text_start, at }|
 	if at > text_start {
 		pieces.append(Text(text_start, at))
 	} else {
 		pieces
 	}
-
-with_token : List(Piece),
-{
-	text_start : U64,
-	at : U64,
-	token : Piece,
-} -> List(Piece)
-with_token = |pieces, { text_start, at, token }| flushed(pieces, { text_start, at }).append(token)
 
 ## What one byte's scan found: a piece, ending at `end` (the pending text
 ## before it flushed first); the pending text cut at `end` with nothing taken
@@ -409,12 +406,12 @@ Step : [
 ]
 
 ## A same-origin `<img>` or `<video>` at `at`, rebuilt (MdMedia).
-media_at : List(U8), U64, MdSafety.Uploads -> Try(MdMedia.Rebuilt, [NotMedia])
-media_at = |text, at, uploads|
-	match MdMedia.img_at(text, at, uploads) {
+media_at : List(U8), { start : U64, uploads : MdSafety.Uploads } -> Try(MdMedia.Rebuilt, [NotMedia])
+media_at = |text, place|
+	match MdMedia.img_at(text, place) {
 		Ok(tag) => Ok(tag)
 		Err(NotSafe) =>
-			match MdMedia.video_at(text, at, uploads) {
+			match MdMedia.video_at(text, place) {
 				Ok(tag) => Ok(tag)
 				Err(NotSafe) => Err(NotMedia)
 			}
@@ -503,7 +500,8 @@ code_span_at = |text, { at, budget }| {
 code_span_content : List(U8) -> List(U8)
 code_span_content = |content| {
 	n = content.len()
-	if n >= 2 and content.first() == Ok(' ') and content.last() == Ok(' ') and content.any(|c| c != ' ') {
+	is_padded = content.first() == Ok(' ') and content.last() == Ok(' ')
+	if n >= 2 and is_padded and content.any(|c| c != ' ') {
 		MdText.cut(content, { start: 1, end: n - 1 })
 	} else {
 		content
@@ -518,7 +516,7 @@ inline = |text| match MdInline.render_onto({
 	budget: MdText.unlimited,
 	uploads: MdSafety.under("/user_uploads/".to_utf8()),
 }) {
-	Ok(r) => Str.from_utf8(r.out) ?? "not text"
+	Ok(r) => Str.from_utf8(r.out) ?? crash "a test's text is UTF-8"
 	Err(Hostile) => "hostile"
 }
 

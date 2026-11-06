@@ -35,9 +35,9 @@ MdRawHtml := [].{
 			if MdText.at(raw, $i) != '<' {
 				$i = $i + 1
 			} else {
-				safe = match MdMedia.img_at(raw, $i, uploads) {
+				safe = match MdMedia.img_at(raw, { start: $i, uploads }) {
 					Ok(tag) => Ok(tag)
-					Err(NotSafe) => MdMedia.video_at(raw, $i, uploads)
+					Err(NotSafe) => MdMedia.video_at(raw, { start: $i, uploads })
 				}
 				match safe {
 					Ok(tag) => {

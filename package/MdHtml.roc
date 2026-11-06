@@ -6,7 +6,7 @@
 ##
 ## What stays elsewhere: which attributes a member's `<img>` or `<video>`
 ## keeps, and what a video player is given, is a safety rule (MdSafety); the
-## whitespace between blocks is the dispatcher's (Md). Pure.
+## whitespace between blocks is the dispatcher's (MdBlocks). Pure.
 import MdText
 import MdTable
 
@@ -146,6 +146,7 @@ MdHtml := [].{
 		name.to_utf8().concat(attr.to_utf8()).append('>')
 	}
 
+	## The close of a `cell_open`.
 	cell_close : [Th, Td] -> List(U8)
 	cell_close = |tag| (
 		if tag == Th {
@@ -203,7 +204,7 @@ MdHtml := [].{
 		['"'],
 		match title {
 			Untitled => []
-			Titled(text) => attrs_onto([], [{ name: "title".to_utf8(), value: Is(text) }])
+			Titled(text) => attrs_onto([], [{ name: "title".to_utf8(), attr_value: Is(text) }])
 		},
 		if tab == NewTab {
 			" target=\"_blank\" rel=\"noopener\"".to_utf8()
@@ -232,7 +233,7 @@ MdHtml := [].{
 
 	## One attribute of a rebuilt media tag: ` name`, or ` name="value"`,
 	## the value escaped.
-	Attr : { name : List(U8), value : [Bare, Is(List(U8))] }
+	Attr : { name : List(U8), attr_value : [Bare, Is(List(U8))] }
 
 	## A member's `<img>`, rebuilt from the attributes MdSafety let through.
 	img : List(Attr) -> List(U8)
@@ -298,9 +299,9 @@ heading_digit = |level| '0' + level.to_u8_wrap()
 attrs_onto : List(U8), List(MdHtml.Attr) -> List(U8)
 attrs_onto = |out, attrs| {
 	var $out = out
-	for { name, value } in attrs {
+	for { name, attr_value } in attrs {
 		named = $out.append(' ').concat(name)
-		$out = match value {
+		$out = match attr_value {
 			Bare => named
 			Is(v) => MdText.escape_onto(named.concat(['=', '"']), v).append('"')
 		}
@@ -318,6 +319,6 @@ expect MdHtml.link_open({
 	title: Untitled,
 }) == "<a href=\"/a?b&amp;c\">".to_utf8()
 expect MdHtml.video([
-	{ name: "controls".to_utf8(), value: Bare },
-	{ name: "src".to_utf8(), value: Is("/v\".mp4".to_utf8()) },
+	{ name: "controls".to_utf8(), attr_value: Bare },
+	{ name: "src".to_utf8(), attr_value: Is("/v\".mp4".to_utf8()) },
 ]) == "<video controls src=\"/v&quot;.mp4\"></video>".to_utf8()

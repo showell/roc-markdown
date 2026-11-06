@@ -12,6 +12,8 @@
 -- The checks:
 --   - first, the disk: under Shale's cookbook/disk.shale floor of free
 --     space (20 GB) the run stops at once, with its line;
+--   - Shale's Roc recipes over package/, each count held at the number in
+--     LINTS, so a moved count fails the run;
 --   - `zig build test`: the package's expects, the judge, and the REPL
 --     piped against the frozen answers (judge/repl_check.zig), the
 --     playground's wasm in node against them too and its page on a stand-in
@@ -78,6 +80,75 @@ if disk.code ~= 0 then
   fail("verify: " .. why)
 end
 say(disk_line ~= nil, disk_line ~= nil and disk_line.text or ("cookbook:disk.shale gave no line: " .. trim(disk.out)))
+
+-- ── Shale's Roc recipes, the cheapest check ──
+-- The recipes Safari's gate holds, over package/, every count held at zero but
+-- `wide string`, which isn't held: an expect's frozen HTML is one string, and
+-- Roc has no short way to split one.
+const LINTS = {
+  {recipe = "name_hunt", args = {}, budget = {}, counts = {
+    {"state_effect", 0}, {"question", 0}, {"vague", 0}, {"name_type", 0}, {"negative", 0},
+    {"noun_effect", 0}, {"command_tense", 0}, {"mixed_tense", 0}, {"container", 0},
+    {"preposition_split", 0}, {"short_name", 0}, {"worker_name", 0}, {"stacked_preposition", 0},
+    {"taken_word", 0}, {"bare_participle", 0},
+  }},
+  {recipe = "errors", args = {}, budget = {}, counts = {
+    {"error_alias", 0}, {"optional_tag", 0}, {"set_fallback", 0}, {"placeholder", 0}, {"number_fallback", 0},
+  }},
+  {recipe = "nest_depth", args = {"min=4"}, budget = {}, counts = {{"nested", 0}}},
+  {recipe = "parens", args = {}, budget = {}, counts = {{"paren_if", 0}, {"wrapped_body", 0}, {"else_block", 0}, {"lambda_if", 0}}},
+  {recipe = "boundaries", args = {}, budget = {}, counts = {
+    {"single", 0}, {"fixed", 0}, {"entry", 0}, {"constant", 0}, {"bool_param", 0}, {"dead", 0}, {"unused_api", 0}, {"same_branches", 0},
+  }},
+  {recipe = "stack", args = {}, budget = {"--budget", "steps=4000000000"}, counts = {{"to stack", 0}, {"to unstack", 0}, {"long", 0}}},
+  {recipe = "vocabulary", args = {"words=tools/vocabulary.txt"}, budget = {}, counts = {{"retired_name", 0}, {"retired_comment", 0}}},
+  {recipe = "plain_names", args = {}, budget = {}, counts = {{"pure_mutator", 0}, {"abbreviation", 0}, {"module_doc", 0}}},
+  {recipe = "families", args = {}, budget = {}, counts = {{"family", 0}, {"twin_name", 0}}},
+}
+
+-- A recipe's last line that isn't blank or Shale's own footer: its counts.
+function lint_summary(out)
+  local summary = ""
+  for l in lines(trim(out)) do
+    if not starts_with(l, "──") and trim(l) ~= "" then summary = l end
+  end
+  return summary
+end
+
+-- The number a summary gives for `check`: "check N", or "N check" for stack's.
+function count_in(line, check)
+  local after = re_find(line, check .. " ([0-9]+)")
+  if after ~= nil then return tonumber(after.group) end
+  local before = re_find(line, "([0-9]+) " .. check)
+  if before ~= nil then return tonumber(before.group) end
+  return nil
+end
+
+-- The command that runs `lint` over package/.
+function lint_argv(lint)
+  local argv = {"shale"}
+  for b in lint.budget do argv[#argv + 1] = b end
+  argv[#argv + 1] = real("cookbook:roc/" .. lint.recipe .. ".shale")
+  argv[#argv + 1] = "glob=package/*.roc"
+  for a in lint.args do argv[#argv + 1] = a end
+  return argv
+end
+
+for lint in LINTS do
+  -- `want`: a gate recipe exits nonzero on a finding, and its counts say which.
+  local r = run(lint_argv(lint), {cwd = ".", timeout_ms = 120000, whole = 4000000, want = "any"})
+  local summary = lint_summary(r.out)
+  local wrong = {}
+  local said = {}
+  for c in lint.counts do
+    local got = count_in(summary, c[1])
+    if got ~= c[2] then wrong[#wrong + 1] = c[1] .. " is " .. tostring(got) .. ", held at " .. c[2] end
+    if got ~= 0 then said[#said + 1] = c[1] .. " " .. tostring(got) end
+  end
+  if contains(r.out, "refused: ") then wrong[#wrong + 1] = "a file was refused: " .. trim(r.out) end
+  local held = #said == 0 and "all at zero" or join(said, ", ")
+  say(#wrong == 0, "roc recipe " .. lint.recipe .. ": " .. (#wrong == 0 and held or join(wrong, "; ")))
+end
 
 -- The judge's `== <label>: P/T hold ...` lines, as {label = {pass, total}}.
 function counts(out)

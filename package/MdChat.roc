@@ -5,7 +5,7 @@
 ## asks here at fixed points, plain calls and no plugin system:
 ##   - the inline pass (MdInline), at each byte of a line not inside a link's
 ##     label, for a reference (`reference_at`);
-##   - the fence's renderer (Md), for a fence that is a quote-reply
+##   - the fence's renderer (MdFence), for a fence that is a quote-reply
 ##     (`is_quote_fence`);
 ##   - the fence's grammar (MdFence), for the longest run that opens one
 ##     (`max_fence_run`).

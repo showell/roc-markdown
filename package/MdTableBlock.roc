@@ -9,9 +9,9 @@ import MdText
 
 MdTableBlock := [].{
 
-	## GFM's table from `line_start` (MdTable `table_at`): its header row in `<thead>`, then a body row a
-	## line, up to a blank line or one that starts a block (is_block_start),
-	## each cut or padded to the header's width with empty cells. No body, no
+	## GFM's table from `line_start` (MdTable `table_at`): its header row in
+	## `<thead>`, then a body row a line, up to `ends_table`, each padded to the
+	## header's width with empty cells, and a chat's cut to it. No body, no
 	## `<tbody>`. A unit a row and a unit a cell, checked a cell: a short row's
 	## padding is output its source never paid for.
 	table_onto : List(U8),
@@ -144,5 +144,8 @@ columns_of_row : {
 } -> List(MdTable.Align)
 columns_of_row = |{ cells, aligns, dialect }| match dialect {
 	Chat => aligns
-	Document(_) => aligns.concat(List.repeat(Plain, cells.len().max(aligns.len()) - aligns.len()))
+	Document(_) => {
+		extra_cells = cells.len().max(aligns.len()) - aligns.len()
+		aligns.concat(List.repeat(Plain, extra_cells))
+	}
 }

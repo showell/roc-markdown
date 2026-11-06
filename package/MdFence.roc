@@ -35,11 +35,12 @@ MdFence := [].{
 				} else {
 					count = Bytes.count_while(line, { keep: |c| c == f, at: indent }) - indent
 					info = Bytes.trim(line.drop_first(indent + count), info_space)
-					if count < 3 or count > MdChat.max_fence_run or (f == '`' and info.contains('`')) {
+					is_backtick_info = f == '`' and info.contains('`')
+					if count < 3 or count > MdChat.max_fence_run or is_backtick_info {
 						Err(NotAFence)
 					} else {
 						# The language's backslash escapes are CommonMark's (`foo\+bar`).
-						lang = MdText.unescaped(
+						lang = MdText.without_escapes(
 							info.take_first(
 								Bytes.count_while(
 									info,
@@ -54,7 +55,7 @@ MdFence := [].{
 	}
 
 	## A fence's opening at the line of `md` at `line_start`, and where its body
-	## starts: the block dispatcher's (Md) question.
+	## starts: the block dispatcher's (MdBlocks) question.
 	open_at : List(U8), U64 -> Try({ open : Open, body_start : U64 }, [NotAFence])
 	open_at = |md, line_start| {
 		eol = MdText.line_end(md, line_start)
@@ -111,7 +112,7 @@ MdFence := [].{
 			}
 		}
 		content = MdText.cut(md, { start: body_start, end: $content_end })
-		body = dedented({ content, indent: fence.indent })
+		body = without_fence_indent({ content, indent: fence.indent })
 		code = || MdText.escape_onto(
 			MdHtml.code_block_open(fence.lang),
 			body,
@@ -172,8 +173,8 @@ MdFence := [].{
 
 ## Each line ended with a newline, less up to the fence's own indent of
 ## spaces.
-dedented : { content : List(U8), indent : U64 } -> List(U8)
-dedented = |{ content, indent }| {
+without_fence_indent : { content : List(U8), indent : U64 } -> List(U8)
+without_fence_indent = |{ content, indent }| {
 	len = content.len()
 	var $out = []
 	var $i = 0
