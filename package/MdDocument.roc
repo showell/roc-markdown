@@ -76,15 +76,16 @@ marked_heading_at = |html, at| match [1, 2, 3, 4, 5, 6].find_first(|n| MdText.is
 	}
 }
 
-## A heading's id: its ASCII letters and digits in lower case, every other run
-## of bytes one hyphen. A heading with none of them is a `section`.
+## A heading's id: its ASCII letters and digits in lower case, its apostrophes
+## gone, as on GitHub, and every other run of bytes one hyphen. A heading with
+## no letter or digit is a `section`.
 slug : List(U8) -> List(U8)
 slug = |text| {
 	var $id = []
 	for c in text {
 		if Ascii.is_alphanumeric(c) {
 			$id = $id.append(Ascii.to_lowercase(c))
-		} else if $id != [] and $id.last() != Ok('-') {
+		} else if c != '\'' and $id != [] and $id.last() != Ok('-') {
 			$id = $id.append('-')
 		} else {
 			{}
@@ -113,7 +114,9 @@ mark : U64, Str -> List(U8)
 mark = |level, text| MdHtml.heading_open_with_id(level, []).concat(text.to_utf8()).concat(MdHtml.heading_close(level))
 
 expect slug("The sky".to_utf8()) == "the-sky".to_utf8()
-expect slug("  What's a *sighting*?".to_utf8()) == "what-s-a-sighting".to_utf8()
+expect slug("  What's a *sighting*?".to_utf8()) == "whats-a-sighting".to_utf8()
+expect slug("a ' b".to_utf8()) == "a-b".to_utf8()
+expect slug("'".to_utf8()) == "section".to_utf8()
 expect slug("🔭 Zoom 2".to_utf8()) == "zoom-2".to_utf8()
 expect slug("🔭".to_utf8()) == "section".to_utf8()
 expect distinct("a".to_utf8(), []) == "a".to_utf8()

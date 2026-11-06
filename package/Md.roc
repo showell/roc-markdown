@@ -827,6 +827,7 @@ expect md("<img src=\"/user_uploads/a.png\">") == "<img src=\"/user_uploads/a.pn
 
 # A document's headings have ids, wherever they stand; a chat's have none.
 expect doc("## The *sky*") == "<h2 id=\"the-sky\">The <em>sky</em></h2>\n"
+expect doc("## What's a sighting?") == "<h2 id=\"whats-a-sighting\">What&#39;s a sighting?</h2>\n"
 expect md("## The *sky*") == "<h2>The <em>sky</em></h2>\n"
 expect Md.render_document("# A\n\n> ## A\n\n- ## `A`\n".to_utf8(), { fence: widgets }).headings == [
 	{ level: 1, id: "a".to_utf8(), text: "A".to_utf8() },

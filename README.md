@@ -105,7 +105,7 @@ by the media rule (`MdMedia.rebuild`, a feed of images), a table row's cells.
 (`MSG_` is text and ```` ```quote ```` is code), a newline is a space, a
 link to another site stays in its tab, and raw HTML and media stay escaped.
 It answers `{ html, headings }`: each heading has an `id` made from its text
-(`what-s-a-sighting`, then `what-s-a-sighting-2`), and `headings` lists
+(`whats-a-sighting`, then `whats-a-sighting-2`), and `headings` lists
 `{ level, id, text }` for a table of contents.
 
 The one way in for your own HTML is the `fence` option, a function from
