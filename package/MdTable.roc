@@ -46,7 +46,7 @@ MdTable := [].{
 		if ($after_pipe) $cells else $cells.append(MdText.trim_line($cell))
 	}
 
-	## GFM's table at the line at `pos`: that line is its header row and the
+	## GFM's table at the line at `line_start`: that line is its header row and the
 	## next a delimiter row of as many cells. Its header's cells, each
 	## column's alignment, and where its body starts.
 	Table : {
@@ -56,8 +56,8 @@ MdTable := [].{
 	}
 
 	table_at : List(U8), U64 -> Try(Table, [NotATable])
-	table_at = |md, pos| {
-		eol = MdText.line_end(md, pos)
+	table_at = |md, line_start| {
+		eol = MdText.line_end(md, line_start)
 		if eol >= md.len() {
 			Err(NotATable)
 		} else {
@@ -65,7 +65,7 @@ MdTable := [].{
 			match delimiter_row(MdText.cut(md, { start: eol + 1, end: delim_end })) {
 				Err(NotADelimiter) => Err(NotATable)
 				Ok(aligns) => {
-					header = cells(MdText.cut(md, { start: pos, end: eol }))
+					header = cells(MdText.cut(md, { start: line_start, end: eol }))
 					if header.len() == aligns.len() {
 						Ok({ header, aligns, body: MdText.next_line(md, delim_end) })
 					} else {
@@ -77,7 +77,7 @@ MdTable := [].{
 	}
 
 	is_table_at : List(U8), U64 -> Bool
-	is_table_at = |md, pos| table_at(md, pos).is_ok()
+	is_table_at = |md, line_start| table_at(md, line_start).is_ok()
 
 	## The delimiter row: a `|` somewhere (so a line of dashes alone is no
 	## delimiter), and every cell one `-` or more, a `:` before them, after

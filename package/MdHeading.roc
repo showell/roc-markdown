@@ -42,7 +42,7 @@ MdHeading := [].{
 			out: out.concat(
 				match dialect {
 					Chat => MdHtml.heading_open(level)
-					Document(_) => MdHtml.heading_open_with_id(level, [])
+					Document(_) => MdHtml.heading_mark(level)
 				},
 			),
 			text: content,

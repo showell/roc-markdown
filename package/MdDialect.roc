@@ -2,18 +2,26 @@
 ## Every question only a document asks goes through here, and a chat's answer is
 ## no, which keeps every chat answer as it is. Pure.
 import MdDocument
+import MdIndent
+import MdInline
 import MdLinks
-import MdSafety
 
 MdDialect := [].{
 
 	Dialect : [Chat, Document(MdDocument.Options)]
 
 	## How the inline pass reads a dialect's text.
-	inline_refs : Dialect -> [Linked, InLabel, Document(MdSafety.Images)]
+	inline_refs : Dialect -> MdInline.Refs
 	inline_refs = |dialect| match dialect {
 		Chat => Linked
 		Document(options) => Document(options.images)
+	}
+
+	## How a dialect counts a line's indent.
+	indent_reading : Dialect -> MdIndent.Reading
+	indent_reading = |dialect| match dialect {
+		Chat => Spaces
+		Document(_) => TabStops
 	}
 
 	## The line is a rule. A chat has none.

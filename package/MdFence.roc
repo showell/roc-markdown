@@ -53,12 +53,12 @@ MdFence := [].{
 		}
 	}
 
-	## A fence's opening at the line of `md` at `pos`, and where its body
+	## A fence's opening at the line of `md` at `line_start`, and where its body
 	## starts: the block dispatcher's (Md) question.
 	open_at : List(U8), U64 -> Try({ open : Open, body_start : U64 }, [NotAFence])
-	open_at = |md, pos| {
-		eol = MdText.line_end(md, pos)
-		fence = MdFence.open(MdText.cut(md, { start: pos, end: eol }))?
+	open_at = |md, line_start| {
+		eol = MdText.line_end(md, line_start)
+		fence = MdFence.open(MdText.cut(md, { start: line_start, end: eol }))?
 		Ok({ open: fence, body_start: MdText.next_line(md, eol) })
 	}
 

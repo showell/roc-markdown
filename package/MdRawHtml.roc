@@ -9,16 +9,16 @@ MdRawHtml := [].{
 
 	## A raw block, every same-origin `<img>` and
 	## `<video>` rebuilt (MdMedia), every other byte escaped. One unit a byte.
-	raw_html_onto : List(U8), { md : List(U8), pos : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> MdText.Block
-	raw_html_onto = |out, { md, pos, budget, uploads }| {
+	raw_html_onto : List(U8), { md : List(U8), line_start : U64, budget : MdText.Budget, uploads : MdSafety.Uploads } -> MdText.Block
+	raw_html_onto = |out, { md, line_start, budget, uploads }| {
 		# CommonMark's type 7: only at a block's start, and up to a blank line,
 		# with no <p> and no newline added.
 		md_len = md.len()
-		var $p = MdText.next_line(md, MdText.line_end(md, pos))
+		var $p = MdText.next_line(md, MdText.line_end(md, line_start))
 		while $p < md_len and !MdText.is_blank(MdText.cut(md, { start: $p, end: MdText.line_end(md, $p) })) {
 			$p = MdText.next_line(md, MdText.line_end(md, $p))
 		}
-		raw = MdText.cut(md, { start: pos, end: $p })
+		raw = MdText.cut(md, { start: line_start, end: $p })
 		len = raw.len()
 		var $out = out
 		var $last = 0

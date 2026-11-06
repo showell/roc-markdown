@@ -155,9 +155,9 @@ MdText := [].{
 	is_blank : List(U8) -> Bool
 	is_blank = |line| line.all(|c| c == ' ' or c == '\t' or c == '\r')
 
-	## The `\n` ending the line at `pos`, or the end.
+	## The `\n` ending the line at `line_start`, or the end.
 	line_end : List(U8), U64 -> U64
-	line_end = |md, pos| find_or_end(md, { byte: '\n', at: pos })
+	line_end = |md, line_start| find_or_end(md, { byte: '\n', at: line_start })
 
 	## The start of the line after the one ending at `eol`.
 	next_line : List(U8), U64 -> U64

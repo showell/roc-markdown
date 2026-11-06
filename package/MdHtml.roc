@@ -32,10 +32,15 @@ MdHtml := [].{
 	heading_open : U64 -> List(U8)
 	heading_open = |level| ['<', 'h', heading_digit(level), '>']
 
-	## A document's heading with its id. Empty, it is the mark MdDocument looks
-	## for, so a heading a caller's hook wrote stays as the hook wrote it.
+	## A document's heading with its id.
 	heading_open_with_id : U64, List(U8) -> List(U8)
 	heading_open_with_id = |level, id| ['<', 'h', heading_digit(level)].concat(" id=\"".to_utf8()).concat(id).concat(['"', '>'])
+
+	## A document's heading before it has its id, which MdDocument looks for.
+	## An author's `<` is always escaped, and a control byte keeps it from a
+	## heading a caller's hook wrote, which stays as the hook wrote it.
+	heading_mark : U64 -> List(U8)
+	heading_mark = |level| heading_open_with_id(level, [mark_byte])
 
 	heading_close : U64 -> List(U8)
 	heading_close = |level| ['<', '/', 'h', heading_digit(level), '>', '\n']
@@ -156,12 +161,20 @@ MdHtml := [].{
 	del_close : List(U8)
 	del_close = "</del>".to_utf8()
 
-	## A link's opening tag: its href escaped, and a new tab, without the
-	## opener, when `NewTab`.
-	link_open : { href : List(U8), tab : [SameTab, NewTab] } -> List(U8)
-	link_open = |{ href, tab }| [
+	## A link's or an image's title, which only a document's links and any image
+	## write.
+	Title : [Untitled, Titled(List(U8))]
+
+	## A link's opening tag: its href and title escaped, and a new tab, without
+	## the opener, when `NewTab`.
+	link_open : { href : List(U8), tab : [SameTab, NewTab], title : Title } -> List(U8)
+	link_open = |{ href, tab, title }| [
 		MdText.escape_onto("<a href=\"".to_utf8(), href),
 		['"'],
+		match title {
+			Untitled => []
+			Titled(text) => attrs_onto([], [{ name: "title".to_utf8(), value: Is(text) }])
+		},
 		if (tab == NewTab) " target=\"_blank\" rel=\"noopener\"".to_utf8() else [],
 		['>'],
 	].join()
@@ -243,6 +256,9 @@ entities = [
 	("&#39;".to_utf8(), '\''),
 ]
 
+mark_byte : U8
+mark_byte = 1
+
 heading_digit : U64 -> U8
 heading_digit = |level| '0' + level.to_u8_wrap()
 
@@ -263,5 +279,5 @@ expect MdHtml.heading_open(3) == "<h3>".to_utf8()
 expect MdHtml.plain_text("foo <em>bar</em> &amp; <code>a&lt;b</code> &quot;q&quot;".to_utf8()) == "foo bar & a<b \"q\"".to_utf8()
 expect MdHtml.plain_text("<a href=\"/u?a&amp;b\" target=\"_blank\">x</a>".to_utf8()) == "x".to_utf8()
 expect MdHtml.ol_open(4) == "<ol start=\"4\">\n".to_utf8()
-expect MdHtml.link_open({ href: "/a?b&c".to_utf8(), tab: SameTab }) == "<a href=\"/a?b&amp;c\">".to_utf8()
+expect MdHtml.link_open({ href: "/a?b&c".to_utf8(), tab: SameTab, title: Untitled }) == "<a href=\"/a?b&amp;c\">".to_utf8()
 expect MdHtml.video([{ name: "controls".to_utf8(), value: Bare }, { name: "src".to_utf8(), value: Is("/v\".mp4".to_utf8()) }]) == "<video controls src=\"/v&quot;.mp4\"></video>".to_utf8()

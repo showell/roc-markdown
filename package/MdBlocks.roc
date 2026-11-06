@@ -74,25 +74,25 @@ MdBlocks := [].{
 			})
 			var $out = out
 			var $budget = budget
-			var $pos = 0
-			while $pos < len {
+			var $line_start = 0
+			while $line_start < len {
 				$budget = MdText.charge($budget, 1)
 				if MdText.is_blown($budget) {
 					return Err(Hostile)
 				} else {
 					{}
 				}
-				eol = MdText.line_end(md, $pos)
-				line = MdText.cut(md, { start: $pos, end: eol })
+				eol = MdText.line_end(md, $line_start)
+				line = MdText.cut(md, { start: $line_start, end: eol })
 				next = MdText.next_line(md, eol)
 				if MdText.is_blank(line) {
-					$pos = next
+					$line_start = next
 				} else {
 					block = block_at(
 						tight_sep($out, spacing),
 						{
 							md,
-							pos: $pos,
+							line_start: $line_start,
 							line,
 							next,
 							spacing,
@@ -105,7 +105,7 @@ MdBlocks := [].{
 					)?
 					$out = block.out
 					$budget = block.budget
-					$pos = block.after
+					$line_start = block.after
 				}
 			}
 			Ok({ out: $out, budget: $budget })
@@ -118,7 +118,7 @@ MdBlocks := [].{
 max_block_depth : U64
 max_block_depth = 16
 
-## The block at `pos` (its line `line`, the line after it at `next`) onto
+## The block at `line_start` (its line `line`, the line after it at `next`) onto
 ## `out`, already separated from the block before: the dispatcher's one
 ## question, its blocks in the order they are asked. A document's indented code
 ## and rule come first: nothing else claims four columns of indent, and `- - -`
@@ -128,7 +128,7 @@ max_block_depth = 16
 block_at : List(U8),
 {
 	md : List(U8),
-	pos : U64,
+	line_start : U64,
 	line : List(U8),
 	next : U64,
 	spacing : [Tight, Loose],
@@ -142,7 +142,7 @@ block_at = |
 	out,
 	{
 		md,
-		pos,
+		line_start,
 		line,
 		next,
 		spacing,
@@ -155,29 +155,40 @@ block_at = |
 | {
 	is_rule = |text| MdDialect.is_rule(dialect, text)
 	is_code = |text| MdDialect.is_code(dialect, text)
-	starts_block = is_block_start(dialect)
+	starts_block = |text, start| is_block_start(dialect, { md: text, line_start: start })
+	reading = MdDialect.indent_reading(dialect)
 	if is_code(line) {
-		Ok(MdDocument.indented_code_onto(out, { md, pos, budget }))
+		Ok(MdDocument.indented_code_onto(out, { md, line_start, budget }))
 	} else if is_rule(line) {
 		Ok({ out: out.concat(MdHtml.hr), budget, after: next })
 	} else {
-		match MdFence.open_at(md, pos) {
+		match MdFence.open_at(md, line_start) {
 			Ok(open) => Ok(MdFence.fence_onto(out, { md, open, line, budget, dialect }))
 			Err(NotAFence) =>
 				match MdHeading.atx_heading(line) {
 					Ok(h) => MdHeading.heading_onto(out, { level: h.level, content: h.content, after: next, budget, uploads, dialect })
 					Err(NotAHeading) =>
-						match MdList.list_marker_at(md, pos) {
-							Ok(marker) => MdList.list_onto(out, { md, pos, first: marker, budget, nested, is_block_start: starts_block, is_rule, is_code })
+						match MdList.list_marker_at(md, { line_start, reading }) {
+							Ok(marker) => MdList.list_onto(out, { md, line_start, first: marker, budget, nested, is_block_start: starts_block, is_rule, is_code, reading })
 							Err(NotAMarker) =>
 								if MdQuote.is_quote_line(line) {
-									MdQuote.quote_onto(out, { md, pos, budget, nested, is_block_start: starts_block, is_code })
+									MdQuote.quote_onto(out, { md, line_start, budget, nested, is_block_start: starts_block, is_code, reading })
 								} else if MdRawHtml.is_html_block_start(line) and !MdDialect.is_angle_url_line(dialect, line) {
-									Ok(MdRawHtml.raw_html_onto(out, { md, pos, budget, uploads }))
-								} else if MdTable.is_table_at(md, pos) {
-									MdTableBlock.table_onto(out, { md, pos, budget, uploads, dialect, is_block_start: starts_block })
+									Ok(MdRawHtml.raw_html_onto(out, { md, line_start, budget, uploads }))
+								} else if MdTable.is_table_at(md, line_start) {
+									MdTableBlock.table_onto(
+										out,
+										{
+											md,
+											line_start,
+											budget,
+											uploads,
+											dialect,
+											ends_table: |text, row| starts_block(text, row) or is_code(MdText.cut(text, { start: row, end: MdText.line_end(text, row) })),
+										},
+									)
 								} else {
-									paragraph_onto(out, { md, pos, spacing, wrap, budget, uploads, dialect })
+									paragraph_onto(out, { md, line_start, spacing, wrap, budget, uploads, dialect })
 								}
 						}
 				}
@@ -200,7 +211,7 @@ block_at = |
 paragraph_onto : List(U8),
 {
 	md : List(U8),
-	pos : U64,
+	line_start : U64,
 	spacing : [Tight, Loose],
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
@@ -211,7 +222,7 @@ paragraph_onto = |
 	out,
 	{
 		md,
-		pos,
+		line_start,
 		spacing,
 		wrap,
 		budget,
@@ -221,17 +232,17 @@ paragraph_onto = |
 | {
 	len = md.len()
 	var $lines = []
-	var $p = pos
+	var $p = line_start
 	while $p < len {
 		eol = MdText.line_end(md, $p)
 		line = MdText.cut(md, { start: $p, end: eol })
-		if MdText.is_blank(line) or MdFence.open_at(
-			md,
-			$p,
-		).is_ok() or MdHeading.atx_heading(line).is_ok() or MdList.is_list_interrupting(
-			md,
-			$p,
-		) or MdQuote.is_quote_line(line) or ($p > pos and MdTable.is_table_at(md, $p)) or MdDialect.is_rule(dialect, line) {
+		is_interrupted = MdFence.open_at(md, $p).is_ok()
+			or MdHeading.atx_heading(line).is_ok()
+			or MdList.is_list_interrupting(md, { line_start: $p, reading: MdDialect.indent_reading(dialect) })
+			or MdQuote.is_quote_line(line)
+			or ($p > line_start and MdTable.is_table_at(md, $p))
+			or MdDialect.is_rule(dialect, line)
+		if MdText.is_blank(line) or is_interrupted {
 			break
 		} else {
 			{}
@@ -311,14 +322,17 @@ tight_sep = |
 
 # ── block starts ──
 
-## The line at `pos` starts a block a lazy
+## The line at `line_start` starts a block a lazy
 ## continuation may not take in (a blank line, a list item, a quote, a
 ## fence, a heading, and in a document a rule).
-is_block_start : MdDialect.Dialect -> (List(U8), U64 -> Bool)
-is_block_start = |dialect| |md, pos| {
-	line = MdText.cut(md, { start: pos, end: MdText.line_end(md, pos) })
-	MdText.is_blank(line) or MdList.list_marker_at(
-		md,
-		pos,
-	).is_ok() or MdQuote.is_quote_line(line) or MdFence.open_at(md, pos).is_ok() or MdHeading.atx_heading(line).is_ok() or MdDialect.is_rule(dialect, line)
+is_block_start : MdDialect.Dialect, { md : List(U8), line_start : U64 } -> Bool
+is_block_start = |dialect, { md, line_start }| {
+	line = MdText.cut(md, { start: line_start, end: MdText.line_end(md, line_start) })
+	reading = MdDialect.indent_reading(dialect)
+	MdText.is_blank(line)
+		or MdList.list_marker_at(md, { line_start, reading }).is_ok()
+		or MdQuote.is_quote_line(line)
+		or MdFence.open_at(md, line_start).is_ok()
+		or MdHeading.atx_heading(line).is_ok()
+		or MdDialect.is_rule(dialect, line)
 }

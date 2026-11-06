@@ -1,41 +1,38 @@
-## **A LIST**: a list item's
-## marker, which lists continue one another and which may interrupt a
-## paragraph, and the list rendered, each item's content gathered dedented
-## and rendered as blocks one level deeper. Pure.
+## A list: an item's marker, which lists continue one another and which may
+## interrupt a paragraph, and the list rendered, each item's content gathered
+## dedented and rendered as blocks one level deeper. Pure.
 ##
-## **A CONTAINER, SO Md HANDS IN WHAT IT ASKS OF THE DISPATCHER**: Md
-## dispatches to a list, and an item's content is blocks again, so an
-## import of Md here would be a cycle, which Roc refuses. `list_onto` takes
-## what it needs from Md as arguments instead: `nested` (an item's content as
-## blocks, one level deeper: the depth and the wrap are Md's, captured there),
-## `is_block_start` (the lines a lazy one may not be), and the two questions
-## only a document answers yes to, `is_rule` and `is_code`. Md stays the one
-## home of each, and a list reads in one module.
+## An item's content is blocks again, so an import of MdBlocks here would be a
+## cycle, which Roc refuses. `list_onto` takes what it needs from there as
+## arguments: `nested` (an item's content as blocks, one level deeper),
+## `is_block_start` (the lines a lazy one may not be), the two questions only a
+## document answers yes to, `is_rule` and `is_code`, and how it reads an indent.
 import Ascii
 import Bytes
 import MdHtml
+import MdIndent
 import MdTable
 import MdText
 
 MdList := [].{
 
-	## A list item's marker: its kind, the spaces before it, the column its
-	## content starts at (the item's indent), and where its content starts in
-	## the source.
+	Kind : [Bullet(U8), Ordered({ start : U64, delim : U8 })]
+
+	## A list item's marker: its kind, the column its content starts at (the
+	## item's indent), and what its own line holds of that content.
 	Marker : {
-		kind : [Bullet(U8), Ordered({ start : U64, delim : U8 })],
-		content_col : U64,
-		content_start : U64,
+		kind : Kind,
+		content_column : U64,
+		first_line : List(U8),
 	}
 
 	## Up to three spaces, then `-`, `+`, `*`, or up to
 	## nine digits and `.` or `)`, then a space, a tab or the line's end. One
 	## to four spaces after are the content's indent; more is one, the rest the
 	## content's.
-	list_marker_at : List(U8), U64 -> Try(Marker, [NotAMarker])
-	list_marker_at = |md, pos| {
-		eol = MdText.line_end(md, pos)
-		line = MdText.cut(md, { start: pos, end: eol })
+	list_marker_at : List(U8), { line_start : U64, reading : MdIndent.Reading } -> Try(Marker, [NotAMarker])
+	list_marker_at = |md, { line_start, reading }| {
+		line = MdText.cut(md, { start: line_start, end: MdText.line_end(md, line_start) })
 		n = line.len()
 		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
 		if indent >= 4 or indent >= n {
@@ -62,43 +59,29 @@ MdList := [].{
 			if after != Err(OutOfBounds) and after != Ok(' ') and after != Ok('\t') {
 				Err(NotAMarker)
 			} else {
-				spaces = Bytes.count_while(line, { keep: |s| s == ' ', at: marker_end }) - marker_end
-				if marker_end >= n {
-					Ok({
-						kind,
-						content_col: marker_end + 1,
-						content_start: eol,
-					})
-				} else if spaces == 0 or spaces > 4 {
-					Ok({
-						kind,
-						content_col: marker_end + 1,
-						content_start: pos + marker_end + (if (spaces == 0) 0 else 1),
-					})
-				} else {
-					Ok({
-						kind,
-						content_col: marker_end + spaces,
-						content_start: pos + marker_end + spaces,
-					})
-				}
+				Ok(
+					match reading {
+						Spaces => spaced_marker(line, { kind, marker_end })
+						TabStops => tabbed_marker(line, { kind, marker_end })
+					},
+				)
 			}
 		}
 	}
 
 	## A list may interrupt a paragraph when its
 	## first item is not empty, and an ordered one only when it starts at 1.
-	is_list_interrupting : List(U8), U64 -> Bool
-	is_list_interrupting = |md, pos| match list_marker_at(md, pos) {
+	is_list_interrupting : List(U8), { line_start : U64, reading : MdIndent.Reading } -> Bool
+	is_list_interrupting = |md, place| match list_marker_at(md, place) {
 		Ok(m) =>
-			m.content_start < MdText.line_end(md, pos) and match m.kind {
+			m.first_line != [] and match m.kind {
 				Ordered(o) => o.start == 1
 				Bullet(_) => Bool.True
 			}
 		Err(NotAMarker) => Bool.False
 	}
 
-	## The whole list from `pos`, its first marker
+	## The whole list from `line_start`, its first marker
 	## `first`. Each item's content is gathered dedented, its inner blank lines
 	## kept, and rendered as blocks one level deeper; a blank line between
 	## items, or inside one, makes the list loose, whose paragraphs keep their
@@ -106,25 +89,27 @@ MdList := [].{
 	list_onto : List(U8),
 	{
 		md : List(U8),
-		pos : U64,
+		line_start : U64,
 		first : Marker,
 		budget : MdText.Budget,
 		nested : MdText.Nested -> Try(MdText.Rendered, [Hostile]),
 		is_block_start : List(U8), U64 -> Bool,
 		is_rule : List(U8) -> Bool,
 		is_code : List(U8) -> Bool,
+		reading : MdIndent.Reading,
 	} -> Try(MdText.Block, [Hostile])
 	list_onto = |
 		out,
 		{
 			md,
-			pos,
+			line_start,
 			first,
 			budget,
 			nested,
 			is_block_start,
 			is_rule,
 			is_code,
+			reading,
 		},
 	| {
 		len = md.len()
@@ -132,9 +117,9 @@ MdList := [].{
 		var $loose = Bool.False
 		var $cur = []
 		var $have_item = Bool.False
-		var $cur_col = first.content_col
+		var $cur_column = first.content_column
 		var $blanks = 0
-		var $p = pos
+		var $p = line_start
 		while $p < len {
 			eol = MdText.line_end(md, $p)
 			line = MdText.cut(md, { start: $p, end: eol })
@@ -143,10 +128,10 @@ MdList := [].{
 				$blanks = $blanks + 1
 				$p = next
 			} else {
-				indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 })
-				marker = list_marker_at(md, $p)
+				indent = MdIndent.columns_of(line, reading)
+				marker = list_marker_at(md, { line_start: $p, reading })
 				match marker {
-					Ok(m) if indent < $cur_col => {
+					Ok(m) if indent < $cur_column => {
 						# `- - -` reads as a marker too, and a rule outranks one.
 						if !is_same_list(m, first) or is_rule(line) {
 							break
@@ -160,19 +145,19 @@ MdList := [].{
 							{}
 						}
 						$have_item = Bool.True
-						$cur_col = m.content_col
+						$cur_column = m.content_column
 						$blanks = 0
-						$cur = MdText.cut(md, { start: m.content_start, end: eol }).append('\n')
+						$cur = m.first_line.append('\n')
 					}
 					_ =>
-						if indent >= $cur_col and $have_item {
+						if indent >= $cur_column and $have_item {
 							# An indented line: the item's own, its nested blocks.
 							# The blank lines before it are the item's too: they
 							# part its paragraphs and stay in its fences.
 							$loose = $loose or $blanks > 0
 							$cur = $cur.concat(List.repeat('\n', $blanks))
 							$blanks = 0
-							$cur = $cur.concat(line.drop_first($cur_col)).append('\n')
+							$cur = $cur.concat(MdIndent.without_columns(line, { columns: $cur_column, from: 0, reading })).append('\n')
 						} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
 							# A lazy continuation of the item's paragraph.
 							$cur = $cur.concat(line).append('\n')
@@ -219,6 +204,51 @@ MdList := [].{
 	}
 }
 
+## A chat's marker: one to four spaces after it are the content's indent, and
+## with more, or a tab, its content is what follows one space.
+spaced_marker : List(U8), { kind : MdList.Kind, marker_end : U64 } -> MdList.Marker
+spaced_marker = |line, { kind, marker_end }| {
+	spaces = Bytes.count_while(line, { keep: |s| s == ' ', at: marker_end }) - marker_end
+	if marker_end >= line.len() {
+		{ kind, content_column: marker_end + 1, first_line: [] }
+	} else if spaces == 0 or spaces > 4 {
+		{
+			kind,
+			content_column: marker_end + 1,
+			first_line: line.drop_first(marker_end + (if (spaces == 0) 0 else 1)),
+		}
+	} else {
+		{
+			kind,
+			content_column: marker_end + spaces,
+			first_line: line.drop_first(marker_end + spaces),
+		}
+	}
+}
+
+## A document's marker, the same rule in columns, so a tab after it is the indent
+## it reaches. A line with nothing after the marker is an empty item.
+tabbed_marker : List(U8), { kind : MdList.Kind, marker_end : U64 } -> MdList.Marker
+tabbed_marker = |line, { kind, marker_end }| {
+	rest = line.drop_first(marker_end)
+	reached = MdIndent.column_after_indent(rest, { at: 0, column: marker_end })
+	if MdText.is_blank(rest) {
+		{ kind, content_column: marker_end + 1, first_line: [] }
+	} else if reached > marker_end + 4 {
+		{
+			kind,
+			content_column: marker_end + 1,
+			first_line: MdIndent.without_columns(rest, { columns: 1, from: marker_end, reading: TabStops }),
+		}
+	} else {
+		{
+			kind,
+			content_column: reached,
+			first_line: MdIndent.without_columns(rest, { columns: reached - marker_end, from: marker_end, reading: TabStops }),
+		}
+	}
+}
+
 ## The same bullet, or the same ordered delimiter.
 is_same_list : MdList.Marker, MdList.Marker -> Bool
 is_same_list = |a, b| match (a.kind, b.kind) {
@@ -235,14 +265,14 @@ is_same_list = |a, b| match (a.kind, b.kind) {
 is_first_child_block : List(U8), { is_block_start : List(U8), U64 -> Bool, is_code : List(U8) -> Bool } -> Bool
 is_first_child_block = |item, { is_block_start, is_code }| {
 	len = item.len()
-	var $pos = 0
-	while $pos < len {
-		eol = MdText.line_end(item, $pos)
-		line = MdText.cut(item, { start: $pos, end: eol })
+	var $line_start = 0
+	while $line_start < len {
+		eol = MdText.line_end(item, $line_start)
+		line = MdText.cut(item, { start: $line_start, end: eol })
 		if !MdText.is_blank(line) {
-			return is_block_start(item, $pos) or MdTable.is_table_at(item, $pos) or is_code(line)
+			return is_block_start(item, $line_start) or MdTable.is_table_at(item, $line_start) or is_code(line)
 		} else {
-			$pos = MdText.next_line(item, eol)
+			$line_start = MdText.next_line(item, eol)
 		}
 	}
 	Bool.False

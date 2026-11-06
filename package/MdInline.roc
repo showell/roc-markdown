@@ -31,16 +31,29 @@ import MdSafety
 
 MdInline := [].{
 
-	## `text` rendered onto `out`. `Linked`
-	## turns the chat's `MSG_` reference (MdChat) into its link; `InLabel` leaves it text, as a
-	## link's label must be, being inside an `<a>` already. `Document` has no
-	## reference, in or out of a label, and its links to other sites stay in
-	## their tab. A document also reads `<http://…>`, leaves an email as text,
-	## and shows its images as its option says.
+	## What the pass reads. `Linked` turns the chat's `MSG_` reference (MdChat)
+	## into its link, and `InLabel` leaves it text, as a link's label must be,
+	## being inside an `<a>` already. `Document` has no reference, and its links
+	## to other sites stay in their tab. A document also reads `<http://…>`,
+	## leaves an email as text, and shows its images as its option says.
+	##
+	## `DocumentLabel` is a link's label in a document, where nothing may become a
+	## second `<a>`: links and URLs stay text, and an image that would be a link
+	## is its alt. `DocumentAlt` is an image's alt, which reads neither links nor
+	## images. So a label costs at most two more passes, however its brackets nest.
+	Refs : [
+		Linked,
+		InLabel,
+		Document(MdSafety.Images),
+		DocumentLabel(MdSafety.Images),
+		DocumentAlt,
+	]
+
+	## `text` rendered onto `out`.
 	render_onto : {
 		out : List(U8),
 		text : List(U8),
-		refs : [Linked, InLabel, Document(MdSafety.Images)],
+		refs : Refs,
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
@@ -54,19 +67,23 @@ MdInline := [].{
 		},
 	| {
 		len = text.len()
-		is_document = match refs {
-			Document(_) => Bool.True
-			_ => Bool.False
-		}
-		shows_images = refs == Document(Shown)
+		is_document = refs != Linked and refs != InLabel
+		reads_links = refs != DocumentLabel(Shown) and refs != DocumentLabel(AsLinks) and refs != DocumentAlt
+		shows_images = refs == Document(Shown) or refs == DocumentLabel(Shown)
+		alt_as_text = refs == DocumentLabel(AsLinks)
 		outside = if (is_document) SameTab else NewTab
-		label_refs = if (is_document) refs else InLabel
+		label_refs = match refs {
+			Document(images) => DocumentLabel(images)
+			_ => InLabel
+		}
+		alt_refs = if (is_document) DocumentAlt else label_refs
 		var $budget = budget
 		var $pieces = []
 		var $runs = []
 		var $text_start = 0
 		var $i = 0
 		var $next_bracket = MdText.find_or_end(text, { byte: ']', at: 0 })
+		var $brackets = if (is_document) Balanced(Unscanned) else FirstClose
 		var $closes = Unscanned
 		var $email_dead = 0
 		while $i < len {
@@ -90,7 +107,7 @@ MdInline := [].{
 						match media_at(text, $i, uploads) {
 							Ok(media) => Token(Html(media.html), media.end)
 							Err(NotMedia) =>
-								match if (is_document) MdLinks.angle_url_at(text, $i) else Err(NotALink) {
+								match if (is_document and reads_links) MdLinks.angle_url_at(text, $i) else Err(NotALink) {
 									Ok(found) => Token(Html(MdLinks.autolink_html(found.url, Url, outside)), found.end)
 									Err(NotALink) => Skip($i + 1)
 								}
@@ -110,7 +127,7 @@ MdInline := [].{
 								Skip($i + n)
 							}
 						}
-					} else if c == '!' and text.get($i + 1) == Ok('[') {
+					} else if c == '!' and text.get($i + 1) == Ok('[') and refs != DocumentAlt {
 						# `![alt](src)`: an image where its src is an upload, else
 						# the `!` is dropped and the `[` read as a link (MdSafety).
 						linked = MdLinks.link_at(
@@ -118,16 +135,18 @@ MdInline := [].{
 							{
 								at: $i + 1,
 								next_bracket: $next_bracket,
+								brackets: $brackets,
 								closes: $closes,
 								budget: $budget,
 							},
 						)
 						$next_bracket = linked.next_bracket
+						$brackets = linked.brackets
 						$closes = linked.closes
 						$budget = linked.budget
 						image = match linked.link {
 							Ok(link) =>
-								match MdLinks.image_dest(link.url) {
+								match if (is_document) MdLinks.document_dest(link.url) else MdLinks.image_dest(link.url) {
 									Ok(dest) => Ok({ link, dest })
 									Err(NotAnImage) => Err(NotAnImage)
 								}
@@ -135,25 +154,27 @@ MdInline := [].{
 						}
 						match image {
 							Ok(found) =>
-								if MdSafety.is_upload_url(found.dest.src, uploads) or (shows_images and !MdSafety.is_dangerous_url(found.dest.src)) {
+								if MdSafety.is_upload_url(found.dest.src, uploads) or ((shows_images or alt_as_text) and !MdSafety.is_dangerous_url(found.dest.src)) {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.render_onto({
 										out: [],
 										text: MdText.cut(text, found.link.label),
-										refs: label_refs,
+										refs: alt_refs,
 										budget: $budget,
 										uploads,
 									})?
 									$budget = alt.budget
 									text_alt = MdHtml.plain_text(alt.out)
 									html =
-										if shows_images {
+										if alt_as_text {
+											Ok(MdText.escape_onto([], text_alt))
+										} else if shows_images {
 											MdLinks.shown_image({ src: found.dest.src, alt: text_alt, title: found.dest.title })
 										} else {
 											MdLinks.image({ src: found.dest.src, alt: text_alt, title: found.dest.title, uploads })
 										}
-									Token(Html(html ?? []), found.link.end)
+									Token(Html(html ?? crash "MdInline.render_onto: an image the rules above let through"), found.link.end)
 								} else if MdSafety.is_dangerous_url(found.dest.src) {
 									# Refused: the whole image's source, `!` and all,
 									# left in the pending text (MdSafety).
@@ -163,29 +184,31 @@ MdInline := [].{
 								}
 							Err(NotAnImage) => Skip($i + 1)
 						}
-					} else if c == '[' {
+					} else if c == '[' and reads_links {
 						linked = MdLinks.link_at(
 							text,
 							{
 								at: $i,
 								next_bracket: $next_bracket,
+								brackets: $brackets,
 								closes: $closes,
 								budget: $budget,
 							},
 						)
 						$next_bracket = linked.next_bracket
+						$brackets = linked.brackets
 						$closes = linked.closes
 						$budget = linked.budget
 						match linked.link {
-							Ok(link) if MdSafety.is_dangerous_url(link.url) =>
+							Ok(link) if is_refused_link(link.url, is_document) =>
 							# Refused: the whole link's source left in the
 							# pending text, nothing in it read (MdSafety).
 								Skip(link.end)
 							Ok(link) => {
-								# The label is a line of its own, rendered `InLabel`
-								# inside the `<a>`.
+								# The label is a line of its own, rendered inside the `<a>`.
+								dest = link_dest(link.url, is_document)
 								label = MdInline.render_onto({
-									out: MdLinks.link_open(link.url, outside),
+									out: MdLinks.link_open(dest.src, { outside, title: dest.title }),
 									text: MdText.cut(text, link.label),
 									refs: label_refs,
 									budget: $budget,
@@ -209,7 +232,7 @@ MdInline := [].{
 							$runs = $runs.append(run)
 							Token(Run($runs.len() - 1), $i + n)
 						}
-					} else if MdLinks.is_autolink_boundary(text, $i) {
+					} else if reads_links and MdLinks.is_autolink_boundary(text, $i) {
 						found = MdLinks.autolink_at(
 							text,
 							{
@@ -270,6 +293,18 @@ MdInline := [].{
 		}
 	}
 }
+
+## What a link's destination says. A chat reads it whole, and a document reads a
+## title and `<a b>` from it, or whole when it is neither.
+link_dest : List(U8), Bool -> { src : List(U8), title : MdHtml.Title }
+link_dest = |url, is_document| match if (is_document) MdLinks.document_dest(url) else Err(NotAnImage) {
+	Ok(dest) => dest
+	Err(NotAnImage) => { src: url, title: Untitled }
+}
+
+## A browser would run the destination, as written or as `link_dest` reads it.
+is_refused_link : List(U8), Bool -> Bool
+is_refused_link = |url, is_document| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_dest(url, is_document).src)
 
 ## Whether the byte at `i` is ASCII punctuation, which a backslash before it
 ## escapes.

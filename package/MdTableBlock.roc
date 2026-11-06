@@ -9,7 +9,7 @@ import MdText
 
 MdTableBlock := [].{
 
-	## GFM's table from `pos` (MdTable `table_at`): its header row in `<thead>`, then a body row a
+	## GFM's table from `line_start` (MdTable `table_at`): its header row in `<thead>`, then a body row a
 	## line, up to a blank line or one that starts a block (is_block_start),
 	## each cut or padded to the header's width with empty cells. No body, no
 	## `<tbody>`. A unit a row and a unit a cell, checked a cell: a short row's
@@ -17,13 +17,13 @@ MdTableBlock := [].{
 	table_onto : List(U8),
 	{
 		md : List(U8),
-		pos : U64,
+		line_start : U64,
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 		dialect : MdDialect.Dialect,
-		is_block_start : List(U8), U64 -> Bool,
+		ends_table : List(U8), U64 -> Bool,
 	} -> Try(MdText.Block, [Hostile])
-	table_onto = |out, { md, pos, budget, uploads, dialect, is_block_start }| match MdTable.table_at(md, pos) {
+	table_onto = |out, { md, line_start, budget, uploads, dialect, ends_table }| match MdTable.table_at(md, line_start) {
 		Err(NotATable) => crash "MdTableBlock.table_onto: no table where the dispatcher found one"
 		Ok(table) => {
 			len = md.len()
@@ -35,7 +35,7 @@ MdTableBlock := [].{
 			var $budget = head.budget
 			var $rows = 0
 			var $p = table.body
-			while $p < len and !is_block_start(md, $p) {
+			while $p < len and !ends_table(md, $p) {
 				eol = MdText.line_end(md, $p)
 				row = row_onto(
 					if ($rows == 0) $out.concat(MdHtml.tbody_open) else $out,
@@ -62,8 +62,7 @@ MdTableBlock := [].{
 	}
 }
 
-## One `<tr>`: a cell a column, the row's own or an empty one, past the
-## columns' count none.
+## One `<tr>`: a cell a column, the row's own or an empty one.
 row_onto : List(U8),
 {
 	cells : List(List(U8)),
@@ -77,7 +76,7 @@ row_onto = |out, { cells, aligns, tag, budget, uploads, dialect }| {
 	var $out = out.concat(MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
 	var $k = 0
-	for align in aligns {
+	for align in columns_of_row({ cells, aligns, dialect }) {
 		$budget = MdText.charge($budget, 1)
 		if MdText.is_blown($budget) {
 			return Err(Hostile)
@@ -96,4 +95,13 @@ row_onto = |out, { cells, aligns, tag, budget, uploads, dialect }| {
 		$k = $k + 1
 	}
 	Ok({ out: $out.concat(MdHtml.tr_close), budget: $budget })
+}
+
+## The alignments a row is written by. A chat's row stops at the header's width,
+## as GFM's does. A document's goes on, with its extra cells unaligned, because
+## cutting them would lose what the author wrote.
+columns_of_row : { cells : List(List(U8)), aligns : List(MdTable.Align), dialect : MdDialect.Dialect } -> List(MdTable.Align)
+columns_of_row = |{ cells, aligns, dialect }| match dialect {
+	Chat => aligns
+	Document(_) => aligns.concat(List.repeat(Plain, cells.len().max(aligns.len()) - aligns.len()))
 }

@@ -21,9 +21,11 @@ import MdSafety
 MdLinks := [].{
 
 	## The link `[label](url)` at `at`: its
-	## label's span, its destination, and the index past its `)`. `next_bracket`, the
-	## first `]` the line has not yet passed, only moves forward, so its scans
-	## cost the line's length in all, not once a `[`. The destination's parens
+	## label's span, its destination, and the index past its `)`. In a chat a
+	## label ends at the first `]`: `next_bracket`, the first `]` the line has not
+	## yet passed, only moves forward, so its scans cost the line's length in all,
+	## not once a `[`. In a document, where `brackets` is `Balanced`, it ends at
+	## the `]` that balances its `[`, so a label may hold an image. The destination's parens
 	## balance (CommonMark): it ends at the `)` that closes its `(`, from
 	## `closes`, the line's one paren pass, made at the first `](` and charged
 	## its length once. A `(` with no balancing `)` is no link. The
@@ -35,6 +37,7 @@ MdLinks := [].{
 	{
 		at : U64,
 		next_bracket : U64,
+		brackets : LabelEnds,
 		closes : Closes,
 		budget : MdText.Budget,
 	} -> {
@@ -47,6 +50,7 @@ MdLinks := [].{
 			[NotALink],
 		),
 		next_bracket : U64,
+		brackets : LabelEnds,
 		closes : Closes,
 		budget : MdText.Budget,
 	}
@@ -55,38 +59,36 @@ MdLinks := [].{
 		{
 			at,
 			next_bracket,
+			brackets,
 			closes,
 			budget,
 		},
 	| {
 		len = text.len()
-		var $next_bracket = next_bracket
-		var $budget = budget
-		while $next_bracket < len and $next_bracket < at + 1 {
-			from = $next_bracket
-			$next_bracket = MdText.find_or_end(text, { byte: ']', at: $next_bracket + 1 })
-			$budget = MdText.charge($budget, $next_bracket - from)
-		}
-		if $next_bracket >= len or $next_bracket + 1 >= len or MdText.at(text, $next_bracket + 1) != '(' {
+		label = label_end(text, { at, next_bracket, brackets, budget })
+		var $budget = label.budget
+		if label.close >= len or label.close + 1 >= len or MdText.at(text, label.close + 1) != '(' {
 			{
 				link: Err(NotALink),
-				next_bracket: $next_bracket,
+				next_bracket: label.next_bracket,
+				brackets: label.brackets,
 				closes,
 				budget: $budget,
 			}
 		} else {
-			close_bracket = $next_bracket
+			close_bracket = label.close
 			open_paren = close_bracket + 1
 			(table, scanned) = match closes {
 				Scanned(t) => (t, $budget)
-				Unscanned => (paren_closes(text), MdText.charge($budget, len))
+				Unscanned => (pair_closes(text, { opener: '(', closer: ')', escapes: Unread }), MdText.charge($budget, len))
 			}
 			$budget = scanned
 			close_paren = table.get(open_paren) ?? len
 			if close_paren >= len {
 				{
 					link: Err(NotALink),
-					next_bracket: $next_bracket,
+					next_bracket: label.next_bracket,
+					brackets: label.brackets,
 					closes: Scanned(table),
 					budget: $budget,
 				}
@@ -97,7 +99,8 @@ MdLinks := [].{
 						url: MdText.unescaped(MdText.cut(text, { start: open_paren + 1, end: close_paren })),
 						end: close_paren + 1,
 					}),
-					next_bracket: $next_bracket,
+					next_bracket: label.next_bracket,
+					brackets: label.brackets,
 					closes: Scanned(table),
 					budget: $budget,
 				}
@@ -111,35 +114,38 @@ MdLinks := [].{
 	## `[a](((…` costs its length once, not once a `](`.
 	Closes : [Unscanned, Scanned(List(U64))]
 
+	## How a label's `]` is found: the first one, or the one that balances its
+	## `[`, from a table `Closes` scans once, as it does for parens.
+	LabelEnds : [FirstClose, Balanced(Closes)]
+
 	## An image's destination, `src` or `src "title"` (CommonMark's link
 	## destination and title, the title in `"…"`, `'…'` or `(…)`), its ends'
 	## spaces dropped. Anything after the src that is no title is no image.
-	## (A link's title is not read: it stays in the destination.)
-	image_dest : List(U8) -> Try({ src : List(U8), title : [None, Some(List(U8))] }, [NotAnImage])
+	## (A chat's link reads no title: it stays in the destination.)
+	image_dest : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
 	image_dest = |url| {
 		dest = MdText.trim_line(url)
 		src_len = Bytes.count_while(dest, { keep: |c| c != ' ' and c != '\t', at: 0 })
-		src = dest.take_first(src_len)
-		rest = MdText.trim_line(dest.drop_first(src_len))
-		n = rest.len()
-		if n == 0 {
-			Ok({ src, title: None })
+		titled_dest(dest.take_first(src_len), dest.drop_first(src_len))
+	}
+
+	## A document's destination, for its links and images alike: `image_dest`'s,
+	## or CommonMark's `<a b>`, whose brackets let a src hold a space.
+	document_dest : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
+	document_dest = |url| {
+		dest = MdText.trim_line(url)
+		close = Bytes.count_while(dest, { keep: |c| c != '<' and c != '>', at: 1 })
+		if dest.first() == Ok('<') and dest.get(close) == Ok('>') {
+			titled_dest(MdText.cut(dest, { start: 1, end: close }), dest.drop_first(close + 1))
 		} else {
-			first = MdText.at(rest, 0)
-			last = MdText.at(rest, n - 1)
-			quoted = (first == '"' and last == '"') or (first == '\'' and last == '\'') or (first == '(' and last == ')')
-			if n >= 2 and quoted {
-				Ok({ src, title: Some(MdText.cut(rest, { start: 1, end: n - 1 })) })
-			} else {
-				Err(NotAnImage)
-			}
+			image_dest(url)
 		}
 	}
 
 	## `![alt](src "title")`'s tag: the one a member's `<img src alt title>`
 	## is rebuilt as (MdSafety's allowlist), or `NotSafe` where its src is no
 	## upload (`MdSafety.is_upload_url`, the rule `<img>` follows).
-	image : { src : List(U8), alt : List(U8), title : [None, Some(List(U8))], uploads : MdSafety.Uploads } -> Try(List(U8), [NotSafe])
+	image : { src : List(U8), alt : List(U8), title : MdHtml.Title, uploads : MdSafety.Uploads } -> Try(List(U8), [NotSafe])
 	image = |{ src, alt, title, uploads }| {
 		attrs = MdSafety.media_attrs({
 			kind: Img,
@@ -151,8 +157,8 @@ MdLinks := [].{
 					Ok(alt)
 				} else if name == "title".to_utf8() {
 					match title {
-						Some(t) => Ok(t)
-						None => Err(Absent)
+						Titled(t) => Ok(t)
+						Untitled => Err(Absent)
 					}
 				} else {
 					Err(Absent)
@@ -165,7 +171,7 @@ MdLinks := [].{
 	## uploads rule isn't asked, because a document's src is the host's own. A
 	## dangerous src is still refused, so the sink stays safe whatever its
 	## callers do.
-	shown_image : { src : List(U8), alt : List(U8), title : [None, Some(List(U8))] } -> Try(List(U8), [NotSafe])
+	shown_image : { src : List(U8), alt : List(U8), title : MdHtml.Title } -> Try(List(U8), [NotSafe])
 	shown_image = |{ src, alt, title }|
 		if MdSafety.is_dangerous_url(src) {
 			Err(NotSafe)
@@ -177,8 +183,8 @@ MdLinks := [].{
 			Ok(
 				MdHtml.img(
 					match title {
-						Some(t) => named.append({ name: "title".to_utf8(), value: Is(t) })
-						None => named
+						Titled(t) => named.append({ name: "title".to_utf8(), value: Is(t) })
+						Untitled => named
 					},
 				),
 			)
@@ -188,10 +194,11 @@ MdLinks := [].{
 	## another site opens (MdSafety's rule). MdInline never asks it of a
 	## dangerous url (such a link is shown as its source); the href is still
 	## dropped here, so the sink stays safe whatever its callers do.
-	link_open : List(U8), [SameTab, NewTab] -> List(U8)
-	link_open = |url, outside| MdHtml.link_open({
+	link_open : List(U8), { outside : [SameTab, NewTab], title : MdHtml.Title } -> List(U8)
+	link_open = |url, { outside, title }| MdHtml.link_open({
 		href: if (MdSafety.is_dangerous_url(url)) [] else url,
 		tab: if (MdSafety.is_external_href(url)) outside else SameTab,
+		title,
 	})
 
 	## `<http://…>` or `<https://…>` at `at`: its URL, and the index past its
@@ -313,28 +320,82 @@ MdLinks := [].{
 	autolink_html : List(U8), AutoKind, [SameTab, NewTab] -> List(U8)
 	autolink_html = |link, kind, outside| {
 		head = match kind {
-			Url => MdHtml.link_open({ href: link, tab: outside })
-			Www => MdHtml.link_open({ href: "http://".to_utf8().concat(link), tab: outside })
-			Email => MdHtml.link_open({ href: "mailto:".to_utf8().concat(link), tab: SameTab })
+			Url => MdHtml.link_open({ href: link, tab: outside, title: Untitled })
+			Www => MdHtml.link_open({ href: "http://".to_utf8().concat(link), tab: outside, title: Untitled })
+			Email => MdHtml.link_open({ href: "mailto:".to_utf8().concat(link), tab: SameTab, title: Untitled })
 		}
 		MdText.escape_onto(head, link).concat(MdHtml.link_close)
 	}
 }
 
-paren_closes : List(U8) -> List(U64)
-paren_closes = |text| {
+## Where the label `[` at `at` ends, or the text's length when it doesn't.
+label_end : List(U8),
+{
+	at : U64,
+	next_bracket : U64,
+	brackets : MdLinks.LabelEnds,
+	budget : MdText.Budget,
+} -> {
+	close : U64,
+	next_bracket : U64,
+	brackets : MdLinks.LabelEnds,
+	budget : MdText.Budget,
+}
+label_end = |text, { at, next_bracket, brackets, budget }| {
+	len = text.len()
+	match brackets {
+		FirstClose => {
+			var $next_bracket = next_bracket
+			var $budget = budget
+			while $next_bracket < len and $next_bracket < at + 1 {
+				from = $next_bracket
+				$next_bracket = MdText.find_or_end(text, { byte: ']', at: $next_bracket + 1 })
+				$budget = MdText.charge($budget, $next_bracket - from)
+			}
+			{
+				close: $next_bracket,
+				next_bracket: $next_bracket,
+				brackets,
+				budget: $budget,
+			}
+		}
+		Balanced(Scanned(table)) => {
+			close: table.get(at) ?? len,
+			next_bracket,
+			brackets,
+			budget,
+		}
+		Balanced(Unscanned) => {
+			table = pair_closes(text, { opener: '[', closer: ']', escapes: Read })
+			{
+				close: table.get(at) ?? len,
+				next_bracket,
+				brackets: Balanced(Scanned(table)),
+				budget: MdText.charge(budget, len),
+			}
+		}
+	}
+}
+
+## Each `opener`'s balancing `closer` in the line, by one pass of a stack: its
+## index, or the line's length for an opener with none and every other byte.
+## With `escapes` `Read`, a backslashed byte is neither.
+pair_closes : List(U8), { opener : U8, closer : U8, escapes : [Read, Unread] } -> List(U64)
+pair_closes = |text, { opener, closer, escapes }| {
 	len = text.len()
 	var $closes = List.repeat(len, len)
 	var $open = []
 	var $i = 0
 	while $i < len {
 		c = MdText.at(text, $i)
-		if c == '(' {
+		if c == '\\' and escapes == Read {
+			$i = $i + 1
+		} else if c == opener {
 			$open = $open.append($i)
-		} else if c == ')' {
+		} else if c == closer {
 			match $open.last() {
 				Ok(j) => {
-					$closes = $closes.set(j, $i) ?? crash "MdLinks.paren_closes: a ( past the line"
+					$closes = $closes.set(j, $i) ?? crash "MdLinks.pair_closes: an opener past the line"
 					$open = $open.drop_last(1)
 				}
 				Err(ListWasEmpty) => {}
@@ -345,6 +406,26 @@ paren_closes = |text| {
 		$i = $i + 1
 	}
 	$closes
+}
+
+## A destination's `src`, and what follows it read as a title. Anything else
+## there is no destination.
+titled_dest : List(U8), List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
+titled_dest = |src, after| {
+	rest = MdText.trim_line(after)
+	n = rest.len()
+	if n == 0 {
+		Ok({ src, title: Untitled })
+	} else {
+		first = MdText.at(rest, 0)
+		last = MdText.at(rest, n - 1)
+		quoted = (first == '"' and last == '"') or (first == '\'' and last == '\'') or (first == '(' and last == ')')
+		if n >= 2 and quoted {
+			Ok({ src, title: Titled(MdText.cut(rest, { start: 1, end: n - 1 })) })
+		} else {
+			Err(NotAnImage)
+		}
+	}
 }
 
 ## URL bytes from `start` up to a space or `<`,

@@ -57,8 +57,11 @@ Md := [].{
 	## raw HTML is escaped, and each heading has an id. It adds what a chat
 	## doesn't read: rules, indented code and `<http://…>`, and it leaves an
 	## email as text. The hook is the one way in for HTML of the caller's own.
-	render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered
-	render_document = |md, options| MdDocument.named(rendered(md, { wrap: Reflow, budget: MdText.unlimited, uploads: no_uploads, dialect: Document(options) }))
+	render_document : List(U8), Md.DocumentOptions -> MdDocument.Page
+	render_document = |md, options| {
+		lines = MdDocument.with_plain_line_ends(md)
+		MdDocument.with_heading_ids(rendered(lines, { wrap: Reflow, budget: MdText.unlimited, uploads: no_uploads, dialect: Document(options) }))
+	}
 
 	## Text made safe for HTML, an element's content or an attribute's value
 	## (either quote): `&`, `<`, `>`, `"` and `'` as entities, every other
@@ -159,6 +162,8 @@ widgets = |{ tag, args, body }|
 		Html("<iframe src=\"/w/".to_utf8().concat(args).concat("\"></iframe>\n".to_utf8()))
 	} else if tag == "dot".to_utf8() {
 		Html("<svg>".to_utf8().concat(body).concat("</svg>\n".to_utf8()))
+	} else if tag == "raw".to_utf8() {
+		Html("<h2 id=\"\">x</h2>\n".to_utf8())
 	} else if tag == "heading".to_utf8() {
 		Html("<h2>mine</h2>\n<h2 id=\"x\">too</h2>\n".to_utf8())
 	} else {
@@ -365,6 +370,87 @@ expect doc("| a@b.c |\n| - |") == "<table>\n<thead>\n<tr>\n<th>a@b.c</th>\n</tr>
 expect doc("[a](mailto:b@c.d)") == "<p><a href=\"mailto:b@c.d\">a</a></p>\n"
 expect md("mail a.b@c.d now") == "<p>mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a> now</p>\n"
 expect Str.from_utf8(Md.render_trusted_reflow("a.b@c.d".to_utf8(), chat)) == Ok("<p><a href=\"mailto:a.b@c.d\">a.b@c.d</a></p>\n")
+
+# A tab after a marker is the indent it reaches, in a document. A chat counts it
+# as one space, as ever.
+expect doc("-\tfoo") == "<ul>\n<li>foo</li>\n</ul>\n"
+expect doc("1.\tfoo") == "<ol>\n<li>foo</li>\n</ol>\n"
+expect doc("-\t\tfoo") == "<ul>\n<li>\n<pre><code>  foo\n</code></pre>\n</li>\n</ul>\n"
+expect doc("-\t") == "<ul>\n<li></li>\n</ul>\n"
+expect doc("a\n-\t") == "<p>a -</p>\n"
+expect md("-\tfoo") == "<ul>\n<li>foo</li>\n</ul>\n"
+expect md("1.\tfoo") == "<ol>\n<li>foo</li>\n</ol>\n"
+
+# A tab in an item's indent counts its columns, in a document, so the item goes
+# on and a list nests. A chat counts spaces, so the same lines leave the item.
+expect doc("- a\n\n\tb") == "<ul>\n<li>\n<p>a</p>\n<p>b</p>\n</li>\n</ul>\n"
+expect doc("- a\n\n\t\tb") == "<ul>\n<li>\n<p>a</p>\n<pre><code>  b\n</code></pre>\n</li>\n</ul>\n"
+expect doc("- a\n\t- b") == "<ul>\n<li>a\n<ul>\n<li>b</li>\n</ul>\n</li>\n</ul>\n"
+expect doc("1.\ta\n\n\tb\n\n\t\tc") == "<ol>\n<li>\n<p>a</p>\n<p>b</p>\n<pre><code>c\n</code></pre>\n</li>\n</ol>\n"
+expect md("- a\n\n\tb") == "<ul>\n<li>a</li>\n</ul>\n<p>b</p>\n"
+expect md("- a\n\t- b") == "<ul>\n<li>a<br>\n- b</li>\n</ul>\n"
+# Tabs past the item's indent are a fence's own.
+expect doc("- ```\n  \tx\n  ```") == "<ul>\n<li>\n<pre><code>\tx\n</code></pre>\n</li>\n</ul>\n"
+
+# A tab after a quote's `>` is its space and then indent, in a document.
+expect doc(">\tfoo") == "<blockquote>\n<p>foo</p>\n</blockquote>\n"
+expect doc(">\t\tfoo") == "<blockquote>\n<pre><code>  foo\n</code></pre>\n</blockquote>\n"
+expect md(">\tfoo") == "<blockquote>\n<p>foo</p>\n</blockquote>\n"
+expect md(">\t\tfoo") == "<blockquote>\n<p>foo</p>\n</blockquote>\n"
+
+# A document's row keeps every cell, even past the header. GFM and a chat cut
+# them, so a `|` inside a link costs a chat's reader the rest of the row.
+expect doc("| a |\n| :-: |\n| b | c |") == "<table>\n<thead>\n<tr>\n<th align=\"center\">a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align=\"center\">b</td>\n<td>c</td>\n</tr>\n</tbody>\n</table>\n"
+expect doc("| a | b |\n| - | - |\n| c |") == md("| a | b |\n| - | - |\n| c |")
+expect md("| a |\n| - |\n| b | c |") == "<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>b</td>\n</tr>\n</tbody>\n</table>\n"
+# Indented code ends a document's table, and is a row of a chat's.
+expect doc("| a |\n| - |\n    b") == "<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n</table>\n<pre><code>b\n</code></pre>\n"
+expect md("| a |\n| - |\n    b") == "<table>\n<thead>\n<tr>\n<th>a</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>b</td>\n</tr>\n</tbody>\n</table>\n"
+
+# A document's label ends at its balancing `]`, so a link may wrap an image. An
+# image that would be a link is its alt there, as an `<a>` can't hold an `<a>`.
+expect shown("[![a](i.png)](/x)") == "<p><a href=\"/x\"><img src=\"i.png\" alt=\"a\"></a></p>\n"
+expect doc("[![a](i.png)](/x)") == "<p><a href=\"/x\">a</a></p>\n"
+expect md("[![a](i.png)](/x)") == "<p><a href=\"i.png\">![a</a>](/x)</p>\n"
+expect doc("[a\\]b](c) [a\\[b](c)") == "<p><a href=\"c\">a]b</a> <a href=\"c\">a[b</a></p>\n"
+expect doc("[a[b](c)") == "<p>[a<a href=\"c\">b</a></p>\n"
+expect doc("[a]b](c)") == "<p>[a]b](c)</p>\n"
+# Nothing in a document's label becomes a second link.
+expect doc("[https://x.org](/y)") == "<p><a href=\"/y\">https://x.org</a></p>\n"
+expect doc("[<http://x.org>](/y)") == "<p><a href=\"/y\">&lt;http://x.org&gt;</a></p>\n"
+expect doc("[[a](b)](c)") == "<p><a href=\"c\">[a](b)</a></p>\n"
+expect md("[https://x.org](/y)") == "<p><a href=\"/y\"><a href=\"https://x.org\" target=\"_blank\" rel=\"noopener\">https://x.org</a></a></p>\n"
+# An image's alt reads neither links nor images, however the brackets nest.
+expect shown("![![a](b)](c)") == "<p><img src=\"c\" alt=\"![a](b)\"></p>\n"
+expect shown("[![![a](b)](c)](d)") == "<p><a href=\"d\"><img src=\"c\" alt=\"![a](b)\"></a></p>\n"
+# What a browser would run stays source, inside a label too.
+expect shown("[![a](javascript:x)](/y)") == "<p><a href=\"/y\">![a](javascript:x)</a></p>\n"
+expect shown("[a](/y)[b](javascript:x)") == "<p><a href=\"/y\">a</a>[b](javascript:x)</p>\n"
+
+# A document's link reads a title and `<a b>`, as its image does. A chat's reads
+# neither, so its href holds them.
+expect doc("[a](/b \"t>\")") == "<p><a href=\"/b\" title=\"t&gt;\">a</a></p>\n"
+expect doc("[a](<b c>)") == "<p><a href=\"b c\">a</a></p>\n"
+expect doc("[a](<b c> 't')") == "<p><a href=\"b c\" title=\"t\">a</a></p>\n"
+expect doc("[a](b c)") == "<p><a href=\"b c\">a</a></p>\n"
+expect doc("[a](<b)") == "<p><a href=\"&lt;b\">a</a></p>\n"
+expect doc("![a](c.png \"t\")") == "<p><a href=\"c.png\" title=\"t\">a</a></p>\n"
+expect shown("![a](<b c.png> 't')") == "<p><img src=\"b c.png\" alt=\"a\" title=\"t\"></p>\n"
+expect md("[a](/b \"t\")") == "<p><a href=\"/b &quot;t&quot;\">a</a></p>\n"
+expect md("[a](<b c>)") == "<p><a href=\"&lt;b c&gt;\">a</a></p>\n"
+# Brackets hide nothing from the safety rule.
+expect doc("[a](<javascript:x>)") == "<p>[a](&lt;javascript:x&gt;)</p>\n"
+expect doc("[a]( <JavaScript:x> \"t\")") == "<p>[a]( &lt;JavaScript:x&gt; &quot;t&quot;)</p>\n"
+expect shown("![a](<java\tscript:x>)") == "<p>![a](&lt;java\tscript:x&gt;)</p>\n"
+
+# A document's `\r\n` is a line's end to every block and to the hook.
+expect doc("-\r\n- b\r\n") == "<ul>\n<li></li>\n<li>b</li>\n</ul>\n"
+expect doc("# h #\r\n```dot\r\na\r\n```\r\n") == "<h1 id=\"h\">h</h1>\n<svg>a\n</svg>\n"
+expect md("-\r\n- b\r\n") == "<p>-</p>\n<ul>\n<li>b</li>\n</ul>\n"
+
+# A heading a hook wrote stays as it wrote it, even with an empty id.
+expect doc("```raw\n```\n# b") == "<h2 id=\"\">x</h2>\n<h1 id=\"b\">b</h1>\n"
+expect Md.render_document("```raw\n```\n# b".to_utf8(), { fence: widgets, images: AsLinks }).headings == [{ level: 1, id: "b".to_utf8(), text: "b".to_utf8() }]
 
 # The chat's answers for a text with every feature here, in each mode a
 # chat has.

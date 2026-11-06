@@ -115,8 +115,14 @@ frozen and a page's prose isn't a message:
   `---` under a line of text ends that paragraph and is a rule.
 - A line indented four columns (a tab is up to four) is code, as in CommonMark:
   it can't interrupt a paragraph, and in a list the four columns count from the
-  item's content.
+  item's content. A tab in any indent, or after a list's or a quote's marker,
+  counts as the columns it reaches.
 - `<http://...>` and `<https://...>` are links.
+- A link's label ends at its balancing `]`, so `[![a](i.png)](/x)` is a linked
+  image, and nothing in a label becomes a second link.
+- A link reads a title and `<a b>`: `[a](<b c> "t")`.
+- A table's row keeps every cell, past the header's width too, where GFM and a
+  chat drop what's over. Losing the author's text is never right on a page.
 - `a@b.c` is text, since a page's `a@b.c` is rarely an address. A written
   `[a](mailto:b@c.d)` stays a link.
 
