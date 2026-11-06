@@ -61,6 +61,9 @@ passed with `--also` and never leaves the machine it lives on. **The judge
 prints counts and failing case ids, never a case's text,** so it can judge
 messages nobody else should read.
 
+`Md.render_document` is in no corpus. The expects beside it hold it, next to a
+chat's render of the same text.
+
 ## Re-freezing
 
 `zig build judge -- --refreeze LABEL` rewrites one corpus's answers and
@@ -140,6 +143,7 @@ as its uploads rule, as roc-chat does).
 | `package/MdHtml.roc` | every tag and attribute the renderer writes |
 | `package/MdSafety.roc` | the URL and attribute rules |
 | `package/MdChat.roc` | the chat's own extensions |
+| `package/MdDocument.roc` | a document's fence hook and heading ids |
 | `package/MdText.roc` | lines, escaping and the work budget |
 | `package/Ascii.roc`, `Bytes.roc` | the byte checks and scans the rest share |
 | `judge/` | the judge, its side of the Roc, the REPL, and `data/` |

@@ -89,6 +89,7 @@ html = Md.render(message, options)
 | `Md.work_units : List(U8), Md.Options -> U64` | what a render costs |
 | `Md.render_trusted : List(U8), Md.Options -> List(U8)` | your own docs, no budget |
 | `Md.render_trusted_reflow : List(U8), Md.Options -> List(U8)` | the same, a newline as a space |
+| `Md.render_document : List(U8), Md.DocumentOptions -> MdDocument.Rendered` | a page of a book, with a hook for its fences (below) |
 | `Md.uploads_under : List(U8) -> (List(U8) -> Bool)` | the rule of one uploads folder: every path under it |
 | `Md.no_uploads : List(U8) -> Bool` | the rule of a host with no uploads |
 | `Md.escape : List(U8) -> List(U8)` | text made safe for HTML, the renderer's own escape, for your pages |
@@ -97,6 +98,34 @@ html = Md.render(message, options)
 those blocks outside a render, so it reads the renderer's own grammar: a
 fence's open and close (a feed of code excerpts), a stored `<img>` rebuilt
 by the media rule (`MdMedia.rebuild`, a feed of images), a table row's cells.
+
+## Documents
+
+`Md.render_document` renders your own prose as a page. Chat syntax is off
+(`MSG_` is text and ```` ```quote ```` is code), a newline is a space, a
+link to another site stays in its tab, and raw HTML and media stay escaped.
+It answers `{ html, headings }`: each heading has an `id` made from its text
+(`what-s-a-sighting`, then `what-s-a-sighting-2`), and `headings` lists
+`{ level, id, text }` for a table of contents.
+
+The one way in for your own HTML is the `fence` option, a function from
+`{ tag, args, body }` to `Html(bytes)` or `Pass`. For a ```` ```widget sky ````
+fence the tag is `widget` and the args are `sky`. `Html` goes out unescaped,
+which is why the hook exists only here, and `Pass` renders ordinary code with
+`class="language-<tag>"`.
+
+```roc
+fence = |{ tag, args, body }|
+	if tag == Str.to_utf8("widget") {
+		Html(iframe_for(args))
+	} else if tag == Str.to_utf8("dot") {
+		Html(svg_of(body))
+	} else {
+		Pass
+	}
+
+page = Md.render_document(chapter, { fence })
+```
 
 ## Changing it
 
