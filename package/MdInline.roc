@@ -443,7 +443,7 @@ emit = |out, { text, pieces, runs }| {
 		$out = match piece {
 			Text(start, end) => MdText.escape_onto($out, MdText.cut(text, { start, end }))
 			Html(html) => $out.concat(html)
-			Run(k) => MdEmphasis.run_onto($out, MdEmphasis.run_at(runs, k))
+			Run(k) => MdEmphasis.run_onto($out, MdEmphasis.indexed_run(runs, k))
 		}
 	}
 	$out

@@ -130,7 +130,7 @@ MdEmphasis := [].{
 			} else {
 				{}
 			}
-			closer = MdEmphasis.run_at($runs, ci)
+			closer = MdEmphasis.indexed_run($runs, ci)
 			if !closer.can_close {
 				$closer = closer.above
 			} else {
@@ -145,7 +145,7 @@ MdEmphasis := [].{
 					} else {
 						{}
 					}
-					opener = MdEmphasis.run_at($runs, index_of($opener))
+					opener = MdEmphasis.indexed_run($runs, index_of($opener))
 					# The rule of 3: a run that may both open and close matches
 					# another only when their lengths' sum is no multiple of 3,
 					# unless both are.
@@ -164,7 +164,7 @@ MdEmphasis := [].{
 				}
 				if $found {
 					oi = index_of($opener)
-					opener = MdEmphasis.run_at($runs, oi)
+					opener = MdEmphasis.indexed_run($runs, oi)
 					use = if opener.count >= 2 and closer.count >= 2 {
 						2
 					} else {
@@ -201,7 +201,7 @@ MdEmphasis := [].{
 						{}
 					}
 					if closer.count == use {
-						above = MdEmphasis.run_at($runs, ci).above
+						above = MdEmphasis.indexed_run($runs, ci).above
 						$runs = runs_without($runs, ci)
 						$closer = above
 					} else {
@@ -226,8 +226,8 @@ MdEmphasis := [].{
 	}
 
 	## Run `k` of the line's runs.
-	run_at : List(DelimiterRun), U64 -> DelimiterRun
-	run_at = |runs, k| match runs.get(k) {
+	indexed_run : List(DelimiterRun), U64 -> DelimiterRun
+	indexed_run = |runs, k| match runs.get(k) {
 		Ok(run) => run
 		Err(OutOfBounds) => crash "MdEmphasis: a run's index past the runs"
 	}
@@ -319,18 +319,18 @@ floor_keys = 18
 ## pieces, and its delimiters left, stay.
 runs_without : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRun)
 runs_without = |runs, k| {
-	run = MdEmphasis.run_at(runs, k)
+	run = MdEmphasis.indexed_run(runs, k)
 	with_below = match run.below {
 		At(b) => set_run(
 			runs,
-			{ at: b, delimiters: { ..MdEmphasis.run_at(runs, b), above: run.above } },
+			{ at: b, delimiters: { ..MdEmphasis.indexed_run(runs, b), above: run.above } },
 		)
 		Edge => runs
 	}
 	match run.above {
 		At(a) => set_run(
 			with_below,
-			{ at: a, delimiters: { ..MdEmphasis.run_at(with_below, a), below: run.below } },
+			{ at: a, delimiters: { ..MdEmphasis.indexed_run(with_below, a), below: run.below } },
 		)
 		Edge => with_below
 	}
