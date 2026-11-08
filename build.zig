@@ -194,7 +194,7 @@ fn rocCompiler(b: *std.Build) []const u8 {
         _ = b.root.root_dir.handle.realPathFileAlloc(b.graph.io, beside, b.allocator) catch break :pinned "roc";
         break :pinned beside;
     };
-    const none = "the package is Roc, and there is no Roc compiler at `{s}`: put Roc {s} (roc-version) at ~/tools/roc-{s}/roc or on the PATH (showell/roc-apps release toolchain-2026-10-30 carries it), or name it with -Droc=<path>";
+    const none = "the package is Roc, and there is no Roc compiler at `{s}`: put Roc {s} (roc-version) at ~/tools/roc-{s}/roc or on the PATH (showell/roc-apps release toolchain-2026-11-07 carries it), or name it with -Droc=<path>";
     const found = if (std.mem.indexOfScalar(u8, named, '/') == null)
         b.findProgram(.{ .names = &.{named} }) orelse std.process.fatal(none, .{ named, roc_pin, roc_pin })
     else
