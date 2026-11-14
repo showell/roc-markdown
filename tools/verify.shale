@@ -10,7 +10,7 @@
 -- .zig-cache/verify/, beside a copy of package/.
 --
 -- The checks:
---   - first, the disk: under Shale's cookbook/disk.shale floor of free
+--   - first, the disk: under Shale's cookbook/check_disk_space.shale floor of free
 --     space (20 GB) the run stops at once, with its line;
 --   - Shale's Roc recipes over package/, each count held at the number in
 --     LINTS, so a moved count fails the run;
@@ -67,10 +67,10 @@ function say(ok, what)
 end
 
 -- ── the disk, first ──
--- **A FULL DISK FAILS HERE, NEVER MID-RUN**: Shale's cookbook/disk.shale
+-- **A FULL DISK FAILS HERE, NEVER MID-RUN**: Shale's cookbook/check_disk_space.shale
 -- stops under its floor of free space, its line naming the biggest growth
 -- spots, and this run stops with that line.
-local disk = run({"shale", real("cookbook:disk.shale")}, {cwd = ".", timeout_ms = 600000, tail = 5, width = 1000})
+local disk = run({"shale", real("cookbook:check_disk_space.shale")}, {cwd = ".", timeout_ms = 600000, tail = 5, width = 1000})
 local disk_line = re_find(disk.out, "disk: [^\n]*")
 if disk.code ~= 0 then
   local why = trim(disk.out)
@@ -79,31 +79,31 @@ if disk.code ~= 0 then
   if steps ~= nil then why = sub(why, 1, #why - #steps.text) end
   fail("verify: " .. why)
 end
-say(disk_line ~= nil, disk_line ~= nil and disk_line.text or ("cookbook:disk.shale gave no line: " .. trim(disk.out)))
+say(disk_line ~= nil, disk_line ~= nil and disk_line.text or ("cookbook:check_disk_space.shale gave no line: " .. trim(disk.out)))
 
 -- ── Shale's Roc recipes, the cheapest check ──
 -- The recipes Safari's gate holds, over package/, every count held at zero but
 -- `wide string`, which isn't held: an expect's frozen HTML is one string, and
 -- Roc has no short way to split one.
 const LINTS = {
-  {recipe = "name_hunt", args = {}, budget = {}, counts = {
+  {recipe = "hunt_names", args = {}, budget = {}, counts = {
     {"state_effect", 0}, {"question", 0}, {"vague", 0}, {"name_type", 0}, {"negative", 0},
     {"noun_effect", 0}, {"command_tense", 0}, {"mixed_tense", 0}, {"container", 0},
     {"preposition_split", 0}, {"short_name", 0}, {"worker_name", 0}, {"stacked_preposition", 0},
     {"taken_word", 0}, {"bare_participle", 0},
   }},
-  {recipe = "errors", args = {}, budget = {}, counts = {
+  {recipe = "check_errors", args = {}, budget = {}, counts = {
     {"error_alias", 0}, {"optional_tag", 0}, {"set_fallback", 0}, {"placeholder", 0}, {"number_fallback", 0},
   }},
-  {recipe = "nest_depth", args = {"min=4"}, budget = {}, counts = {{"nested", 0}}},
-  {recipe = "parens", args = {}, budget = {}, counts = {{"paren_if", 0}, {"wrapped_body", 0}, {"else_block", 0}, {"lambda_if", 0}}},
-  {recipe = "boundaries", args = {}, budget = {}, counts = {
+  {recipe = "find_deep_calls", args = {"min=4"}, budget = {}, counts = {{"nested", 0}}},
+  {recipe = "find_extra_parens", args = {}, budget = {}, counts = {{"paren_if", 0}, {"wrapped_body", 0}, {"else_block", 0}, {"lambda_if", 0}}},
+  {recipe = "check_boundaries", args = {}, budget = {}, counts = {
     {"single", 0}, {"fixed", 0}, {"entry", 0}, {"constant", 0}, {"bool_param", 0}, {"dead", 0}, {"unused_api", 0}, {"same_branches", 0},
   }},
-  {recipe = "stack", args = {}, budget = {"--budget", "steps=4000000000"}, counts = {{"to stack", 0}, {"to unstack", 0}, {"long", 0}}},
-  {recipe = "vocabulary", args = {"words=tools/vocabulary.txt"}, budget = {}, counts = {{"retired_name", 0}, {"retired_comment", 0}}},
-  {recipe = "plain_names", args = {}, budget = {}, counts = {{"pure_mutator", 0}, {"abbreviation", 0}, {"module_doc", 0}}},
-  {recipe = "families", args = {}, budget = {}, counts = {{"family", 0}, {"twin_name", 0}}},
+  {recipe = "check_stacking", args = {}, budget = {"--budget", "steps=4000000000"}, counts = {{"to stack", 0}, {"to unstack", 0}, {"long", 0}}},
+  {recipe = "check_vocabulary", args = {"words=tools/vocabulary.txt"}, budget = {}, counts = {{"retired_name", 0}, {"retired_comment", 0}}},
+  {recipe = "find_unclear_names", args = {}, budget = {}, counts = {{"pure_mutator", 0}, {"abbreviation", 0}, {"module_doc", 0}}},
+  {recipe = "check_families", args = {}, budget = {}, counts = {{"family", 0}, {"twin_name", 0}}},
 }
 
 -- A recipe's last line that isn't blank or Shale's own footer: its counts.
