@@ -8,6 +8,7 @@ spec_tables 8
 spec_strike 2
 spec_escapes 13
 spec_images 22
+chat_sample 54
 pinned 3
 examples 6
 hostile 1097

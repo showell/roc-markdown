@@ -26,12 +26,7 @@
 --   - `zig fmt --check` and `roc fmt --check` clean;
 --   - roc-chat's `roc test` against this package (roc-chat's `chat=`
 --     branch, default main, cloned beside a copy of package/);
---   - gold (`gold=`, default repos:gopher-gold/gold.jsonl, the box's),
---     judged in `zig build test`'s one judge run (`-Dalso`): every
---     one of its 10,103 cases agrees. **ONLY COUNTS ARE PRINTED, NEVER A
---     MESSAGE'S TEXT.** Where it is absent, `SKIP gold`, the one SKIP there
---     is;
---   - the judge's CPU time, and gold's part of it.
+--   - the judge's CPU time.
 --
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
 
@@ -49,9 +44,8 @@ for line in split(read("judge/data/ratchet.txt"), "\n") do
     want_total = want_total + want[label]
   end
 end
-const gold_cases = 10103
 const scratch_dir = ".zig-cache/verify"
--- `zig build test`: one judge run on the dev backend, gold included, about
+-- `zig build test`: one judge run on the dev backend, about
 -- 75 s of CPU (the hostile shapes nearly all of it), and a build first.
 const judge_ms = 900000
 
@@ -173,14 +167,8 @@ function cpu_ms(line)
   return parse_int(m.group)
 end
 
--- ── zig build test, gold judged in the same run, and the counts ──
--- Gold (`gold=`, the box's by default) goes to the test step's judge
--- (`-Dalso`), so one judge run covers every corpus.
-local gold = arg("gold", "repos:gopher-gold/gold.jsonl")
-local have_gold = exists(gold)
-local test_argv = {"zig", "build", "test"}
-if have_gold then test_argv[#test_argv + 1] = "-Dalso=" .. real(gold) end
-local t = run(test_argv, {cwd = ".", timeout_ms = judge_ms, tail = 60})
+-- ── zig build test, and the counts ──
+local t = run({"zig", "build", "test"}, {cwd = ".", timeout_ms = judge_ms, tail = 60})
 say(t.code == 0, "zig build test (exit " .. t.code .. ", " .. t.ms .. " ms)")
 local got = counts(t.out)
 local total = 0
@@ -205,19 +193,9 @@ local pl = re_find(t.out, "== playground: [^\n]*")
 say(pl ~= nil and re_find(pl.text, " 0 fail;") ~= nil, "the playground: " .. (pl ~= nil and sub(pl.text, 15) or "no `== playground` line"))
 local pg = re_find(t.out, "== page: [^\n]*")
 say(pg ~= nil, "the playground's page: " .. (pg ~= nil and sub(pg.text, 10) or "no `== page` line"))
--- Gold: only its count line is read, never a case's id or a message's text.
-local gold_ms = -1
-if not have_gold then
-  board.lines[#board.lines + 1] = "SKIP  gold: not on this machine"
-  print("SKIP  gold: not on this machine")
-else
-  local gc = get(got, "gold", {pass = -1, total = -1})
-  gold_ms = cpu_ms(re_find(t.out, "== gold: [^\n]*"))
-  say(gc.pass == gold_cases and gc.total == gold_cases, "gold: " .. gc.pass .. "/" .. gc.total .. " agree (want " .. gold_cases .. ")")
-end
--- The judge's time, gold's part of it apart.
+-- The judge's time.
 local judge_cpu = cpu_ms(re_find(t.out, "==> [^\n]*"))
-say(judge_cpu >= 0, "the judge's time: " .. judge_cpu .. " ms CPU" .. (gold_ms >= 0 and (", gold " .. gold_ms .. " of it") or ""))
+say(judge_cpu >= 0, "the judge's time: " .. judge_cpu .. " ms CPU")
 
 -- ── the paren and table shapes stay linear ──
 -- Each shape's work units at 8,191 against its units at 1,000: linear is
@@ -289,10 +267,7 @@ end
 
 
 remove_tree(scratch_dir)
-local checks = 0
-for l in board.lines do
-  if not starts_with(l, "SKIP") then checks = checks + 1 end
-end
+local checks = #board.lines
 if board.failed == 0 then
   print("verify: " .. checks .. " of " .. checks .. " passed")
 else

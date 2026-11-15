@@ -13,6 +13,9 @@ spec_tables.jsonl user-uploads
 spec_strike.jsonl user-uploads
 spec_escapes.jsonl user-uploads
 spec_images.jsonl user-uploads
+# Gopher Chat's real messages, a sample with every word replaced
+# (tools/sanitize_chat.shale), under the old chat's uploads rule.
+chat_sample.jsonl old-chat
 # Pinned departures from CommonMark (each its own note).
 pinned.jsonl user-uploads
 # The canned examples of the REPL (judge/repl.zig: `:examples`) and the

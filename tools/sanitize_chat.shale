@@ -1,0 +1,216 @@
+-- **THE CHAT SAMPLE, MADE ONCE FROM GOLD**: judge/data/chat_sample.jsonl,
+-- the public stand-in for gold, Gopher Chat's 10,103 real messages, which
+-- were private. It took the gold cases CHOSEN names (see below), and wrote
+-- each one's text with every word replaced, keeping the markdown's shape.
+-- It ran from the repository's root while gold was on the box:
+--
+--   shale tools/sanitize_chat.shale gold=repos:gopher-gold/gold.jsonl
+--
+-- Gold is gone now, so the script is a record of how the sample was made,
+-- and its rules are what a reviewer reads. **IT PRINTS ONLY COUNTS, NEVER A
+-- MESSAGE'S TEXT.**
+--
+-- The rules, in the order they apply to a message:
+--   1. A host is `example`: any dotted name ending .com, .org, .net, .io,
+--      .to, .dev, .ai or .app (in a URL, an email or bare) keeps its `www.`
+--      and its ending and becomes `www.example.com` or `example.org`; any
+--      other host after `http://` or `https://` (an IP, `localhost`)
+--      becomes `example.com`.
+--   2. The text is then read as runs of letters and digits:
+--      - a run of 16 or more hex digits (an upload's id, a hash) becomes
+--        `0123456789abcdef` repeated to its length;
+--      - a run that is a word of KEPT (below), `mp4` say, is kept whole;
+--      - any other run is split into letters and digits;
+--      - a run of three or more digits (a date, an IP's part, a phone
+--        number, an id) becomes `1234567890` repeated to its length;
+--      - a word is kept when it is one letter, when it is a word the
+--        renderer reads (KEPT: a scheme, `www`, `MSG`, `quote`, the old
+--        chat's upload paths' `chat`, `c`, `channel` and `uploads`, a media
+--        file's extension, `example` and the host endings), when it names
+--        an HTML tag (after `<` or `</`) or an attribute (before `="`), or
+--        when it is a code fence's info string (a language name);
+--      - every other word becomes a word of LEXICON's of the same length,
+--        with the same letters capitalised: the same word, any case, always
+--        the same replacement, so a repeated word stays repeated.
+-- So every byte that is not a letter or a digit is kept: the markup,
+-- the spaces and line breaks, the punctuation and the emoji. A word keeps
+-- its length, so a table's columns and a line's length stay as they were.
+--
+-- Which cases: `shale tools/count_features.shale` over gold, `cover=3`
+-- (every feature of gold's answers in three chosen cases, or in all of
+-- them when fewer hold it), and eight plain messages spread over gold's
+-- order. CHOSEN is gold's line numbers, from 1.
+--
+-- budget: steps=2000000000 arena_bytes=2000000000 kept_bytes=200000000 read_bytes=2000000000
+
+const CHOSEN = {1, 3, 12, 33, 68, 75, 189, 318, 347, 379, 425, 440, 606, 931, 1057, 1073, 1326, 1440, 1554, 2038, 2057, 2523, 3680, 3704, 3733, 3934, 4067, 4290, 4459, 4723, 4984, 5744, 5769, 6193, 6194, 6333, 6692, 6760, 6936, 7454, 7648, 8826, 9001, 9115, 9375, 9522, 10019, 10031, 10072, 10075, 10080, 10091, 10102, 10103}
+
+const KEPT = {"http", "https", "www", "mailto", "javascript", "vbscript", "data", "file", "msg", "quote", "chat", "c", "channel", "uploads", "user", "png", "gif", "jpeg", "jpg", "webp", "svg", "mp4", "webm", "mov", "example", "com", "org", "net", "io", "to", "dev", "ai", "app"}
+
+-- Neutral words by length; a longer word is made of five-letter ones and one
+-- for what is left.
+const LEXICON = {
+  ["2"] = {"ox", "be", "go", "up", "on", "at", "in", "so", "we", "an", "my", "us"},
+  ["3"] = {"sun", "oak", "bay", "elm", "fog", "hen", "ivy", "jar", "kit", "map", "owl", "pea", "rug", "tin", "yak", "zip"},
+  ["4"] = {"lake", "moss", "pine", "reed", "sand", "tide", "vine", "wren", "fern", "gull", "kelp", "plum", "dune", "mist", "rain", "leaf"},
+  ["5"] = {"maple", "river", "stone", "cloud", "grove", "heron", "otter", "pearl", "shore", "thyme", "brook", "cedar", "daisy", "flint", "hazel", "lemon"},
+  ["6"] = {"meadow", "pebble", "willow", "harbor", "canyon", "garden", "breeze", "copper", "forest", "island", "marble", "orchid", "parrot", "quartz", "timber", "walnut"},
+  ["7"] = {"lantern", "orchard", "pelican", "sparrow", "thistle", "harvest", "blossom", "compass", "granite", "juniper", "morning", "octopus", "pumpkin", "rainbow", "seagull", "cypress"},
+  ["8"] = {"mountain", "lavender", "rosemary", "sunlight", "seashell", "woodland", "hedgerow", "moonbeam", "pinecone", "raindrop", "snowfall", "tortoise", "waterway", "sandbank", "bluebird", "chestnut"},
+  ["9"] = {"evergreen", "sunflower", "waterfall", "starlight", "butterfly", "driftwood", "riverbank", "snowflake", "dandelion", "heartwood", "bluebells", "moonstone", "cornfield", "sandstone", "honeycomb", "pineapple"},
+  ["10"] = {"lighthouse", "wildflower", "watercress", "blackberry", "riverstone", "cloudberry", "sunflowers", "bluebonnet", "starflower", "springtime", "greenhouse", "evergreens", "waterborne", "sweetbriar", "applewoods", "nightshade"},
+}
+
+const hosts = {"com", "org", "net", "io", "to", "dev", "ai", "app"}
+
+-- What each rule changed, counted (`n` by rule name), and the words' map.
+const tally = {n = {}, words = {}, next = {}}
+
+function host_rule(md)
+  local ends = join(hosts, "|")
+  local m1 = re_find_all(md, "(www\\.)?(?:[A-Za-z0-9-]+\\.)+(?:" .. ends .. ")\\b")
+  local s = re_replace(md, "(www\\.)?(?:[A-Za-z0-9-]+\\.)+(" .. ends .. ")\\b", "\\1example.\\2")
+  for m in m1 do
+    if m.text ~= "example.com" and m.text ~= "www.example.com" then incr(tally.n, "host") end
+  end
+  local m2 = re_find_all(s, "(https?://)(www\\.)?[A-Za-z0-9.-]+")
+  for m in m2 do
+    if not contains(m.text, "example.") then incr(tally.n, "host (other)") end
+  end
+  return re_replace(s, "(https?://)(www\\.)?[A-Za-z0-9.-]+", "\\1\\2example.com")
+end
+
+-- `pattern` repeated to `n` bytes.
+function repeated(pattern, n)
+  local s = ""
+  while #s < n do s = s .. pattern end
+  return sub(s, 1, n)
+end
+
+function is_upper(c)
+  return upper(c) == c and lower(c) ~= c
+end
+
+-- The lexicon's word for `n` letters: its next one, in turn.
+function fresh_word(n)
+  if n > 10 then return fresh_word(5) .. fresh_word(n - 5) end
+  local key = tostring(n)
+  local list = LEXICON[key]
+  local at = get(tally.next, key, 0)
+  tally.next[key] = at + 1
+  return list[(at % #list) + 1]
+end
+
+-- `w`'s replacement, the same each time, with `w`'s capitals.
+function word_for(w)
+  local key = lower(w)
+  if not has_key(tally.words, key) then tally.words[key] = fresh_word(#w) end
+  local base = tally.words[key]
+  local out = ""
+  local i = 1
+  while i <= #w do
+    local c = sub(base, i, i)
+    if is_upper(sub(w, i, i)) then c = upper(c) end
+    out = out .. c
+    i = i + 1
+  end
+  incr(tally.n, "word")
+  return out
+end
+
+-- Whether position `at` (from 1) lies on a code fence's opening line.
+function on_fence_line(fences, at)
+  for f in fences do
+    if at >= f.from and at <= f.to then return true end
+  end
+  return false
+end
+
+-- The spans of the lines that open a code fence, `{from, to}`.
+function fence_lines(md)
+  local spans = {}
+  local start = 1
+  for l in split(md, "\n") do
+    if re_find(l, "^ *(?:`{3,}|~{3,})") ~= nil then spans[#spans + 1] = {from = start, to = start + #l - 1} end
+    start = start + #l + 1
+  end
+  return spans
+end
+
+-- One letters-only or digits-only piece of a run, at `at` in `md`.
+function piece_for(md, piece, at, fences)
+  if re_match(piece, "^[0-9]+$") then
+    if #piece >= 3 then
+      incr(tally.n, "digits")
+      return repeated("1234567890", #piece)
+    end
+    return piece
+  end
+  if #piece == 1 or has_item(KEPT, lower(piece)) then return piece end
+  if at > 1 and sub(md, at - 1, at - 1) == "<" then return piece end
+  if at > 2 and sub(md, at - 2, at - 1) == "</" then return piece end
+  if sub(md, at + #piece, at + #piece + 1) == "=\"" then return piece end
+  if on_fence_line(fences, at) then return piece end
+  return word_for(piece)
+end
+
+function words_rule(md)
+  local fences = fence_lines(md)
+  local out = ""
+  local last = 1
+  for m in re_find_all(md, "[A-Za-z0-9]+") do
+    out = out .. sub(md, last, m.at - 1)
+    if #m.text >= 16 and re_match(m.text, "^[0-9a-fA-F]+$") then
+      incr(tally.n, "hex id")
+      out = out .. repeated("0123456789abcdef", #m.text)
+    elseif has_item(KEPT, lower(m.text)) then
+      out = out .. m.text
+    else
+      for p in re_find_all(m.text, "[A-Za-z]+|[0-9]+") do
+        out = out .. piece_for(md, p.text, m.at + p.at - 1, fences)
+      end
+    end
+    last = m.at + #m.text
+  end
+  return out .. sub(md, last, #md)
+end
+
+function sanitized(md)
+  return words_rule(host_rule(md))
+end
+
+for key in keys(LEXICON) do
+  for w in LEXICON[key] do
+    if tostring(#w) ~= key then fail("LEXICON: `" .. w .. "` is not " .. key .. " letters") end
+  end
+end
+local gold = arg("gold", "repos:gopher-gold/gold.jsonl")
+local out_path = arg("out", "judge/data/chat_sample.jsonl")
+local wanted = {}
+for i in CHOSEN do wanted[tostring(i)] = 1 end
+local found = {}
+local off = 0
+local n = 0
+local done = false
+while not done do
+  local r = read_lines(gold, off, 1000000)
+  off = r.next
+  done = r.done
+  for l in r.lines do
+    if l ~= "" then
+      n = n + 1
+      if has_key(wanted, tostring(n)) then found[tostring(n)] = json_read(l).md end
+    end
+  end
+end
+local rows = {}
+for i in CHOSEN do
+  local md = found[tostring(i)]
+  local id = "chat_sample/" .. repeated("0", 5 - #tostring(i)) .. i
+  rows[#rows + 1] = json_write({id = id, md = sanitized(md)})
+end
+if exists(out_path) then remove(out_path) end
+create(out_path, join(rows, "\n") .. "\n")
+print(#rows .. " cases written to " .. out_path .. ", from " .. n .. " in gold")
+for k in sort(keys(tally.n)) do print("  " .. k .. ": " .. tally.n[k]) end
+print("  distinct words replaced: " .. #keys(tally.words))

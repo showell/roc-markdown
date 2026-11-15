@@ -6,7 +6,7 @@ const std = @import("std");
 /// archive by the pinned Roc).
 ///
 ///   zig build test                     roc test, then the judge
-///   zig build judge -- --also <gold>   the judge, with a private corpus
+///   zig build judge -- --also <corpus> the judge, with a private corpus
 ///   zig build repl                     markdown at a prompt, or piped
 ///   zig build playground               the web playground, zig-out/playground/
 pub fn build(b: *std.Build) void {
@@ -59,10 +59,6 @@ pub fn build(b: *std.Build) void {
     tests.dependOn(&roc_test.step);
     const judged = b.addRunArtifact(judge_exe);
     judged.has_side_effects = true;
-    // A private corpus judged in the same run (tools/verify.shale's gold), so
-    // one judge run covers every corpus.
-    if (b.option([]const u8, "also", "a private corpus the test step's judge takes too (its --also)")) |also|
-        judged.addArgs(&.{ "--also", also });
     judged.step.dependOn(&roc_test.step);
     tests.dependOn(&judged.step);
     // The judge's own checks, each held both ways (judge/judge.zig's tests).

@@ -6,8 +6,8 @@ cost. It is a Roc package with no dependencies and no platform, pure
 functions from bytes to bytes, so any Roc app can import it. It is the
 dialect of Gopher Chat (lynrummy.com), and it is held, case by case, to
 frozen answers for 314 of CommonMark's and GFM's spec examples (TESTING.md
-says how they were chosen), about a thousand hostile inputs, and ten
-thousand real chat messages.
+says how they were chosen), about a thousand hostile inputs, and a sample of
+real chat messages with every word replaced.
 
 **Try it:** [the playground](https://roc.lynrummy.com/markdown/) runs this
 package, compiled to WebAssembly, as you type. It has dense examples to edit.

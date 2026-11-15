@@ -1,0 +1,256 @@
+-- **WHAT A CORPUS'S ANSWERS EXERCISE, COUNTED**: each case's features, read
+-- from its frozen answers (beside it, `X.answers.jsonl`) and its text, and how
+-- many cases hold each one. It is how judge/data/chat_sample.jsonl was chosen
+-- from gold and shown to cover it (tools/sanitize_chat.shale):
+--
+--   shale tools/count_features.shale corpus=judge/data/chat_sample.jsonl
+--   shale tools/count_features.shale corpus=<gold> cover=3 plain=8
+--   shale tools/count_features.shale corpus=<gold> against=judge/data/chat_sample.jsonl
+--
+-- `cover=N` picks cases greedily until every feature is held by N of them
+-- (or by all that hold it, when fewer do), then `plain=N` adds that many
+-- plain messages (PLAIN's features alone) spread over the corpus, and
+-- prints the picks' line numbers. `against=` names another corpus, and the
+-- run fails when a feature of `corpus` is in none of its cases. `out=`
+-- writes each case's features, a line a case, `<line>\t<id>\t<features>`.
+-- **IT PRINTS COUNTS AND LINE NUMBERS, NEVER A CASE'S TEXT OR ID.**
+--
+-- A feature is one of these, each read from the chat render's answers:
+--   - `tag:` an element the html writes, with its attributes' names, its
+--     class (a code fence's language as `language-X`), where its href or
+--     src points (`@ext`, `@local`, `@upload`, `@mailto`, `@frag`) and a
+--     cell's alignment;
+--   - `nest:` an element inside another, `p>strong`, `top>pre`;
+--   - `ent:` an entity the html writes, `&lt;`;
+--   - `lit:` markup left as text in the html: `*`, `_`, `[`, `&lt;` (raw
+--     HTML shown), `MSG_`, `http`;
+--   - `empty` (no html), `hostile` (refused), `trusted-differs` and
+--     `reflow-differs` (a trusted render unlike the chat's, a reflow unlike
+--     the trusted one);
+--   - `src:` the text's own shape: a tab, a CR, non-ASCII, a 4-byte UTF-8
+--     sequence, a two-space or backslash line break, a blank line, a
+--     four-space indent, a backslash escape;
+--   - `len:` the text's size, tiny (10 bytes), short (100), medium (1,000),
+--     long (4,000) or huge.
+--
+-- budget: steps=4000000000 arena_bytes=3000000000 kept_bytes=200000000 read_bytes=2000000000
+
+const void_tags = {"br", "img", "hr", "input"}
+const PLAIN = {"tag:p[]", "nest:top>p", "len:short", "len:medium", "ent:&#39;", "tag:br[]", "nest:p>br", "src:blank-line", "reflow-differs", "lit:!"}
+const LITERALS = {"*", "_", "~", "`", "[", "]", "\\", "|", "#", "!", "&lt;", "http", "www.", "@", "MSG_", "javascript:"}
+
+function kind_of_url(u)
+  if starts_with(u, "mailto:") then return "mailto" end
+  if starts_with(u, "http://") or starts_with(u, "https://") then return "ext" end
+  if starts_with(u, "/") then
+    if find(u, "/uploads/") ~= nil or starts_with(u, "/user_uploads/") then return "upload" end
+    return "local"
+  end
+  if starts_with(u, "#") then return "frag" end
+  return "other"
+end
+
+-- Every element's tag and nesting feature, into `f`.
+function tag_features(html, f)
+  local stack = {}
+  for m in re_find_all(html, "<(/?)([a-z0-9]+)([^>]*)>") do
+    local tag = m.groups[2]
+    if m.groups[1] == "/" then
+      if #stack > 0 then stack = take(stack, #stack - 1) end
+    else
+      local names = {}
+      local extra = ""
+      for a in re_find_all(m.groups[3], " ([a-z-]+)(?:=\"([^\"]*)\")?") do
+        names[#names + 1] = a.groups[1]
+        if a.groups[1] == "class" then extra = extra .. "." .. a.groups[2] end
+        if a.groups[1] == "href" or a.groups[1] == "src" then extra = extra .. "@" .. kind_of_url(a.groups[2]) end
+        if a.groups[1] == "align" then extra = extra .. "~" .. a.groups[2] end
+      end
+      sort(names)
+      if starts_with(extra, ".language-") then extra = ".language-X" end
+      f["tag:" .. tag .. "[" .. join(names, ",") .. "]" .. extra] = 1
+      local parent = "top"
+      if #stack > 0 then parent = stack[#stack] end
+      f["nest:" .. parent .. ">" .. tag] = 1
+      if not has_item(void_tags, tag) then stack[#stack + 1] = tag end
+    end
+  end
+end
+
+-- A case's features, sorted.
+function features_of(md, ans)
+  local f = {}
+  local html = ans.html
+  tag_features(html, f)
+  for e in re_find_all(html, "&#?[a-z0-9]+;") do f["ent:" .. e.text] = 1 end
+  local text = re_replace(html, "<[^>]*>", "")
+  for c in LITERALS do
+    if find(text, c) ~= nil then f["lit:" .. c] = 1 end
+  end
+  if html == "" then f["empty"] = 1 end
+  if ans.hostile ~= "" then f["hostile"] = 1 end
+  if ans.trusted ~= html then f["trusted-differs"] = 1 end
+  if ans.trusted_reflow ~= ans.trusted then f["reflow-differs"] = 1 end
+  if find(md, "\r") ~= nil then f["src:cr"] = 1 end
+  if find(md, "\t") ~= nil then f["src:tab"] = 1 end
+  if re_find(md, "[\x80-\xff]") ~= nil then f["src:utf8"] = 1 end
+  if re_find(md, "[\xf0-\xf4]") ~= nil then f["src:utf8-4byte"] = 1 end
+  if find(md, "  \n") ~= nil then f["src:two-space-break"] = 1 end
+  if find(md, "\\\n") ~= nil then f["src:backslash-break"] = 1 end
+  if find(md, "\n\n") ~= nil then f["src:blank-line"] = 1 end
+  if re_find(md, "(?:^|\n)    ") ~= nil then f["src:indent4"] = 1 end
+  if re_find(md, "\\\\[!-/:-@\\[-`{-~]") ~= nil then f["src:escape"] = 1 end
+  local n = #md
+  local b = "huge"
+  if n <= 10 then b = "tiny" elseif n <= 100 then b = "short" elseif n <= 1000 then b = "medium" elseif n <= 4000 then b = "long" end
+  f["len:" .. b] = 1
+  return sort(keys(f))
+end
+
+-- Where a corpus's answers are: beside it.
+function answers_of(corpus)
+  return strip_suffix(corpus, ".jsonl") .. ".answers.jsonl"
+end
+
+-- Every case of `corpus` as `{line, id, fs}`, read a part at a time, the
+-- answers in the corpus's order.
+function cases_of(corpus)
+  local cases = {}
+  local goff = 0
+  local aoff = 0
+  local pending = {}
+  local done = false
+  while not done do
+    local gr = read_lines(corpus, goff, 400000)
+    goff = gr.next
+    done = gr.done
+    local glines = {}
+    for l in gr.lines do
+      if l ~= "" then glines[#glines + 1] = l end
+    end
+    while #pending < #glines do
+      local more = read_lines(answers_of(corpus), aoff, 400000)
+      aoff = more.next
+      for l in more.lines do
+        if l ~= "" then pending[#pending + 1] = l end
+      end
+      if more.done and #pending < #glines then fail(answers_of(corpus) .. " has fewer answers than its corpus has cases") end
+    end
+    local k = 0
+    for gl in glines do
+      k = k + 1
+      local g = json_read(gl)
+      local a = json_read(pending[k])
+      if g.id ~= a.id then fail("the answers are not in the corpus's order at line " .. (#cases + 1)) end
+      cases[#cases + 1] = {line = #cases + 1, id = g.id, fs = features_of(g.md, a)}
+      yield()
+    end
+    pending = drop(pending, k)
+  end
+  return cases
+end
+
+-- How many cases hold each feature.
+function counts_of(cases)
+  local count = {}
+  for c in cases do
+    for f in c.fs do incr(count, f) end
+  end
+  return count
+end
+
+-- The greedy cover: each feature in `per` picked cases, or in all that hold
+-- it; on a tie, the case with fewer features.
+function cover_of(cases, count, per)
+  local need = {}
+  local left = 0
+  for f in keys(count) do
+    need[f] = min(per, count[f])
+    left = left + need[f]
+  end
+  local taken = {}
+  local picked = {}
+  while left > 0 do
+    local best = nil
+    local best_gain = 0
+    for c in cases do
+      if not has_key(taken, c.id) then
+        local gain = 0
+        for f in c.fs do
+          if need[f] > 0 then gain = gain + 1 end
+        end
+        if gain > best_gain or (gain == best_gain and gain > 0 and #c.fs < #best.fs) then
+          best = c
+          best_gain = gain
+        end
+      end
+    end
+    taken[best.id] = 1
+    picked[#picked + 1] = best.line
+    for f in best.fs do
+      if need[f] > 0 then
+        need[f] = need[f] - 1
+        left = left - 1
+      end
+    end
+  end
+  return {picked = picked, taken = taken}
+end
+
+-- `n` plain cases not yet taken, spread evenly over the corpus.
+function plain_of(cases, taken, n)
+  local plain = {}
+  for c in cases do
+    local ok = #c.fs > 0 and not has_key(taken, c.id)
+    for f in c.fs do
+      if not has_item(PLAIN, f) then ok = false end
+    end
+    if ok then plain[#plain + 1] = c.line end
+  end
+  local picked = {}
+  local k = 0
+  while k < n and #plain > 0 do
+    picked[#picked + 1] = plain[(k * #plain) // n + 1]
+    k = k + 1
+  end
+  return picked
+end
+
+local corpus = arg("corpus", "judge/data/chat_sample.jsonl")
+local cases = cases_of(corpus)
+local count = counts_of(cases)
+local rows = {}
+for f in sort(keys(count)) do rows[#rows + 1] = {feature = f, cases = count[f]} end
+print(table(rows, {"feature", "cases"}))
+print(#rows .. " features over " .. #cases .. " cases")
+local out = arg("out", "")
+if out ~= "" then
+  local ls = {}
+  for c in cases do ls[#ls + 1] = c.line .. "\t" .. c.id .. "\t" .. join(c.fs, " ") end
+  if exists(out) then remove(out) end
+  create(out, join(ls, "\n") .. "\n")
+end
+local per = arg("cover", 0)
+if per > 0 then
+  local cover = cover_of(cases, count, per)
+  local plain = plain_of(cases, cover.taken, arg("plain", 0))
+  print("cover " .. per .. ": " .. #cover.picked .. " cases; plain: " .. #plain)
+  local all = {}
+  for l in cover.picked do all[#all + 1] = l end
+  for l in plain do all[#all + 1] = l end
+  print(join(sort(all), ", "))
+end
+local against = arg("against", "")
+if against ~= "" then
+  local theirs = counts_of(cases_of(against))
+  local missing = {}
+  for f in sort(keys(count)) do
+    if not has_key(theirs, f) then missing[#missing + 1] = f end
+  end
+  local extra = 0
+  for f in keys(theirs) do
+    if not has_key(count, f) then extra = extra + 1 end
+  end
+  print(against .. ": holds " .. (#rows - #missing) .. " of these " .. #rows .. " features (and " .. extra .. " more)")
+  if #missing > 0 then fail("missing from " .. against .. ": " .. join(missing, " ")) end
+end

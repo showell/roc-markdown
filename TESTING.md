@@ -9,7 +9,7 @@ only rises.
 
 ```
 zig build test                          # roc test, then the judge, the REPL's and the playground's tests
-zig build judge -- --also <gold.jsonl>  # the judge, with a private corpus too
+zig build judge -- --also <corpus.jsonl> # the judge, with a private corpus too
 shale tools/verify.shale                # every check above, a PASS/FAIL checklist
 ```
 
@@ -26,7 +26,8 @@ written for, passed as a host passes one (judge/answers.roc):
 `user-uploads` (roc-chat's `/user_uploads/`) for the dialect's own corpora,
 `same-origin` (any same-origin path) for the Zig renderer's unit tests and
 for **same_origin**, and the old chat's `<base>/<topic>/uploads/<file>` for
-gold (`--also`). The hostile shapes take `user-uploads`.
+**chat_sample** and a private corpus (`--also`). The hostile shapes take
+`user-uploads`.
 
 - **adversarial**, **dialect** and **pinned:** shapes chosen by hand, and
   the dialect's deliberate departures from CommonMark.
@@ -47,6 +48,15 @@ gold (`--also`). The hostile shapes take `user-uploads`.
 - **spec_tables**, **spec_strike**, **spec_escapes**, **spec_images:** GFM's
   table and strikethrough examples, and CommonMark's backslash escapes and
   images, every example of their sections. The spec corpora are CC BY-SA 4.0 (`SPEC-LICENSE`).
+- **chat_sample:** 54 of Gopher Chat's real messages, every word replaced
+  by a neutral one of its length, so the markdown's shape is what's left
+  (`tools/sanitize_chat.shale`, which made it once, has the rules). It
+  stands in for gold, the chat's 10,103 messages, which were private: the
+  sample holds every feature gold's answers held (each element, nesting,
+  entity, literal and source shape `tools/count_features.shale` names),
+  each in three of its cases, or in all of gold's when it had fewer, and
+  eight plain messages besides. Each sanitized case has exactly its
+  original's features.
 - **examples:** the canned examples of the playground and the REPL
   (`:examples`), one file for both, frozen so a change that
   moves one fails loudly. One, `hostile`, is a message the chat refuses
@@ -56,10 +66,10 @@ gold (`--also`). The hostile shapes take `user-uploads`.
   (deep nesting, long delimiter runs, wide tables). Their answers are hashed
   to keep the file small. Verify also holds their work units linear.
 
-**A private corpus,** such as gold, the chat's ten thousand real messages, is
-passed with `--also` and never leaves the machine it lives on. **The judge
-prints counts and failing case ids, never a case's text,** so it can judge
-messages nobody else should read.
+**A private corpus** is passed with `--also`, under the old chat's uploads
+rule, and never leaves the machine it lives on. **The judge prints counts
+and failing case ids, never a case's text,** so it can judge messages
+nobody else should read.
 
 `Md.render_document` is in no corpus. The expects beside it hold it, next to a
 chat's render of the same text.
@@ -82,9 +92,7 @@ moved without quoting it: "four tables, one link with parens".
 - the budget's refusals;
 - the REPL's and the playground's tests;
 - both formatters;
-- roc-chat's tests against this package;
-- gold, when it's on the machine (a `SKIP` elsewhere, the only skip
-  allowed).
+- roc-chat's tests against this package.
 
 **Planted faults are a one-time tool**, not a check verify runs: a fault
 planted (the judge's `--data DIR` takes a scratch copy of judge/data) proves
@@ -154,6 +162,7 @@ as its uploads rule, as roc-chat does).
 | `judge/` | the judge, its side of the Roc, the REPL, and `data/` |
 | `playground/` | the playground: its Roc app, wasm32 platform, page and test |
 | `tools/verify.shale`, `vocabulary.txt` | every check in one run, and the words its recipes hold |
+| `tools/count_features.shale`, `sanitize_chat.shale` | what a corpus's answers exercise, and how chat_sample was made |
 
 The history before this repository is roc-webbox's (`chat/`). It was split
 out with `git filter-branch`, so `git log --follow` reaches back through it.
