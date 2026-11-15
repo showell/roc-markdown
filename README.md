@@ -160,9 +160,18 @@ The package is meant to be forked, and the likely changes each have one home:
   A non-chat app removes it, and another chat adds its own, such as
   `@mentions`, there.
 
+## Who uses it
+
+- **[roc-chat](https://github.com/showell/roc-chat)**, the Roc chat: its
+  pages render every message with this package, checked out beside it. It
+  runs at chat.lynrummy.com, and it isn't in production yet: lynrummy.com's
+  chat is still the Zig one.
+- **[roc-webbox](https://github.com/showell/roc-webbox)**: its chat, frozen
+  as reference since roc-chat replaced it, imports the package by path
+  (`chat/main.roc` and `chat/twin.roc`).
+
 ## Status
 
-- **In use:** it renders Gopher Chat's new Roc server (chat.lynrummy.com).
 - **Its history:** it began as a port of the chat's original renderer, in Zig,
   and has diverged from it on purpose since 2026-10-29.
 - **The Roc compiler is pinned** to a nightly, as Roc has no stable release
