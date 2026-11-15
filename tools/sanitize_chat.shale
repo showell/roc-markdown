@@ -30,8 +30,13 @@
 --        an HTML tag (after `<` or `</`) or an attribute (before `="`), or
 --        when it is a code fence's info string (a language name);
 --      - every other word becomes a word of LEXICON's of the same length,
---        with the same letters capitalised: the same word, any case, always
---        the same replacement, so a repeated word stays repeated.
+--        with the same letters capitalised, chosen by where it stands (the
+--        case's gold line and the word's byte offset), never by what it
+--        was. **EACH OCCURRENCE GETS ITS OWN REPLACEMENT**: a mapping from
+--        each word to one replacement would be a substitution cipher, and
+--        counting words across the corpus could partly decode it. A choice
+--        made from the position alone carries nothing of the original word,
+--        and it is still the same on every run.
 -- So every byte that is not a letter or a digit is kept: the markup,
 -- the spaces and line breaks, the punctuation and the emoji. A word keeps
 -- its length, so a table's columns and a line's length stay as they were.
@@ -63,8 +68,9 @@ const LEXICON = {
 
 const hosts = {"com", "org", "net", "io", "to", "dev", "ai", "app"}
 
--- What each rule changed, counted (`n` by rule name), and the words' map.
-const tally = {n = {}, words = {}, next = {}}
+-- What each rule changed, counted (`n` by rule name), and the case being
+-- sanitized (its gold line), which seeds each word's choice.
+const tally = {n = {}, case = 0}
 
 function host_rule(md)
   local ends = join(hosts, "|")
@@ -91,21 +97,23 @@ function is_upper(c)
   return upper(c) == c and lower(c) ~= c
 end
 
--- The lexicon's word for `n` letters: its next one, in turn.
-function fresh_word(n)
-  if n > 10 then return fresh_word(5) .. fresh_word(n - 5) end
-  local key = tostring(n)
-  local list = LEXICON[key]
-  local at = get(tally.next, key, 0)
-  tally.next[key] = at + 1
-  return list[(at % #list) + 1]
+-- A number from 0 to 1000002 mixed from the case and a position: the same
+-- on every run, and nothing of the text in it.
+function seed_of(case, at)
+  local x = (case * 7919 + at * 104729) % 1000003
+  return (x * x + 12345) % 1000003
 end
 
--- `w`'s replacement, the same each time, with `w`'s capitals.
-function word_for(w)
-  local key = lower(w)
-  if not has_key(tally.words, key) then tally.words[key] = fresh_word(#w) end
-  local base = tally.words[key]
+-- The lexicon's word for `n` letters, chosen by `seed`.
+function fresh_word(n, seed)
+  if n > 10 then return fresh_word(5, seed) .. fresh_word(n - 5, seed_of(seed, n)) end
+  local list = LEXICON[tostring(n)]
+  return list[(seed % #list) + 1]
+end
+
+-- `w`'s replacement at byte `at` of its case, with `w`'s capitals.
+function word_for(w, at)
+  local base = fresh_word(#w, seed_of(tally.case, at))
   local out = ""
   local i = 1
   while i <= #w do
@@ -151,7 +159,7 @@ function piece_for(md, piece, at, fences)
   if at > 2 and sub(md, at - 2, at - 1) == "</" then return piece end
   if sub(md, at + #piece, at + #piece + 1) == "=\"" then return piece end
   if on_fence_line(fences, at) then return piece end
-  return word_for(piece)
+  return word_for(piece, at)
 end
 
 function words_rule(md)
@@ -206,6 +214,7 @@ end
 local rows = {}
 for i in CHOSEN do
   local md = found[tostring(i)]
+  tally.case = i
   local id = "chat_sample/" .. repeated("0", 5 - #tostring(i)) .. i
   rows[#rows + 1] = json_write({id = id, md = sanitized(md)})
 end
@@ -213,4 +222,3 @@ if exists(out_path) then remove(out_path) end
 create(out_path, join(rows, "\n") .. "\n")
 print(#rows .. " cases written to " .. out_path .. ", from " .. n .. " in gold")
 for k in sort(keys(tally.n)) do print("  " .. k .. ": " .. tally.n[k]) end
-print("  distinct words replaced: " .. #keys(tally.words))
