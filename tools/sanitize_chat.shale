@@ -6,8 +6,8 @@
 --
 --   shale tools/sanitize_chat.shale gold=repos:gopher-gold/gold.jsonl
 --
--- Gold is gone now, so the script is a record of how the sample was made,
--- and its rules are what a reviewer reads. **IT PRINTS ONLY COUNTS, NEVER A
+-- Once gold is deleted the script can't run again: it stays as the record
+-- of how the sample was made, and its rules are what a reviewer reads. **IT PRINTS ONLY COUNTS, NEVER A
 -- MESSAGE'S TEXT.**
 --
 -- The rules, in the order they apply to a message:
