@@ -1,0 +1,169 @@
+-- **SHALE'S ROC HUNTS OVER EVERY .roc FILE GIT TRACKS, EACH HELD AT ZERO**:
+-- the recipes roc-apps' tools/quality.shale runs, with its settings, and
+-- check_vocabulary over tools/vocabulary.txt. tools/verify.shale runs this
+-- and takes its lines; on its own, from the repository's root:
+--
+--   shale tools/lints.shale
+--
+-- It prints one line a recipe, `PASS` or `FAIL` with its counts, and exits
+-- nonzero when any failed. A recipe reads `**/*.roc`, and the files it read
+-- are held to the number git tracks, so a build's output never enters a
+-- count and a file the glob missed never leaves one. `wide string` isn't
+-- held: an expect's frozen HTML is one string, and Roc has no short way to
+-- split one.
+--
+-- A count is held at zero, except where EXCEPTIONS names a finding singly,
+-- beside its reason: that finding must be there, and no other of its check.
+-- Each is a debt to raise with Steve, not a setting.
+--
+-- budget: steps=400000000 arena_bytes=1000000000 output_bytes=1000000
+
+const LINTS = {
+  {recipe = "hunt_names", args = {}, checks = {
+    {"state_effect", "state_effect"}, {"question", "question"}, {"vague", "vague"}, {"name_type", "name_type"},
+    {"negative", "negative"}, {"noun_effect", "noun_effect"}, {"command_tense", "command_tense"},
+    {"mixed_tense", "mixed_tense"}, {"container", "container"}, {"preposition_split", "preposition_split"},
+    {"short_name", "short_name"}, {"worker_name", "worker_name"}, {"stacked_preposition", "stacked_preposition"},
+    {"taken_word", "taken_word"}, {"bare_participle", "bare_participle"}, {"phrase_name", "phrase_name"},
+    {"singular_list", "singular_list"}, {"world_verb", "world_verb"}, {"where_name", "where_name"},
+  }},
+  {recipe = "check_errors", args = {}, checks = {
+    {"error_alias", "error_alias"}, {"optional_tag", "optional_tag"}, {"set_fallback", "set_fallback"},
+    {"placeholder", "placeholder"}, {"number_fallback", "number_fallback"},
+  }},
+  {recipe = "find_deep_calls", args = {"min=4"}, checks = {{"nested", "nested"}}},
+  {recipe = "find_extra_parens", args = {}, checks = {
+    {"paren_if", "paren_if"}, {"wrapped_body", "wrapped_body"}, {"else_block", "else_block"}, {"lambda_if", "lambda_if"},
+  }},
+  {recipe = "check_boundaries", args = {}, checks = {
+    {"single", "single"}, {"fixed", "fixed"}, {"entry", "entry"}, {"constant", "constant"}, {"bool_param", "bool_param"},
+    {"dead", "dead"}, {"unused_api", "unused_api"}, {"same_branches", "same_branches"},
+  }},
+  {recipe = "check_stacking", args = {}, checks = {{"to stack", "stack"}, {"to unstack", "unstack"}, {"long", "long"}}},
+  {recipe = "check_vocabulary", args = {"words=tools/vocabulary.txt"}, checks = {{"retired_name", "retired_name"}, {"retired_comment", "retired_comment"}}},
+  {recipe = "find_unclear_names", args = {}, checks = {{"pure_mutator", "pure_mutator"}, {"abbreviation", "abbreviation"}, {"module_doc", "module_doc"}}},
+  {recipe = "check_families", args = {}, checks = {{"family", "family"}, {"twin_name", "twin_name"}}},
+  {recipe = "find_unused_imports", args = {}, checks = {{"unused_import", "unused_import"}}},
+  {recipe = "check_name_types", args = {}, checks = {{"name_type", "name_type"}, {"bare_beside_unit", "bare_beside_unit"}, {"no_value", "no_value"}}},
+}
+
+-- **THE FINDINGS HELD AS NAMED EXCEPTIONS.** Each is one finding, by its
+-- file, its check and the name it reports.
+--
+-- Md's four renders are the package's API: roc-chat (app/Markdown.roc),
+-- roc-webbox (chat/twin.roc) and roc-apps' book builder
+-- (book_builder/builder/BookText.roc) call them by name, so naming each for
+-- what it gives is a change to those repositories too, Steve's to decide.
+const EXCEPTIONS = {
+  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render"},
+  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render_trusted"},
+  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render_trusted_reflow"},
+  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render_document"},
+}
+
+const FINDING_RE = "^([^ :]+\\.roc):[0-9]+(?::[0-9]+)?: ([a-z_]+(?: [a-z_]+)?): "
+
+-- The number a summary gives for a check: "check N", or "N check" for
+-- check_stacking's "N to stack". Nil when the summary doesn't name it.
+function count_in_summary(summary, label)
+  local after = re_find(summary, "(?:^|[;:,] )" .. label .. " ([0-9]+)")
+  if after ~= nil then return tonumber(after.group) end
+  local before = re_find(summary, "(?:^|[;:,] )([0-9]+) " .. label .. "(?:,|$)")
+  if before ~= nil then return tonumber(before.group) end
+  return nil
+end
+
+-- The recipe's own lines: not Shale's `──` reports or the `called from`
+-- lines under a stop.
+function own_lines(out)
+  local kept = {}
+  for l in lines(out) do
+    if not starts_with(l, "──") and not starts_with(l, "   ") and trim(l) ~= "" then push(kept, l) end
+  end
+  return kept
+end
+
+-- The exception a finding line is, by its file, check and first quoted
+-- name, or nil.
+function exception_of(line, path, check)
+  local named = re_find(line, ": " .. check .. ": `([^`]+)`")
+  if named == nil then return nil end
+  for e in EXCEPTIONS do
+    if e.path == path and e.check == check and e.name == named.group then return e end
+  end
+  return nil
+end
+
+function lint_argv(lint)
+  local argv = {"shale", "--budget", "steps=40000000000", real("cookbook:roc/" .. lint.recipe .. ".shale"), "glob=**/*.roc"}
+  for a in lint.args do push(argv, a) end
+  return argv
+end
+
+-- The problems with one recipe's run: a list, empty when it holds.
+function judge_lint(lint, r, tracked, seen)
+  local wrong = {}
+  local own = own_lines(r.out)
+  if #own == 0 then return {lint.recipe .. " printed nothing of its own: " .. trim(r.out)} end
+  local summary = own[#own]
+  for l in own do
+    if starts_with(l, "refused: ") or starts_with(l, "not reached by ") then push(wrong, l) end
+  end
+  local read_files = re_find(summary, "([0-9]+) files")
+  if read_files == nil then
+    push(wrong, "no file count in its summary: " .. summary)
+  elseif tonumber(read_files.group) ~= tracked then
+    push(wrong, "it read " .. read_files.group .. " files, and git tracks " .. tracked)
+  end
+  local held = {}
+  for e in EXCEPTIONS do
+    if e.recipe == lint.recipe then incr(held, e.check) end
+  end
+  for c in lint.checks do
+    local got = count_in_summary(summary, c[1])
+    local want = get(held, c[2], 0)
+    if got ~= want then push(wrong, c[1] .. " is " .. tostring(got) .. ", held at " .. want) end
+  end
+  for l in own do
+    local m = re_find(l, FINDING_RE)
+    if m ~= nil and has_key(held, m.groups[2]) then
+      local e = exception_of(l, m.groups[1], m.groups[2])
+      if e == nil then
+        push(wrong, "not an exception: " .. l)
+      else
+        incr(seen, e.path .. " " .. e.check .. " " .. e.name)
+      end
+    end
+  end
+  return wrong
+end
+
+local tracked = 0
+for f in lines(trim(must(run({"git", "ls-files", "*.roc"}, {cwd = ".", timeout_ms = 30000, whole = 1000000})).out)) do
+  if f ~= "" then tracked = tracked + 1 end
+end
+local failed = 0
+local seen = {}
+for lint in LINTS do
+  -- `want`: a gate recipe exits nonzero on a finding, and its counts say which.
+  local r = run(lint_argv(lint), {cwd = ".", timeout_ms = 120000, whole = 4000000, want = "any"})
+  local wrong = judge_lint(lint, r, tracked, seen)
+  local said = {}
+  for e in EXCEPTIONS do
+    if e.recipe == lint.recipe then push(said, e.check .. " " .. e.path .. " `" .. e.name .. "`") end
+  end
+  if #wrong == 0 then
+    print("PASS  roc recipe " .. lint.recipe .. ": " .. (#said == 0 and "all at zero" or ("zero but the exceptions, " .. join(said, ", "))) .. " (" .. tracked .. " files, " .. r.ms .. " ms)")
+  else
+    failed = failed + 1
+    print("FAIL  roc recipe " .. lint.recipe .. ": " .. join(wrong, "; "))
+  end
+end
+for e in EXCEPTIONS do
+  local key = e.path .. " " .. e.check .. " " .. e.name
+  if get(seen, key, 0) ~= 1 then
+    failed = failed + 1
+    print("FAIL  roc recipe exception " .. key .. ": found " .. get(seen, key, 0) .. " times, held at once")
+  end
+end
+if failed > 0 then fail("lints: " .. failed .. " failed") end

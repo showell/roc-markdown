@@ -84,8 +84,9 @@ moved without quoting it: "four tables, one link with parens".
 ## Verify
 
 `tools/verify.shale` runs everything in one go and prints a checklist:
-- Shale's Roc recipes over `package/`, each count held in the script, with
-  `tools/vocabulary.txt` as this repository's decided words;
+- Shale's Roc recipes over every `.roc` file git tracks (`tools/lints.shale`),
+  each count held at zero but the findings it names singly beside their
+  reasons, with `tools/vocabulary.txt` as this repository's decided words;
 - the build and tests;
 - each corpus's exact count;
 - the hostile shapes' linearity;
@@ -161,7 +162,7 @@ as its uploads rule, as roc-chat does).
 | `package/Ascii.roc`, `Bytes.roc` | the byte checks and scans the rest share |
 | `judge/` | the judge, its side of the Roc, the REPL, and `data/` |
 | `playground/` | the playground: its Roc app, wasm32 platform, page and test |
-| `tools/verify.shale`, `vocabulary.txt` | every check in one run, and the words its recipes hold |
+| `tools/verify.shale`, `lints.shale`, `vocabulary.txt` | every check in one run, the Roc hunts it runs, and the words they hold |
 | `tools/count_features.shale`, `sanitize_chat.shale` | what a corpus's answers exercise, and how chat_sample was made |
 
 The history before this repository is roc-webbox's (`chat/`). It was split
