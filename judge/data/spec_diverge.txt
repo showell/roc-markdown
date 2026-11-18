@@ -6,35 +6,30 @@
 # [dialect]: a departure the dialect means (roc-markdown's README);
 # [gap?]: one it does not name, a candidate bug for Steve to rule on.
 # Licensed CC BY-SA 4.0 as spec_agree.jsonl is (SPEC-LICENSE).
-# considered 401, kept 269 (spec_agree.jsonl), agreeing 236, diverging 33
+# considered 401, kept 269 (spec_agree.jsonl), agreeing 244, diverging 25
 #
 # By reason:
 #     8  [dialect] per-line inline: a span crosses a line break
-#     4  [gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+#     4  [dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
 #     3  [dialect] no thematic break
-#     3  [gap?] lazy continuation not carried into a nested quote
 #     2  [dialect] no setext heading
 #     2  [gap?] a link's brackets bind before a code span
 #     2  [dialect] flanking is ASCII-only: Unicode whitespace and punctuation count as letters
-#     2  [gap?] a link destination ends at the first `)`: parens don't balance
 #     1  [dialect] no indented code (a 4-space indent inside a quote)
-#     1  [gap?] an empty list item then a blank line takes the next line as its content
-#     1  [gap?] an empty item in a loose list is <li>\n</li>, not <li></li>
-#     1  [gap?] a link destination may hold a space
+#     1  [dialect] a chat's destination is read whole, its space too: `<a b>` is a document's (README, Documents)
 #     1  [dialect] no ftp:// autolink
 #     1  [gap?] an email autolink ending in `-` or `_` is trimmed; GFM refuses the whole address
-#     1  [gap?] a blank line inside a fence makes its list loose
 #
 # spec_escapes.jsonl (QUEUE 316), the backslash-escape cases:
 #     2  [dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
 #     1  [dialect] every newline is a `<br>`, so a backslash's hard break adds none
 #     1  [dialect] no indented code
-#     1  [gap?] a link's title is not read: it stays in the destination
+#     1  [dialect] a chat's destination is read whole: a title is a document's (README, Documents)
 #     1  [gap?] no link reference definitions
 #
 # spec_images.jsonl (QUEUE 317), CommonMark's images:
 #    14  [gap?] no link reference definitions
-#     2  [gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+#     2  [dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
 #     5  [dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
 
 cm/77	ATX headings	[dialect] no thematic break
@@ -42,14 +37,8 @@ cm/121	Fenced code blocks	[dialect] per-line inline: a span crosses a line break
 cm/141	Fenced code blocks	[dialect] no setext heading
 cm/234	Block quotes	[dialect] no thematic break
 cm/246	Block quotes	[dialect] no thematic break
-cm/250	Block quotes	[gap?] lazy continuation not carried into a nested quote
-cm/251	Block quotes	[gap?] lazy continuation not carried into a nested quote
 cm/252	Block quotes	[dialect] no indented code (a 4-space indent inside a quote)
-cm/280	List items	[gap?] an empty list item then a blank line takes the next line as its content
-cm/292	List items	[gap?] lazy continuation not carried into a nested quote
 cm/300	List items	[dialect] no setext heading
-cm/315	Lists	[gap?] an empty item in a loose list is <li>\n</li>, not <li></li>
-cm/318	Lists	[gap?] a blank line inside a fence makes its list loose
 cm/335	Code spans	[dialect] per-line inline: a span crosses a line break
 cm/336	Code spans	[dialect] per-line inline: a span crosses a line break
 cm/337	Code spans	[dialect] per-line inline: a span crosses a line break
@@ -60,11 +49,11 @@ cm/394	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a 
 cm/405	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
 cm/423	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
 cm/432	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
-cm/488	Links	[gap?] a link destination may hold a space
-cm/512	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
-cm/514	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
-cm/518	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
-cm/519	Links	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+cm/488	Links	[dialect] a chat's destination is read whole, its space too: `<a b>` is a document's (README, Documents)
+cm/512	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+cm/514	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+cm/518	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+cm/519	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
 cm/525	Links	[gap?] a link's brackets bind before a code span
 gfm/628	Autolinks (extension)	[dialect] no ftp:// autolink
 gfm/631	Autolinks (extension)	[gap?] an email autolink ending in `-` or `_` is trimmed; GFM refuses the whole address
@@ -72,11 +61,11 @@ cm/16	Backslash escapes	[dialect] every newline is a `<br>`, so a backslash's ha
 cm/18	Backslash escapes	[dialect] no indented code
 cm/20	Backslash escapes	[dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
 cm/21	Backslash escapes	[dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
-cm/22	Backslash escapes	[gap?] a link's title is not read: it stays in the destination
+cm/22	Backslash escapes	[dialect] a chat's destination is read whole: a title is a document's (README, Documents)
 cm/23	Backslash escapes	[gap?] no link reference definitions
 cm/573	Images	[gap?] no link reference definitions
-cm/574	Images	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
-cm/575	Images	[gap?] link brackets pair the first `[` with the first `]`: no nesting, no innermost-link rule
+cm/574	Images	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+cm/575	Images	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
 cm/576	Images	[gap?] no link reference definitions
 cm/577	Images	[gap?] no link reference definitions
 cm/578	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link

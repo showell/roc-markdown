@@ -10,6 +10,7 @@
 import Bytes
 import MdHtml
 import MdIndent
+import MdList
 import MdTable
 import MdText
 
@@ -67,10 +68,13 @@ MdQuote := [].{
 					$inner = $inner.concat(stripped).append('\n')
 					# Indented text after a paragraph is that paragraph's, not code.
 					starts_code = !$last_was_text and is_code(stripped)
-					ends_text = MdText.is_blank(stripped) or is_block_start(
-						$inner,
-						start,
-					) or starts_code
+					# A nested quote or list item whose innermost content is text
+					# ends in a paragraph, so a lazy line may continue it.
+					opens_block = is_block_start($inner, start) and !nests_text(
+						stripped,
+						{ is_block_start, is_code, reading },
+					)
+					ends_text = MdText.is_blank(stripped) or opens_block or starts_code
 					$in_table = !ends_text and (
 						$in_table or (
 							$last_was_text and MdTable.is_table_at(
@@ -115,6 +119,51 @@ quote_marker_len = |line| {
 	} else {
 		Ok(indent + 1)
 	}
+}
+
+## The line's quote and list markers stripped, however deep they nest, leave
+## a paragraph's text: not blank, and no block of its own. A lazy line after
+## it continues that innermost paragraph.
+nests_text : List(U8),
+{
+	is_block_start : List(U8), U64 -> Bool,
+	is_code : List(U8) -> Bool,
+	reading : MdIndent.Reading,
+} -> Bool
+nests_text = |line, { is_block_start, is_code, reading }| {
+	var $content = line
+	var $is_nested = Bool.True
+	while $is_nested {
+		match quote_marker_len($content) {
+			Ok(marker_end) => {
+				$content = without_marker($content, { marker_end, reading })
+			}
+			Err(NotAQuote) =>
+				match MdList.list_marker_at($content, { line_start: 0, reading }) {
+					Ok(marker) => {
+						$content = marker.first_line
+					}
+					Err(NotAMarker) => {
+						$is_nested = Bool.False
+					}
+				}
+		}
+	}
+	!MdText.is_blank($content) and !is_block_start($content, 0) and !is_code($content)
+}
+
+# Each marker strips to the innermost content, which answers: text, a block
+# of its own, or nothing.
+expect {
+	asked = {
+		is_block_start: |md, at| md.get(at) == Ok('#'),
+		is_code: |_| Bool.False,
+		reading: Spaces,
+	}
+	yes = nests_text("> 1. > foo".to_utf8(), asked)
+	no_block = nests_text("> - # foo".to_utf8(), asked)
+	no_content = nests_text("> -".to_utf8(), asked)
+	yes and !no_block and !no_content
 }
 
 ## The line less its marker and the one column of space after it. In a chat

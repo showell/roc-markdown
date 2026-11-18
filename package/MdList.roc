@@ -9,6 +9,7 @@
 ## document answers yes to, `is_rule` and `is_code`, and how it reads an indent.
 import Ascii
 import Bytes
+import MdFence
 import MdHtml
 import MdIndent
 import MdTable
@@ -128,6 +129,9 @@ MdList := [].{
 		var $cur = []
 		var $have_item = Bool.False
 		var $cur_column = first.content_column
+		# The fence open at the end of the current item's content, if any: a
+		# blank line inside it is the code's, and loosens nothing.
+		var $fence = Shut
 		var $blanks = 0
 		var $p = line_start
 		while $p < len {
@@ -158,21 +162,26 @@ MdList := [].{
 						$cur_column = m.content_column
 						$blanks = 0
 						$cur = m.first_line.append('\n')
+						$fence = fence_after(Shut, m.first_line)
 					}
 					_ =>
-						if indent >= $cur_column and $have_item {
+						if $blanks > 0 and $cur == ['\n'] {
+							# An item that begins empty takes no content past a
+							# blank line: it stays empty, and the list ends.
+							break
+						} else if indent >= $cur_column and $have_item {
 							# An indented line: the item's own, its nested blocks.
 							# The blank lines before it are the item's too: they
 							# part its paragraphs and stay in its fences.
-							$loose = $loose or $blanks > 0
+							$loose = $loose or ($blanks > 0 and $fence == Shut)
 							$cur = $cur.concat(List.repeat('\n', $blanks))
 							$blanks = 0
-							$cur = $cur.concat(
-								MdIndent.without_columns(
-									line,
-									{ columns: $cur_column, from: 0, reading },
-								),
-							).append('\n')
+							dedented = MdIndent.without_columns(
+								line,
+								{ columns: $cur_column, from: 0, reading },
+							)
+							$fence = fence_after($fence, dedented)
+							$cur = $cur.concat(dedented).append('\n')
 						} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
 							# A lazy continuation of the item's paragraph.
 							$cur = $cur.concat(line).append('\n')
@@ -197,7 +206,9 @@ MdList := [].{
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
 			# separator sees only its content, not the <li>.
-			lead = if $loose or is_first_child_block(item, { is_block_start, is_code }) {
+			# An empty item is `<li></li>`, loose or tight.
+			is_empty = item == ['\n']
+			lead = if ($loose and !is_empty) or is_first_child_block(item, { is_block_start, is_code }) {
 				['\n']
 			} else {
 				[]
@@ -297,6 +308,32 @@ tabbed_marker = |line, { kind, marker_end }| {
 		}
 	}
 }
+
+## Whether a fence is open at a point of an item's content, and which.
+FenceState : [Shut, Open({ char : U8, count : U64 })]
+
+## The fence open after an item's content line `line`, given the one open
+## before it: the line opens one, closes the open one, or leaves it.
+fence_after : FenceState, List(U8) -> FenceState
+fence_after = |before, line| match before {
+	Shut =>
+		match MdFence.open(line) {
+			Ok(fence) => Open({ char: fence.char, count: fence.count })
+			Err(NotAFence) => Shut
+		}
+	Open(fence) =>
+		if MdFence.is_close(line, fence) {
+			Shut
+		} else {
+			before
+		}
+}
+
+expect fence_after(Shut, "```zig".to_utf8()) == Open({ char: '`', count: 3 })
+expect fence_after(Shut, "a ```".to_utf8()) == Shut
+expect fence_after(Open({ char: '`', count: 3 }), "b".to_utf8()) == Open({ char: '`', count: 3 })
+expect fence_after(Open({ char: '`', count: 3 }), "~~~".to_utf8()) == Open({ char: '`', count: 3 })
+expect fence_after(Open({ char: '`', count: 3 }), "````".to_utf8()) == Shut
 
 ## The same bullet, or the same ordered delimiter.
 is_same_list : MdList.Marker, MdList.Marker -> Bool

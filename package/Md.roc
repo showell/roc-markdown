@@ -217,6 +217,17 @@ expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
 expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
 expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"
 expect md("> q\nlazy") == "<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n"
+# A lazy line continues the innermost paragraph, through nested quotes and items,
+# and nothing after a nested block of another kind.
+expect md("> > q\nlazy") == "<blockquote>\n<blockquote>\n<p>q<br>\nlazy</p>\n</blockquote>\n</blockquote>\n"
+expect md("> - q\nlazy") == "<blockquote>\n<ul>\n<li>q<br>\nlazy</li>\n</ul>\n</blockquote>\n"
+expect md("> > # q\nlazy") == "<blockquote>\n<blockquote>\n<h1>q</h1>\n</blockquote>\n</blockquote>\n<p>lazy</p>\n"
+# An item that begins empty stays empty past a blank line, and is `<li></li>`.
+expect md("-\n\n  foo") == "<ul>\n<li></li>\n</ul>\n<p>foo</p>\n"
+expect md("- a\n-\n\n- c") == "<ul>\n<li>\n<p>a</p>\n</li>\n<li></li>\n<li>\n<p>c</p>\n</li>\n</ul>\n"
+# A fence's blank lines are its code's: they loosen no list. Outside it they do.
+expect md("- a\n- ```\n  b\n\n  ```\n- c") == "<ul>\n<li>a</li>\n<li>\n<pre><code>b\n\n</code></pre>\n</li>\n<li>c</li>\n</ul>\n"
+expect md("- a\n- ```\n  b\n  ```\n\n  c") == "<ul>\n<li>\n<p>a</p>\n</li>\n<li>\n<pre><code>b\n</code></pre>\n<p>c</p>\n</li>\n</ul>\n"
 expect Str.from_utf8(
 	Md.render_trusted_reflow("A **bold phrase that\nspans two lines** here.".to_utf8(), chat),
 ) == Ok("<p>A <strong>bold phrase that spans two lines</strong> here.</p>\n")
