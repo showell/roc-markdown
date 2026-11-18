@@ -27,16 +27,16 @@ Md := [].{
 
 	## The rule of one uploads folder: every path under `prefix`.
 	uploads_under : List(U8) -> MdSafety.Uploads
-	uploads_under = |prefix| MdSafety.under(prefix)
+	uploads_under = |prefix| MdSafety.uploads_under(prefix)
 
 	## The rule of a host with no uploads: every member's media is text.
-	no_uploads : MdSafety.Uploads
+	no_uploads : List(U8) -> Bool
 	no_uploads = |_| Bool.False
 
 	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
 	render : List(U8), Md.Options -> List(U8)
-	render = |md, { uploads }| render_html(
+	render = |md, { uploads }| html_of(
 		md,
 		{
 			wrap: HardWrap,
@@ -49,7 +49,7 @@ Md := [].{
 	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
 	render_trusted : List(U8), Md.Options -> List(U8)
-	render_trusted = |md, { uploads }| render_html(
+	render_trusted = |md, { uploads }| html_of(
 		md,
 		{
 			wrap: HardWrap,
@@ -63,7 +63,7 @@ Md := [].{
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
-	render_trusted_reflow = |md, { uploads }| render_html(
+	render_trusted_reflow = |md, { uploads }| html_of(
 		md,
 		{
 			wrap: Reflow,
@@ -85,7 +85,7 @@ Md := [].{
 	render_document = |md, options| {
 		lines = MdDocument.with_plain_line_ends(md)
 		MdDocument.with_heading_ids(
-			render_html(
+			html_of(
 				lines,
 				{
 					wrap: Reflow,
@@ -165,14 +165,14 @@ run = |md, { wrap, budget, uploads, dialect }| MdBlocks.blocks_onto({
 	dialect,
 })
 
-render_html : List(U8),
+html_of : List(U8),
 {
 	wrap : [HardWrap, Reflow],
 	budget : MdText.Budget,
 	uploads : MdSafety.Uploads,
 	dialect : MdDialect.Dialect,
 } -> List(U8)
-render_html = |
+html_of = |
 	md,
 	{ wrap, budget, uploads, dialect },
 | match run(md, { wrap, budget, uploads, dialect }) {

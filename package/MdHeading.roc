@@ -59,7 +59,7 @@ MdHeading := [].{
 			dialect,
 		},
 	| {
-		heading = MdInline.render_onto({
+		heading = MdInline.html_onto({
 			out: out.concat(
 				match dialect {
 					Chat => MdHtml.heading_open(level)

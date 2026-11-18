@@ -32,7 +32,7 @@ MdRawHtml := [].{
 		var $last = 0
 		var $i = 0
 		while $i < len {
-			if MdText.at(raw, $i) != '<' {
+			if MdText.byte_at(raw, $i) != '<' {
 				$i = $i + 1
 			} else {
 				safe = match MdMedia.img_at(raw, { start: $i, uploads }) {
@@ -84,7 +84,7 @@ html_tag_end = |t| {
 	len = t.len()
 	var $i = 1
 	while $i < len {
-		c = MdText.at(t, $i)
+		c = MdText.byte_at(t, $i)
 		if c == '"' or c == '\'' {
 			close = MdText.find_or_end(t, { byte: c, at: $i + 1 })
 			if close >= len {

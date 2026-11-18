@@ -251,7 +251,7 @@ MdHtml := [].{
 		var $out = []
 		var $i = 0
 		while $i < len {
-			c = MdText.at(html, $i)
+			c = MdText.byte_at(html, $i)
 			if c == '<' {
 				$i = MdText.find_or_end(html, { byte: '>', at: $i }) + 1
 			} else if c == '&' {

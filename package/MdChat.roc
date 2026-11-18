@@ -32,7 +32,7 @@ MdChat := [].{
 	## otherwise be read as emphasis and split it.
 	reference_at : List(U8), U64 -> Try({ html : List(U8), end : U64 }, [NoRef])
 	reference_at = |text, i|
-		if MdText.at(text, i) != 'M' {
+		if MdText.byte_at(text, i) != 'M' {
 			Err(NoRef)
 		} else {
 			end = msg_ref_end(text, i)?
@@ -62,16 +62,17 @@ msg_ref_end = |text, i| {
 	n = msg_prefix.len()
 	if i + n > len or MdText.cut(text, { start: i, end: i + n }) != msg_prefix {
 		Err(NoRef)
-	} else if i > 0 and MdText.is_word_char(MdText.at(text, i - 1)) {
+	} else if i > 0 and MdText.is_word_char(MdText.byte_at(text, i - 1)) {
 		Err(NoRef)
 	} else {
 		first_end = slug_end(text, i + n)?
 		topic_end = long_topic_end(text, { channel_start: i + n, first_end })?
-		if topic_end >= len or MdText.at(text, topic_end) != '_' {
+		if topic_end >= len or MdText.byte_at(text, topic_end) != '_' {
 			Err(NoRef)
 		} else {
 			end = Bytes.count_while(text, { keep: Ascii.is_digit, at: topic_end + 1 })
-			if end == topic_end + 1 or (end < len and MdText.is_word_char(MdText.at(text, end))) {
+			ends_in_word = end < len and MdText.is_word_char(MdText.byte_at(text, end))
+			if end == topic_end + 1 or ends_in_word {
 				Err(NoRef)
 			} else {
 				Ok(end)
@@ -85,10 +86,10 @@ msg_ref_end = |text, i| {
 ## came first is a channel's name.
 long_topic_end : List(U8), { channel_start : U64, first_end : U64 } -> Try(U64, [NoRef])
 long_topic_end = |text, { channel_start, first_end }|
-	if first_end >= text.len() or MdText.at(text, first_end) != '.' {
+	if first_end >= text.len() or MdText.byte_at(text, first_end) != '.' {
 		Ok(first_end)
 	} else if first_end - channel_start > channel_name_max or !Ascii.is_letter(
-		MdText.at(text, channel_start),
+		MdText.byte_at(text, channel_start),
 	) {
 		Err(NoRef)
 	} else {

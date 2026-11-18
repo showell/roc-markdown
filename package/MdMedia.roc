@@ -69,13 +69,13 @@ Tag : { attrs : List((List(U8), List(U8))), end : U64 }
 scan : List(U8), { start : U64, name : List(U8) } -> Try(Tag, [NotSafe])
 scan = |raw, { start, name }| {
 	after = start + 1 + name.len()
-	if after >= raw.len() or MdText.at(raw, start) != '<' or !MdText.is_same_ignoring_case(
+	if after >= raw.len() or MdText.byte_at(raw, start) != '<' or !MdText.is_same_ignoring_case(
 		MdText.cut(raw, { start: start + 1, end: after }),
 		name,
 	) {
 		Err(NotSafe)
 	} else {
-		d = MdText.at(raw, after)
+		d = MdText.byte_at(raw, after)
 		if !MdText.is_space(d) and d != '>' and d != '/' {
 			Err(NotSafe)
 		} else {
@@ -92,14 +92,14 @@ attrs_from = |raw, from| {
 	var $attrs = []
 	var $end = 0
 	while $i < len and $end == 0 {
-		c = MdText.at(raw, $i)
+		c = MdText.byte_at(raw, $i)
 		if MdText.is_space(c) or c == '/' {
 			$i = $i + 1
 		} else if c == '>' {
 			$end = $i + 1
 		} else {
 			name_start = $i
-			while $i < len and MdText.is_attr_name_char(MdText.at(raw, $i)) {
+			while $i < len and MdText.is_attr_name_char(MdText.byte_at(raw, $i)) {
 				$i = $i + 1
 			}
 			if $i == name_start {
@@ -109,14 +109,14 @@ attrs_from = |raw, from| {
 			}
 			name = MdText.cut(raw, { start: name_start, end: $i })
 			$i = skip_spaces(raw, $i)
-			if $i < len and MdText.at(raw, $i) == '=' {
+			if $i < len and MdText.byte_at(raw, $i) == '=' {
 				$i = skip_spaces(raw, $i + 1)
 				if $i >= len {
 					return Err(NotSafe)
 				} else {
 					{}
 				}
-				q = MdText.at(raw, $i)
+				q = MdText.byte_at(raw, $i)
 				if q == '"' or q == '\'' {
 					value_start = $i + 1
 					close = MdText.find_or_end(raw, { byte: q, at: value_start })
@@ -133,8 +133,8 @@ attrs_from = |raw, from| {
 				} else {
 					value_start = $i
 					while $i < len and !MdText.is_space(
-						MdText.at(raw, $i),
-					) and MdText.at(raw, $i) != '>' {
+						MdText.byte_at(raw, $i),
+					) and MdText.byte_at(raw, $i) != '>' {
 						$i = $i + 1
 					}
 					$attrs = $attrs.append((name, MdText.cut(raw, { start: value_start, end: $i })))
@@ -155,7 +155,7 @@ attrs_from = |raw, from| {
 skip_spaces : List(U8), U64 -> U64
 skip_spaces = |raw, from| {
 	var $i = from
-	while $i < raw.len() and MdText.is_space(MdText.at(raw, $i)) {
+	while $i < raw.len() and MdText.is_space(MdText.byte_at(raw, $i)) {
 		$i = $i + 1
 	}
 	$i
@@ -166,7 +166,8 @@ skip_spaces = |raw, from| {
 close_tag_end : List(U8), { at : U64, name : List(U8) } -> Try(U64, [NotSafe])
 close_tag_end = |raw, { at, name }| {
 	n = name.len()
-	if at + 2 + n > raw.len() or MdText.at(raw, at) != '<' or MdText.at(raw, at + 1) != '/' {
+	opens_close = MdText.cut(raw, { start: at, end: at + 2 }) == ['<', '/']
+	if at + 2 + n > raw.len() or !opens_close {
 		Err(NotSafe)
 	} else if !MdText.is_same_ignoring_case(
 		MdText.cut(raw, { start: at + 2, end: at + 2 + n }),
@@ -175,7 +176,7 @@ close_tag_end = |raw, { at, name }| {
 		Err(NotSafe)
 	} else {
 		i = skip_spaces(raw, at + 2 + n)
-		if i >= raw.len() or MdText.at(raw, i) != '>' {
+		if i >= raw.len() or MdText.byte_at(raw, i) != '>' {
 			Err(NotSafe)
 		} else {
 			Ok(i + 1)
@@ -193,7 +194,7 @@ last_of = |attrs, name| match attrs.find_last(|(n, _)| MdText.is_same_ignoring_c
 # markdown_media's cases, each as its test has it, under a host whose uploads
 # are `/user_uploads/`.
 user_uploads : MdSafety.Uploads
-user_uploads = MdSafety.under("/user_uploads/".to_utf8())
+user_uploads = MdSafety.uploads_under("/user_uploads/".to_utf8())
 
 img : Str -> Str
 img = |raw| match MdMedia.img_at(raw.to_utf8(), { start: 0, uploads: user_uploads }) {
@@ -231,7 +232,7 @@ expect MdMedia.img_at(
 ) == Err(NotSafe)
 expect MdMedia.img_at(
 	"<img src=\"/files/x.png\">".to_utf8(),
-	{ start: 0, uploads: MdSafety.under("/files/".to_utf8()) },
+	{ start: 0, uploads: MdSafety.uploads_under("/files/".to_utf8()) },
 ).is_ok()
 # The Images feed's (SafeImg's, folded here): its plants, escaped values,
 # case-blind names, the last of a name winning, single quotes, a bare name.

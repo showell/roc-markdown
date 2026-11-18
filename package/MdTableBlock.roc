@@ -40,7 +40,7 @@ MdTableBlock := [].{
 			head = row_onto(
 				out.concat(MdHtml.table_open),
 				{
-					cells: table.header,
+					cells: table.header_cells,
 					aligns: table.aligns,
 					tag: Th,
 					budget,
@@ -120,7 +120,7 @@ row_onto = |
 		} else {
 			{}
 		}
-		cell = MdInline.render_onto({
+		cell = MdInline.html_onto({
 			out: $out.concat(MdHtml.cell_open(tag, align)),
 			text: cells.get($k) ?? [],
 			refs: MdDialect.inline_refs(dialect),

@@ -112,7 +112,7 @@ MdFence := [].{
 			}
 		}
 		content = MdText.cut(md, { start: body_start, end: $content_end })
-		body = without_fence_indent({ content, indent: fence.indent })
+		body = content_without_fence_indent({ content, indent: fence.indent })
 		code = || MdText.escape_onto(
 			MdHtml.code_block_open(fence.lang),
 			body,
@@ -173,8 +173,8 @@ MdFence := [].{
 
 ## Each line ended with a newline, less up to the fence's own indent of
 ## spaces.
-without_fence_indent : { content : List(U8), indent : U64 } -> List(U8)
-without_fence_indent = |{ content, indent }| {
+content_without_fence_indent : { content : List(U8), indent : U64 } -> List(U8)
+content_without_fence_indent = |{ content, indent }| {
 	len = content.len()
 	var $out = []
 	var $i = 0

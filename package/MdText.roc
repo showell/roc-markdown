@@ -39,7 +39,7 @@ MdText := [].{
 
 	## A member's message's budget: 16 units a byte, and 256 over. The
 	## densest linear text costs about 4.5 a byte.
-	for_input : List(U8) -> Budget
+	for_input : List(U8) -> MdText.Budget
 	for_input = |md| { spent: 0, ceiling: per_byte * md.len() + base }
 
 	## The budget of server-owned text, and of a measurement: never blown.
@@ -76,10 +76,10 @@ MdText := [].{
 	cut = |s, { start, end }| s.sublist({ start, len: end - start })
 
 	## The byte at `i`, which the caller has checked is there.
-	at : List(U8), U64 -> U8
-	at = |s, i| match s.get(i) {
+	byte_at : List(U8), U64 -> U8
+	byte_at = |s, i| match s.get(i) {
 		Ok(c) => c
-		Err(OutOfBounds) => crash "MdText.at: a read past the end the caller checked"
+		Err(OutOfBounds) => crash "MdText.byte_at: a read past the end the caller checked"
 	}
 
 	## Space, tab, `\n`, `\r` and form feed; not a
@@ -135,9 +135,9 @@ MdText := [].{
 		var $out = []
 		var $i = 0
 		while $i < len {
-			c = at(text, $i)
-			if c == '\\' and $i + 1 < len and Ascii.is_punctuation(at(text, $i + 1)) {
-				$out = $out.append(at(text, $i + 1))
+			c = byte_at(text, $i)
+			if c == '\\' and $i + 1 < len and Ascii.is_punctuation(byte_at(text, $i + 1)) {
+				$out = $out.append(byte_at(text, $i + 1))
 				$i = $i + 2
 			} else {
 				$out = $out.append(c)

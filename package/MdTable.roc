@@ -28,13 +28,13 @@ MdTable := [].{
 			0
 		}
 		while $i < len {
-			c = MdText.at(t, $i)
+			c = MdText.byte_at(t, $i)
 			$after_pipe = Bool.False
 			if c == '\\' and t.get($i + 1) == Ok('|') {
 				$cell = $cell.append('|')
 				$i = $i + 2
 			} else if c == '\\' and $i + 1 < len {
-				$cell = $cell.concat([c, MdText.at(t, $i + 1)])
+				$cell = $cell.concat([c, MdText.byte_at(t, $i + 1)])
 				$i = $i + 2
 			} else if c == '|' {
 				$cells = $cells.append(MdText.trim_line($cell))
@@ -58,7 +58,7 @@ MdTable := [].{
 	## next a delimiter row of as many cells. Its header's cells, each
 	## column's alignment, and where its body starts.
 	Table : {
-		header : List(List(U8)),
+		header_cells : List(List(U8)),
 		aligns : List(Align),
 		body : U64,
 	}
@@ -70,13 +70,13 @@ MdTable := [].{
 			Err(NotATable)
 		} else {
 			delim_end = MdText.line_end(md, eol + 1)
-			match delimiter_row(MdText.cut(md, { start: eol + 1, end: delim_end })) {
+			match delimiter_row_aligns(MdText.cut(md, { start: eol + 1, end: delim_end })) {
 				Err(NotADelimiter) => Err(NotATable)
 				Ok(aligns) => {
-					header = cells(MdText.cut(md, { start: line_start, end: eol }))
-					if header.len() == aligns.len() {
+					header_cells = cells(MdText.cut(md, { start: line_start, end: eol }))
+					if header_cells.len() == aligns.len() {
 						Ok({
-							header,
+							header_cells,
 							aligns,
 							body: MdText.next_line(md, delim_end),
 						})
@@ -94,8 +94,8 @@ MdTable := [].{
 	## The delimiter row: a `|` somewhere (so a line of dashes alone is no
 	## delimiter), and every cell one `-` or more, a `:` before them, after
 	## them or both. Its alignments, a column each.
-	delimiter_row : List(U8) -> Try(List(Align), [NotADelimiter])
-	delimiter_row = |line|
+	delimiter_row_aligns : List(U8) -> Try(List(Align), [NotADelimiter])
+	delimiter_row_aligns = |line|
 		if !line.contains('|') {
 			Err(NotADelimiter)
 		} else {
@@ -147,14 +147,14 @@ expect cells_of("bar") == ["bar"]
 expect cells_of("| f\\|oo | `\\|` |") == ["f|oo", "`|`"]
 expect cells_of("a \\\\| b") == ["a \\\\", "b"]
 expect cells_of("a \\") == ["a \\"]
-expect MdTable.delimiter_row("| --- | :-- | :-: | --: |".to_utf8()) == Ok([
+expect MdTable.delimiter_row_aligns("| --- | :-- | :-: | --: |".to_utf8()) == Ok([
 	Plain,
 	Left,
 	Center,
 	Right,
 ])
-expect MdTable.delimiter_row(":-: | -----------:".to_utf8()) == Ok([Center, Right])
-expect MdTable.delimiter_row("---".to_utf8()) == Err(NotADelimiter)
-expect MdTable.delimiter_row("| : |".to_utf8()) == Err(NotADelimiter)
-expect MdTable.delimiter_row("| -- | x |".to_utf8()) == Err(NotADelimiter)
-expect MdTable.delimiter_row("|---||".to_utf8()) == Err(NotADelimiter)
+expect MdTable.delimiter_row_aligns(":-: | -----------:".to_utf8()) == Ok([Center, Right])
+expect MdTable.delimiter_row_aligns("---".to_utf8()) == Err(NotADelimiter)
+expect MdTable.delimiter_row_aligns("| : |".to_utf8()) == Err(NotADelimiter)
+expect MdTable.delimiter_row_aligns("| -- | x |".to_utf8()) == Err(NotADelimiter)
+expect MdTable.delimiter_row_aligns("|---||".to_utf8()) == Err(NotADelimiter)

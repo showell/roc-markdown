@@ -42,7 +42,7 @@ MdList := [].{
 		if indent >= 4 or indent >= n {
 			Err(NotAMarker)
 		} else {
-			c = MdText.at(line, indent)
+			c = MdText.byte_at(line, indent)
 			found =
 				if c == '-' or c == '+' or c == '*' {
 					Ok({ kind: Bullet(c), marker_end: indent + 1 })

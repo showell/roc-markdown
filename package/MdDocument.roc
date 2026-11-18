@@ -44,7 +44,7 @@ MdDocument := [].{
 		var $out = []
 		var $i = 0
 		while $i < len {
-			c = MdText.at(md, $i)
+			c = MdText.byte_at(md, $i)
 			is_line_end = c == '\r' and ($i + 1 == len or md.get($i + 1) == Ok('\n'))
 			$out = if is_line_end {
 				$out
@@ -118,7 +118,7 @@ MdDocument := [].{
 	}
 
 	## The render's `html` with every marked heading given its id.
-	with_heading_ids : List(U8) -> Page
+	with_heading_ids : List(U8) -> MdDocument.Page
 	with_heading_ids = |html| {
 		len = html.len()
 		var $out = []

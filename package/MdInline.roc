@@ -50,14 +50,14 @@ MdInline := [].{
 	]
 
 	## `text` rendered onto `out`.
-	render_onto : {
+	html_onto : {
 		out : List(U8),
 		text : List(U8),
 		refs : Refs,
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
-	render_onto = |{ out, text, refs, budget, uploads }| {
+	html_onto = |{ out, text, refs, budget, uploads }| {
 		len = text.len()
 		is_document = refs != Linked and refs != InLabel
 		reads_links = match refs {
@@ -101,7 +101,7 @@ MdInline := [].{
 			} else {
 				{}
 			}
-			c = MdText.at(text, $i)
+			c = MdText.byte_at(text, $i)
 			# Each byte class's scan says what it found (a `Step`); the step is
 			# taken once, below. The chat's reference (MdChat) is read first,
 			# whole.
@@ -195,7 +195,7 @@ MdInline := [].{
 								if MdSafety.is_upload_url(found.dest.src, uploads) or is_shown {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
-									alt = MdInline.render_onto({
+									alt = MdInline.html_onto({
 										out: [],
 										text: MdText.cut(text, found.link.label),
 										refs: alt_refs,
@@ -222,7 +222,7 @@ MdInline := [].{
 											})
 										}
 									Token(
-										Html(html ?? crash "MdInline.render_onto: an image the rules above let through"),
+										Html(html ?? crash "MdInline.html_onto: an image the rules above let through"),
 										found.link.end,
 									)
 								} else if MdSafety.is_dangerous_url(found.dest.src) {
@@ -258,7 +258,7 @@ MdInline := [].{
 							Ok(link) => {
 								# The label is a line of its own, rendered inside the `<a>`.
 								dest = link_dest(link.url, is_document)
-								label = MdInline.render_onto({
+								label = MdInline.html_onto({
 									out: MdLinks.link_open(
 										dest.src,
 										{ outside, title: dest.title },
@@ -472,7 +472,7 @@ code_span_at = |text, { at, budget }| {
 	var $k = at + n
 	while $k < len {
 		$budget = MdText.charge($budget, 1)
-		if MdText.at(text, $k) != '`' {
+		if MdText.byte_at(text, $k) != '`' {
 			$k = $k + 1
 		} else {
 			m = run_length(text, { byte: '`', at: $k })
@@ -509,12 +509,12 @@ code_span_content = |content| {
 }
 
 inline : Str -> Str
-inline = |text| match MdInline.render_onto({
+inline = |text| match MdInline.html_onto({
 	out: [],
 	text: text.to_utf8(),
 	refs: Linked,
 	budget: MdText.unlimited,
-	uploads: MdSafety.under("/user_uploads/".to_utf8()),
+	uploads: MdSafety.uploads_under("/user_uploads/".to_utf8()),
 }) {
 	Ok(r) => Str.from_utf8(r.out) ?? crash "a test's text is UTF-8"
 	Err(Hostile) => "hostile"

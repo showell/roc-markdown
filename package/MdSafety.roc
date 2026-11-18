@@ -81,7 +81,7 @@ MdSafety := [].{
 	is_external_href : List(U8) -> Bool
 	is_external_href = |href| match Bytes.find(href, { needle: MdSafety.scheme_end }) {
 		Ok(p) =>
-			p > 0 and Ascii.is_letter(MdText.at(href, 0)) and MdText.cut(
+			p > 0 and Ascii.is_letter(MdText.byte_at(href, 0)) and MdText.cut(
 				href,
 				{ start: 1, end: p },
 			).all(|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-')
@@ -115,7 +115,7 @@ MdSafety := [].{
 				},
 			)
 			player = if kind == Video {
-				video_player
+				video_player_attrs
 			} else {
 				[]
 			}
@@ -168,8 +168,8 @@ MdSafety := [].{
 
 	## **THE RULE OF ONE UPLOADS FOLDER**: a path under `prefix`
 	## (`/user_uploads/`), the shape most hosts need.
-	under : List(U8) -> MdSafety.Uploads
-	under = |prefix| |path| path.starts_with(prefix)
+	uploads_under : List(U8) -> MdSafety.Uploads
+	uploads_under = |prefix| |path| path.starts_with(prefix)
 
 	## The `://` that ends a URL's scheme: what makes a link external here,
 	## and where an autolink's host starts (MdLinks).
@@ -188,7 +188,7 @@ dots_decoded = |src| {
 			$out = $out.append('.')
 			$i = $i + 3
 		} else {
-			$out = $out.append(MdText.at(src, $i))
+			$out = $out.append(MdText.byte_at(src, $i))
 			$i = $i + 1
 		}
 	}
@@ -222,8 +222,8 @@ has_encoded_separator = |src| {
 }
 
 ## A video is a player the reader starts: never autoplay.
-video_player : List(MdHtml.Attr)
-video_player = [
+video_player_attrs : List(MdHtml.Attr)
+video_player_attrs = [
 	{ name: "controls".to_utf8(), attr_value: Bare },
 	{ name: "preload".to_utf8(), attr_value: Is("metadata".to_utf8()) },
 ]
@@ -254,7 +254,7 @@ expect !MdSafety.is_external_href("#msg-plans_3".to_utf8())
 expect !MdSafety.is_external_href("mailto:a@b.c".to_utf8())
 
 user_uploads : MdSafety.Uploads
-user_uploads = MdSafety.under("/user_uploads/".to_utf8())
+user_uploads = MdSafety.uploads_under("/user_uploads/".to_utf8())
 
 # The host's rule is asked only of a path the URL's checks let through: a
 # rule that takes every path still refuses another site and a `..`.

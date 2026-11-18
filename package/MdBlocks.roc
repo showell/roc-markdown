@@ -53,7 +53,7 @@ MdBlocks := [].{
 			} else {
 				out
 			}
-			flat = MdInline.render_onto({
+			flat = MdInline.html_onto({
 				out: start.concat(MdHtml.p_open),
 				text: md,
 				refs: MdDialect.inline_refs(dialect),
@@ -350,7 +350,7 @@ paragraph_onto = |
 				}
 			).concat(text)
 			if breaks {
-				broke = MdInline.render_onto({
+				broke = MdInline.html_onto({
 					out: $out,
 					text: $reflow,
 					refs: MdDialect.inline_refs(dialect),
@@ -364,7 +364,7 @@ paragraph_onto = |
 				{}
 			}
 		} else {
-			wrapped = MdInline.render_onto({
+			wrapped = MdInline.html_onto({
 				out: if $k == 0 {
 					$out
 				} else {
@@ -381,7 +381,7 @@ paragraph_onto = |
 		$k = $k + 1
 	}
 	if wrap == Reflow {
-		joined = MdInline.render_onto({
+		joined = MdInline.html_onto({
 			out: $out,
 			text: $reflow,
 			refs: MdDialect.inline_refs(dialect),

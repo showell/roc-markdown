@@ -58,7 +58,8 @@ MdLinks := [].{
 		len = text.len()
 		label = label_end(text, { at, next_bracket, brackets, budget })
 		var $budget = label.budget
-		if label.close >= len or label.close + 1 >= len or MdText.at(text, label.close + 1) != '(' {
+		paren_at = label.close + 1
+		if label.close >= len or paren_at >= len or MdText.byte_at(text, paren_at) != '(' {
 			{
 				link: Err(NotALink),
 				next_bracket: label.next_bracket,
@@ -268,7 +269,7 @@ MdLinks := [].{
 		if i == 0 {
 			Bool.True
 		} else {
-			p = MdText.at(text, i - 1)
+			p = MdText.byte_at(text, i - 1)
 			MdText.is_space(p) or p == '*' or p == '_' or p == '~' or p == '('
 		}
 
@@ -431,7 +432,7 @@ pair_closes = |text, { opener, closer, escapes }| {
 	var $open = []
 	var $i = 0
 	while $i < len {
-		c = MdText.at(text, $i)
+		c = MdText.byte_at(text, $i)
 		if c == '\\' and escapes == Read {
 			$i = $i + 1
 		} else if c == opener {
@@ -464,8 +465,8 @@ titled_dest = |src, after| {
 	if n == 0 {
 		Ok({ src, title: Untitled })
 	} else {
-		first = MdText.at(rest, 0)
-		last = MdText.at(rest, n - 1)
+		first = MdText.byte_at(rest, 0)
+		last = MdText.byte_at(rest, n - 1)
 		quoted = (first == '"' and last == '"')
 			or (first == '\'' and last == '\'')
 			or (first == '(' and last == ')')
@@ -505,7 +506,7 @@ url_end = |text, { start, budget }| {
 		var $closes = url.count_if(|c| c == ')')
 		var $end = scanned
 		while $end > start {
-			c = MdText.at(text, $end - 1)
+			c = MdText.byte_at(text, $end - 1)
 			if trailing_punct.contains(c) {
 				$end = $end - 1
 			} else if c == ')' and $closes > opens {
@@ -536,7 +537,7 @@ email_end : List(U8),
 email_end = |text, { start, budget }| {
 	local_end = Bytes.count_while(text, { keep: is_email_local_char, at: start })
 	local_spent = MdText.charge(budget, local_end - start)
-	if local_end == start or local_end >= text.len() or MdText.at(text, local_end) != '@' {
+	if local_end == start or local_end >= text.len() or MdText.byte_at(text, local_end) != '@' {
 		{ end: Err(NotALink), budget: local_spent }
 	} else {
 		domain_start = local_end + 1
@@ -555,7 +556,7 @@ email_end = |text, { start, budget }| {
 			{ end: Err(NotALink), budget: spent }
 		} else {
 			var $j = domain_end
-			while $j > domain_start and ['.', '-', '_'].contains(MdText.at(text, $j - 1)) {
+			while $j > domain_start and ['.', '-', '_'].contains(MdText.byte_at(text, $j - 1)) {
 				$j = $j - 1
 			}
 			{ end: Ok($j), budget: spent }

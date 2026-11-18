@@ -58,7 +58,7 @@ MdEmphasis := [].{
 	## it: whether it may open and close, and nothing matched yet.
 	delimiter_run : List(U8), { start : U64, end : U64 } -> DelimiterRun
 	delimiter_run = |text, { start, end }| {
-		c = MdText.at(text, start)
+		c = MdText.byte_at(text, start)
 		n = end - start
 		flank = flanking(text, { start, end })
 		# An `_` run inside a word neither opens nor closes; a `~` run opens and
@@ -171,7 +171,7 @@ MdEmphasis := [].{
 						1
 					}
 					# Every run strictly between the two leaves the stack.
-					$runs = set_run(
+					$runs = runs_with(
 						$runs,
 						{
 							at: oi,
@@ -183,7 +183,7 @@ MdEmphasis := [].{
 							},
 						},
 					)
-					$runs = set_run(
+					$runs = runs_with(
 						$runs,
 						{
 							at: ci,
@@ -277,12 +277,12 @@ index_of = |link| match link {
 	Edge => crash "MdEmphasis: the stack's edge read as a run"
 }
 
-set_run : List(MdEmphasis.DelimiterRun),
+runs_with : List(MdEmphasis.DelimiterRun),
 {
 	at : U64,
 	delimiters : MdEmphasis.DelimiterRun,
 } -> List(MdEmphasis.DelimiterRun)
-set_run = |
+runs_with = |
 	runs,
 	{ at, delimiters },
 | runs.set(at, delimiters) ?? crash "MdEmphasis: a run set past the runs"
@@ -321,14 +321,14 @@ runs_without : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRu
 runs_without = |runs, k| {
 	run = MdEmphasis.indexed_run(runs, k)
 	with_below = match run.below {
-		At(b) => set_run(
+		At(b) => runs_with(
 			runs,
 			{ at: b, delimiters: { ..MdEmphasis.indexed_run(runs, b), above: run.above } },
 		)
 		Edge => runs
 	}
 	match run.above {
-		At(a) => set_run(
+		At(a) => runs_with(
 			with_below,
 			{ at: a, delimiters: { ..MdEmphasis.indexed_run(with_below, a), below: run.below } },
 		)
@@ -349,12 +349,12 @@ flanking = |text, { start, end }| {
 	before = if start == 0 {
 		' '
 	} else {
-		MdText.at(text, start - 1)
+		MdText.byte_at(text, start - 1)
 	}
 	after = if end >= text.len() {
 		' '
 	} else {
-		MdText.at(text, end)
+		MdText.byte_at(text, end)
 	}
 	before_space = MdText.is_space(before)
 	after_space = MdText.is_space(after)
@@ -380,10 +380,10 @@ em = |line| {
 	var $text_start = 0
 	var $i = 0
 	while $i < len {
-		c = MdText.at(text, $i)
+		c = MdText.byte_at(text, $i)
 		if c == '*' or c == '_' or c == '~' {
 			var $end = $i
-			while $end < len and MdText.at(text, $end) == c {
+			while $end < len and MdText.byte_at(text, $end) == c {
 				$end = $end + 1
 			}
 			$texts = $texts.append(MdText.cut(text, { start: $text_start, end: $i }))
