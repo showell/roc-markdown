@@ -159,9 +159,8 @@ The package is meant to be forked, and the likely changes each have one home:
   pages render every message with this package, checked out beside it. It
   runs at chat.lynrummy.com, and it isn't in production yet: lynrummy.com's
   chat is still the Zig one.
-- **[roc-webbox](https://github.com/showell/roc-webbox)**: its chat, frozen
-  as reference since roc-chat replaced it, imports the package by path
-  (`chat/main.roc` and `chat/twin.roc`).
+- **The Safari Ride book** at roc.lynrummy.com/tutorial/: its pages are
+  rendered in document mode, from roc-apps' book builder.
 
 ## Another Roc markdown library
 
