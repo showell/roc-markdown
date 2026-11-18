@@ -183,7 +183,10 @@ walk, or source positions.
 Reach for this package when you're rendering user messages in a chat or
 anything like one: bytes in, safe HTML out, a dialect people already type,
 and a bound on each message's total work that lets a host refuse a message
-built to be expensive (`Md.hostility`). It builds no tree.
+built to be expensive (`Md.hostility`). For your own prose, its document mode
+(`Md.render_document`, above) turns the chat syntax off and reads more
+CommonMark: rules, indented code, `<https://...>` links, link titles, and
+heading ids for a table of contents. It builds no tree.
 
 The two agree closely on what a link may point to: the same refused schemes
 and the same browser-style cleanup of a URL. They differ in what a refusal
