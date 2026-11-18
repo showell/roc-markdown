@@ -170,6 +170,26 @@ The package is meant to be forked, and the likely changes each have one home:
   as reference since roc-chat replaced it, imports the package by path
   (`chat/main.roc` and `chat/twin.roc`).
 
+## Another Roc markdown library
+
+[grayrest/roc-markdown](https://github.com/grayrest/roc-markdown), by Karl
+Guertin, is a different tool for a different job, and a good one. It parses
+CommonMark 0.31.2 with the GFM extensions (its spec tests pass all but a
+handful of the spec's examples), and it gives you a typed tree of blocks and
+inlines, each with its place in the source, built for an editor, with HTML
+output beside it. Reach for it when you want full CommonMark, a tree to
+walk, or source positions.
+
+Reach for this package when you're rendering user messages in a chat or
+anything like one: bytes in, safe HTML out, a dialect people already type,
+and a bound on each message's total work that lets a host refuse a message
+built to be expensive (`Md.hostility`). It builds no tree.
+
+The two agree closely on what a link may point to: the same refused schemes
+and the same browser-style cleanup of a URL. They differ in what a refusal
+looks like. Here a refused link shows its source as text; there it keeps
+its label and drops the link.
+
 ## Status
 
 - **Its history:** it began as a port of the chat's original renderer, in Zig,
