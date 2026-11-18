@@ -3,32 +3,32 @@
 # One line a case: id, section, reason, tab-separated. The judge
 # (judge/judge.zig, its spec check) fails a case that differs and
 # is not listed, and a listed one that matches, so this says what is true.
-# [dialect]: a departure the dialect means (roc-markdown's README);
+# [dialect]: a departure the dialect means (COMMONMARK.md);
 # [gap]: a known gap the dialect means to close (COMMONMARK.md).
 # Licensed CC BY-SA 4.0 as spec_agree.jsonl is (SPEC-LICENSE).
 # considered 401, kept 269 (spec_agree.jsonl), agreeing 245, diverging 24
 #
 # By reason:
 #     8  [dialect] per-line inline: a span crosses a line break
-#     4  [dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+#     4  [dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
 #     3  [dialect] no thematic break
 #     2  [dialect] no setext heading
 #     2  [gap] a link's brackets bind before a code span
 #     2  [dialect] flanking is ASCII-only: Unicode whitespace and punctuation count as letters
 #     1  [dialect] no indented code (a 4-space indent inside a quote)
-#     1  [dialect] a chat's destination is read whole, its space too: `<a b>` is a document's (README, Documents)
+#     1  [dialect] a chat's destination is read whole, its space too: `<a b>` is a document's (COMMONMARK.md, Links)
 #     1  [dialect] no ftp:// autolink
 #
 # spec_escapes.jsonl (QUEUE 316), the backslash-escape cases:
 #     2  [dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
 #     1  [dialect] every newline is a `<br>`, so a backslash's hard break adds none
 #     1  [dialect] no indented code
-#     1  [dialect] a chat's destination is read whole: a title is a document's (README, Documents)
+#     1  [dialect] a chat's destination is read whole: a title is a document's (COMMONMARK.md, Links)
 #     1  [dialect] no link reference definitions: a link is written where it stands
 #
 # spec_images.jsonl (QUEUE 317), CommonMark's images:
 #    14  [dialect] no link reference definitions: a link is written where it stands
-#     2  [dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+#     2  [dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
 #     5  [dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
 
 cm/77	ATX headings	[dialect] no thematic break
@@ -48,22 +48,22 @@ cm/394	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a 
 cm/405	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
 cm/423	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
 cm/432	Emphasis and strong emphasis	[dialect] per-line inline: a span crosses a line break
-cm/488	Links	[dialect] a chat's destination is read whole, its space too: `<a b>` is a document's (README, Documents)
-cm/512	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
-cm/514	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
-cm/518	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
-cm/519	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+cm/488	Links	[dialect] a chat's destination is read whole, its space too: `<a b>` is a document's (COMMONMARK.md, Links)
+cm/512	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
+cm/514	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
+cm/518	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
+cm/519	Links	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
 cm/525	Links	[gap] a link's brackets bind before a code span
 gfm/628	Autolinks (extension)	[dialect] no ftp:// autolink
 cm/16	Backslash escapes	[dialect] every newline is a `<br>`, so a backslash's hard break adds none
 cm/18	Backslash escapes	[dialect] no indented code
 cm/20	Backslash escapes	[dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
 cm/21	Backslash escapes	[dialect] raw HTML is escaped: no `<url>` autolink, no HTML block
-cm/22	Backslash escapes	[dialect] a chat's destination is read whole: a title is a document's (README, Documents)
+cm/22	Backslash escapes	[dialect] a chat's destination is read whole: a title is a document's (COMMONMARK.md, Links)
 cm/23	Backslash escapes	[dialect] no link reference definitions: a link is written where it stands
 cm/573	Images	[dialect] no link reference definitions: a link is written where it stands
-cm/574	Images	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
-cm/575	Images	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (README, Documents)
+cm/574	Images	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
+cm/575	Images	[dialect] a chat's label ends at its first `]`: a balancing one is a document's (COMMONMARK.md, Links)
 cm/576	Images	[dialect] no link reference definitions: a link is written where it stands
 cm/577	Images	[dialect] no link reference definitions: a link is written where it stands
 cm/578	Images	[dialect] an image's src is an upload (`/user_uploads/…`) or the image is a link
