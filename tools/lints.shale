@@ -48,18 +48,10 @@ const LINTS = {
 }
 
 -- **THE FINDINGS HELD AS NAMED EXCEPTIONS.** Each is one finding, by its
--- file, its check and the name it reports.
---
--- Md's four renders are the package's API: roc-chat (app/Markdown.roc),
--- roc-webbox (chat/twin.roc) and roc-apps' book builder
--- (book_builder/builder/BookText.roc) call them by name, so naming each for
--- what it gives is a change to those repositories too, Steve's to decide.
-const EXCEPTIONS = {
-  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render"},
-  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render_trusted"},
-  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render_trusted_reflow"},
-  {recipe = "hunt_names", check = "world_verb", path = "package/Md.roc", name = "render_document"},
-}
+-- file, its check and the name it reports. There are none: Md's four
+-- renders, the package's API, answer `world_verb` in the code, with a `##`
+-- doc saying who calls them by name (hunt_names reads it).
+const EXCEPTIONS = {}
 
 const FINDING_RE = "^([^ :]+\\.roc):[0-9]+(?::[0-9]+)?: ([a-z_]+(?: [a-z_]+)?): "
 

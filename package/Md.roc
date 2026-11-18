@@ -35,6 +35,8 @@ Md := [].{
 
 	## A member's message, with its budget; a hostile one
 	## is `malformed_html`.
+	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
+	## book builder call by name.
 	render : List(U8), Md.Options -> List(U8)
 	render = |md, { uploads }| html_of(
 		md,
@@ -48,6 +50,8 @@ Md := [].{
 
 	## Server-owned text, never a request's, with no
 	## limit on its work. The depth cap and the escaping still hold.
+	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
+	## book builder call by name.
 	render_trusted : List(U8), Md.Options -> List(U8)
 	render_trusted = |md, { uploads }| html_of(
 		md,
@@ -62,6 +66,8 @@ Md := [].{
 	## Server-owned prose, whose source line
 	## wraps join with a space rather than a `<br>`, so a span may cross one
 	## and the text rewraps to the reader's width.
+	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
+	## book builder call by name.
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
 	render_trusted_reflow = |md, { uploads }| html_of(
 		md,
@@ -81,6 +87,8 @@ Md := [].{
 	## raw HTML is escaped, and each heading has an id. It adds what a chat
 	## doesn't read: rules, indented code and `<http://…>`, and it leaves an
 	## email as text. The hook is the one way in for HTML of the caller's own.
+	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
+	## book builder call by name.
 	render_document : List(U8), Md.DocumentOptions -> MdDocument.Page
 	render_document = |md, options| {
 		lines = MdDocument.with_plain_line_ends(md)
