@@ -10,10 +10,7 @@
 ##     tests were written against;
 ##   - `old-chat`: the old chat's, `<base>/<topic>/uploads/<file>` with
 ##     `<base>` a DM's `/chat/c/<pair>` or a channel's `/channel/<name>`.
-app [answers] {
-	md: "../package/main.roc",
-	pf: platform "./platform/main.roc",
-}
+app [answers] { md: "../package/main.roc", pf: platform "./platform/main.roc" }
 
 import md.Md
 
@@ -52,8 +49,31 @@ is_old_chat_upload = |path| {
 	word = Str.to_utf8
 	filled = |parts| List.all(parts, |p| !List.is_empty(p))
 	match List.split_on(path, '/') {
-		[root, chat, c, pair, topic, uploads, file] if root == [] and chat == word("chat") and c == word("c") and uploads == word("uploads") => filled([pair, topic, file])
-		[root, channel, name, topic, uploads, file] if root == [] and channel == word("channel") and uploads == word("uploads") => filled([name, topic, file])
+		[
+			root,
+			chat,
+			c,
+			pair,
+			topic,
+			uploads,
+			file,
+		] if root == [] and chat == word("chat") and c == word("c") and uploads == word("uploads") => filled([
+			pair,
+			topic,
+			file,
+		])
+		[
+			root,
+			channel,
+			name,
+			topic,
+			uploads,
+			file,
+		] if root == [] and channel == word("channel") and uploads == word("uploads") => filled([
+			name,
+			topic,
+			file,
+		])
 		_ => Bool.False
 	}
 }

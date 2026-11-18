@@ -3,10 +3,7 @@
 ## mode's html, the work units (decimal digits) and the hostility's words
 ## (none when renderable). The mode is a number at the wasm edge: 0 the
 ## chat's `render`, 1 `render_trusted`, 2 `render_trusted_reflow`.
-app [answer] {
-	md: "../package/main.roc",
-	pf: platform "./platform/main.roc",
-}
+app [answer] { md: "../package/main.roc", pf: platform "./platform/main.roc" }
 
 import md.Md
 
