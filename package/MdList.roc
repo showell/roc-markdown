@@ -207,8 +207,8 @@ MdList := [].{
 			# Each item renders into a buffer of its own, so its tight
 			# separator sees only its content, not the <li>.
 			# An empty item is `<li></li>`, loose or tight.
-			is_empty = item == ['\n']
-			lead = if ($loose and !is_empty) or is_first_child_block(item, { is_block_start, is_code }) {
+			is_spaced = $loose and item != ['\n']
+			lead = if is_spaced or is_first_child_block(item, { is_block_start, is_code }) {
 				['\n']
 			} else {
 				[]
