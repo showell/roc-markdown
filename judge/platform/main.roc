@@ -1,7 +1,7 @@
 ## **THE JUDGE'S PLATFORM** (judge/judge.zig): one entry, `roc_judge_answers`,
 ## that hands a message's bytes and the name of its corpus's uploads rule to
-## the app and answers its results, each as bytes. It exists so the judge, a Zig program, can call the package; it
-## is never linked into a server.
+## the app and answers its results, each as bytes. It exists so the judge, a
+## Zig program, can call the package; it is never linked into a server.
 platform ""
 	requires {
 		answers : List(U8), List(U8) -> List(List(U8))

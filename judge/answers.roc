@@ -48,6 +48,13 @@ is_old_chat_upload : List(U8) -> Bool
 is_old_chat_upload = |path| {
 	word = Str.to_utf8
 	filled = |parts| List.all(parts, |p| !List.is_empty(p))
+	dm_words = [
+		[],
+		word("chat"),
+		word("c"),
+		word("uploads"),
+	]
+	channel_words = [[], word("channel"), word("uploads")]
 	match List.split_on(path, '/') {
 		[
 			root,
@@ -57,11 +64,7 @@ is_old_chat_upload = |path| {
 			topic,
 			uploads,
 			file,
-		] if root == [] and chat == word("chat") and c == word("c") and uploads == word("uploads") => filled([
-			pair,
-			topic,
-			file,
-		])
+		] if [root, chat, c, uploads] == dm_words => filled([pair, topic, file])
 		[
 			root,
 			channel,
@@ -69,11 +72,7 @@ is_old_chat_upload = |path| {
 			topic,
 			uploads,
 			file,
-		] if root == [] and channel == word("channel") and uploads == word("uploads") => filled([
-			name,
-			topic,
-			file,
-		])
+		] if [root, channel, uploads] == channel_words => filled([name, topic, file])
 		_ => Bool.False
 	}
 }
