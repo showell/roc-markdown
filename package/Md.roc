@@ -302,6 +302,14 @@ expect doc("- a\n  - b\n\n    ```roc\n    c\n    ```\n- d\n") == md("- a\n  - b\
 
 # A newline is a space, and raw HTML is escaped, media and all.
 expect doc("a\nb") == "<p>a b</p>\n"
+# A reflowed line end is one space, its trailing spaces dropped, but a code
+# span keeps them (CommonMark's). A backslash's hard break is a `<br>`.
+expect doc("a  \nb") == "<p>a b</p>\n"
+expect doc("`a  \nb`") == "<p><code>a   b</code></p>\n"
+expect doc("``\nfoo \n``") == "<p><code>foo </code></p>\n"
+expect doc("\\`a  \nb`") == "<p>`a b`</p>\n"
+expect doc("foo\\\nbar") == "<p>foo<br>\nbar</p>\n"
+expect doc("foo\\\\\nbar") == "<p>foo\\ bar</p>\n"
 expect md("a\nb") == "<p>a<br>\nb</p>\n"
 expect doc("<div>x</div>") == "<p>&lt;div&gt;x&lt;/div&gt;</p>\n"
 expect doc("<video src=\"/user_uploads/a.mp4\"></video>") == "<p>&lt;video src=&quot;/user_uploads/a.mp4&quot;&gt;&lt;/video&gt;</p>\n"
@@ -448,7 +456,7 @@ expect page_with_images("![a](/user_uploads/i.png)") == "<p><img src=\"/user_upl
 expect page_with_images("![a \"q\"](c\".png)") == "<p><img src=\"c&quot;.png\" alt=\"a &quot;q&quot;\"></p>\n"
 expect page_with_images("![a](javascript:alert(1))") == "<p>![a](javascript:alert(1))</p>\n"
 expect page_with_images("![a](data:text/html,x)") == "<p>![a](data:text/html,x)</p>\n"
-expect page_with_images("![a](c.png bad)") == "<p>!<a href=\"c.png bad\">a</a></p>\n"
+expect page_with_images("![a](c.png bad)") == "<p>![a](c.png bad)</p>\n"
 expect page_with_images("<img src=\"c.png\">") == "&lt;img src=&quot;c.png&quot;&gt;"
 expect page_with_images("<video src=\"c.mp4\"></video>") == "<p>&lt;video src=&quot;c.mp4&quot;&gt;&lt;/video&gt;</p>\n"
 expect doc("![a](c.png)") == "<p><a href=\"c.png\">a</a></p>\n"
@@ -547,12 +555,16 @@ expect page_with_images("[![![a](b)](c)](d)") == "<p><a href=\"d\"><img src=\"c\
 expect page_with_images("[![a](javascript:x)](/y)") == "<p><a href=\"/y\">![a](javascript:x)</a></p>\n"
 expect page_with_images("[a](/y)[b](javascript:x)") == "<p><a href=\"/y\">a</a>[b](javascript:x)</p>\n"
 
-# A document's link reads a title and `<a b>`, as its image does. A chat's reads
-# neither, so its href holds them.
+# A document's link reads a title and `<a b>`, as its image does, and a space
+# anywhere else, or a line break, makes no link. A chat's reads neither, so its
+# href holds them.
 expect doc("[a](/b \"t>\")") == "<p><a href=\"/b\" title=\"t&gt;\">a</a></p>\n"
 expect doc("[a](<b c>)") == "<p><a href=\"b c\">a</a></p>\n"
 expect doc("[a](<b c> 't')") == "<p><a href=\"b c\" title=\"t\">a</a></p>\n"
-expect doc("[a](b c)") == "<p><a href=\"b c\">a</a></p>\n"
+expect doc("[a](b c)") == "<p>[a](b c)</p>\n"
+expect doc("[a](b\nc)") == "<p>[a](b c)</p>\n"
+expect doc("[a](b\n\"t\")") == "<p><a href=\"b\" title=\"t\">a</a></p>\n"
+expect md("[a](b c)") == "<p><a href=\"b c\">a</a></p>\n"
 expect doc("[a](<b)") == "<p><a href=\"&lt;b\">a</a></p>\n"
 expect doc("![a](c.png \"t\")") == "<p><a href=\"c.png\" title=\"t\">a</a></p>\n"
 expect page_with_images("![a](<b c.png> 't')") == "<p><img src=\"b c.png\" alt=\"a\" title=\"t\"></p>\n"

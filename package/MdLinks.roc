@@ -527,8 +527,8 @@ url_end = |text, { start, budget }| {
 	}
 }
 
-## `local@domain.tld` at `start`, a trailing
-## `.`, `-` or `_` not its.
+## `local@domain.tld` at `start`, a trailing `.` not its. A domain that then
+## ends in `-` or `_` is no address at all (GFM's).
 email_end : List(U8),
 { start : U64, budget : MdText.Budget } -> {
 	end : Try(U64, [NotALink]),
@@ -556,10 +556,18 @@ email_end = |text, { start, budget }| {
 			{ end: Err(NotALink), budget: spent }
 		} else {
 			var $j = domain_end
-			while $j > domain_start and ['.', '-', '_'].contains(MdText.byte_at(text, $j - 1)) {
+			while $j > domain_start and MdText.byte_at(text, $j - 1) == '.' {
 				$j = $j - 1
 			}
-			{ end: Ok($j), budget: spent }
+			ends_badly = $j == domain_start or ['-', '_'].contains(MdText.byte_at(text, $j - 1))
+			{
+				end: if ends_badly {
+					Err(NotALink)
+				} else {
+					Ok($j)
+				},
+				budget: spent,
+			}
 		}
 	}
 }
@@ -569,3 +577,10 @@ is_email_local_char = |c| Ascii.is_alphanumeric(c) or c == '.' or c == '_' or c 
 
 trailing_punct : List(U8)
 trailing_punct = "?!.,:*_~'\"".to_utf8()
+
+# A trailing `.` is the sentence's; a domain ending in `-` or `_` is no address.
+expect email_end("a@b.c".to_utf8(), { start: 0, budget: MdText.unlimited }).end == Ok(5)
+expect email_end("a@b.c.".to_utf8(), { start: 0, budget: MdText.unlimited }).end == Ok(5)
+expect email_end("a@b.c-".to_utf8(), { start: 0, budget: MdText.unlimited }).end == Err(NotALink)
+expect email_end("a@b.c_.".to_utf8(), { start: 0, budget: MdText.unlimited }).end == Err(NotALink)
+expect email_end("a@b-c.d".to_utf8(), { start: 0, budget: MdText.unlimited }).end == Ok(7)

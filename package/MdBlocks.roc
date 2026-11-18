@@ -330,6 +330,8 @@ paragraph_onto = |
 		out.concat(MdHtml.p_open)
 	}
 	var $budget = budget
+	# A reflowed run's lines up to a hard break, each with its trailing spaces
+	# but the run's last, since a code span keeps them (MdInline.reflow_lines).
 	var $reflow = []
 	var $k = 0
 	for line in $lines {
@@ -342,17 +344,17 @@ paragraph_onto = |
 			},
 		)
 		if wrap == Reflow {
-			$reflow = (
-				if $reflow == [] {
-					$reflow
+			$reflow = $reflow.append(
+				if breaks or $k == last {
+					text
 				} else {
-					$reflow.append(' ')
-				}
-			).concat(text)
+					line.drop_first(Bytes.count_while(line, { keep: is_line_space, at: 0 }))
+				},
+			)
 			if breaks {
 				broke = MdInline.html_onto({
 					out: $out,
-					text: $reflow,
+					text: MdInline.reflow_lines($reflow),
 					refs: MdDialect.inline_refs(dialect),
 					budget: $budget,
 					uploads,
@@ -383,7 +385,7 @@ paragraph_onto = |
 	if wrap == Reflow {
 		joined = MdInline.html_onto({
 			out: $out,
-			text: $reflow,
+			text: MdInline.reflow_lines($reflow),
 			refs: MdDialect.inline_refs(dialect),
 			budget: $budget,
 			uploads,
@@ -403,6 +405,10 @@ paragraph_onto = |
 		after: $p,
 	})
 }
+
+## The bytes `MdText.trim_line` takes off a line's ends.
+is_line_space : U8 -> Bool
+is_line_space = |c| c == ' ' or c == '\t' or c == '\r'
 
 ## CommonMark's hard line break: the line, as written, ends in an odd run of
 ## backslashes (an even one is escaped backslashes).

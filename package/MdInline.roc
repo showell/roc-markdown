@@ -49,6 +49,54 @@ MdInline := [].{
 		DocumentAlt,
 	]
 
+	## A reflowed paragraph's lines joined into one line of inline content, as
+	## CommonMark joins them. Each line comes with its trailing spaces. A line
+	## end outside a code span is one space, the spaces before it dropped. Inside
+	## a code span it is a space too, and the spaces before it are the code's.
+	## The spans are found as `html_onto` finds them, from each backtick run
+	## that a backslash does not escape.
+	reflow_lines : List(List(U8)) -> List(U8)
+	reflow_lines = |lines| {
+		var $joined = []
+		var $is_first = Bool.True
+		for line in lines {
+			$joined = if $is_first {
+				line
+			} else {
+				$joined.append('\n').concat(line)
+			}
+			$is_first = Bool.False
+		}
+		joined = $joined
+		len = joined.len()
+		var $out = []
+		var $i = 0
+		while $i < len {
+			c = MdText.byte_at(joined, $i)
+			if c == '\\' and is_escapable(joined, $i + 1) {
+				$out = $out.concat(MdText.cut(joined, { start: $i, end: $i + 2 }))
+				$i = $i + 2
+			} else if c == '`' {
+				scanned = code_span_at(joined, { at: $i, budget: MdText.unlimited })
+				end = match scanned.span {
+					Ok(span) => span.end
+					Err(NoClose) => $i + run_length(joined, { byte: '`', at: $i })
+				}
+				code = MdText.cut(joined, { start: $i, end })
+				$out = $out.concat(code.map(line_end_as_space))
+				$i = end
+			} else if c == '\n' {
+				kept = $out.len() - Bytes.count_back($out, |b| b == ' ' or b == '\t' or b == '\r')
+				$out = $out.take_first(kept).append(' ')
+				$i = $i + 1
+			} else {
+				$out = $out.append(c)
+				$i = $i + 1
+			}
+		}
+		$out
+	}
+
 	## `text` rendered onto `out`.
 	html_onto : {
 		out : List(U8),
@@ -255,6 +303,10 @@ MdInline := [].{
 							# Refused: the whole link's source left in the
 							# pending text, nothing in it read (MdSafety).
 								Skip(link.end)
+							Ok(link) if is_document and MdLinks.document_dest(link.url).is_err() =>
+							# A document's destination is CommonMark's: a space
+							# outside `<…>` and before no title makes no link.
+								Skip($i + 1)
 							Ok(link) => {
 								# The label is a line of its own, rendered inside the `<a>`.
 								dest = link_dest(link.url, is_document)
@@ -369,6 +421,15 @@ is_refused_link = |
 	url,
 	is_document,
 | MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_dest(url, is_document).src)
+
+## A code span's line end is a space (CommonMark).
+line_end_as_space : U8 -> U8
+line_end_as_space = |b|
+	if b == '\n' {
+		' '
+	} else {
+		b
+	}
 
 ## Whether the byte at `i` is ASCII punctuation, which a backslash before it
 ## escapes.
@@ -529,6 +590,12 @@ expect inline("[x](java\tscript:alert(1))") == "[x](java\tscript:alert(1))"
 expect inline("`a<b`") == "<code>a&lt;b</code>"
 expect inline("go to www.a.com, now") == "go to <a href=\"http://www.a.com\" target=\"_blank\" rel=\"noopener\">www.a.com</a>, now"
 expect inline("mail a.b@c.d.") == "mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a>."
+expect inline("mail a.b@c.d- or a.b@c.d_") == "mail a.b@c.d- or a.b@c.d_"
+# A reflowed line end: one space outside a code span, the code's own inside.
+expect MdInline.reflow_lines(["a  ".to_utf8(), "b".to_utf8()]) == "a b".to_utf8()
+expect MdInline.reflow_lines(["`a  ".to_utf8(), "b`".to_utf8()]) == "`a   b`".to_utf8()
+expect MdInline.reflow_lines(["\\`a  ".to_utf8(), "b`".to_utf8()]) == "\\`a b`".to_utf8()
+expect MdInline.reflow_lines(["``a  ".to_utf8(), "b`".to_utf8()]) == "``a b`".to_utf8()
 # A host without a dot is no autolink: `localhost` is a word.
 expect inline("http://localhost:9100/x.md") == "http://localhost:9100/x.md"
 # The floor keys on a closer's can_open and its run's length as written
