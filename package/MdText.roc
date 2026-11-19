@@ -126,6 +126,15 @@ MdText := [].{
 	trim_line : List(U8) -> List(U8)
 	trim_line = |line| Bytes.trim(line, line_space)
 
+	## Whether the byte at `i` is ASCII punctuation, which a backslash before it
+	## escapes (CommonMark's backslash escapes).
+	is_escapable : List(U8), U64 -> Bool
+	is_escapable = |text, i|
+		match text.get(i) {
+			Ok(c) => Ascii.is_punctuation(c)
+			Err(OutOfBounds) => Bool.False
+		}
+
 	## CommonMark's backslash escapes taken out of `text`: a backslash before
 	## ASCII punctuation is dropped and the punctuation kept; any other is a
 	## backslash. For text no inline pass reads (a fence's info string).
@@ -136,7 +145,7 @@ MdText := [].{
 		var $i = 0
 		while $i < len {
 			c = byte_at(text, $i)
-			if c == '\\' and $i + 1 < len and Ascii.is_punctuation(byte_at(text, $i + 1)) {
+			if c == '\\' and is_escapable(text, $i + 1) {
 				$out = $out.append(byte_at(text, $i + 1))
 				$i = $i + 2
 			} else {

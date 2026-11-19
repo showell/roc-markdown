@@ -5,6 +5,7 @@
 ## new block kind is a branch of `block_at`, and a line of `is_block_start` and
 ## of `paragraph_onto`'s stop when it interrupts a paragraph. Pure.
 import Bytes
+import MdCodeSpan
 import MdDialect
 import MdDocument
 import MdFence
@@ -331,7 +332,7 @@ paragraph_onto = |
 	}
 	var $budget = budget
 	# A reflowed run's lines up to a hard break, each with its trailing spaces
-	# but the run's last, since a code span keeps them (MdInline.reflow_lines).
+	# but the run's last, since a code span keeps them (MdCodeSpan.reflow_lines).
 	var $reflow = []
 	var $k = 0
 	for line in $lines {
@@ -354,7 +355,7 @@ paragraph_onto = |
 			if breaks {
 				broke = MdInline.html_onto({
 					out: $out,
-					text: MdInline.reflow_lines($reflow),
+					text: MdCodeSpan.reflow_lines($reflow),
 					refs: MdDialect.inline_refs(dialect),
 					budget: $budget,
 					uploads,
@@ -385,7 +386,7 @@ paragraph_onto = |
 	if wrap == Reflow {
 		joined = MdInline.html_onto({
 			out: $out,
-			text: MdInline.reflow_lines($reflow),
+			text: MdCodeSpan.reflow_lines($reflow),
 			refs: MdDialect.inline_refs(dialect),
 			budget: $budget,
 			uploads,

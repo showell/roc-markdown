@@ -172,7 +172,7 @@ MdSafety := [].{
 	uploads_under = |prefix| |path| path.starts_with(prefix)
 
 	## The `://` that ends a URL's scheme: what makes a link external here,
-	## and where an autolink's host starts (MdLinks).
+	## and where an autolink's host starts (MdAutolink).
 	scheme_end : List(U8)
 	scheme_end = "://".to_utf8()
 }

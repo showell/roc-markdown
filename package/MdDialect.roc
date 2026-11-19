@@ -1,10 +1,10 @@
 ## Which syntax a render reads: a chat's, or a document's with its options.
 ## Every question only a document asks goes through here, and a chat's answer is
 ## no, which keeps every chat answer as it is. Pure.
+import MdAutolink
 import MdDocument
 import MdIndent
 import MdInline
-import MdLinks
 
 MdDialect := [].{
 
@@ -42,6 +42,6 @@ MdDialect := [].{
 	is_angle_url_line : Dialect, List(U8) -> Bool
 	is_angle_url_line = |dialect, line| match dialect {
 		Chat => Bool.False
-		Document(_) => MdLinks.is_angle_url_line(line)
+		Document(_) => MdAutolink.is_angle_url_line(line)
 	}
 }

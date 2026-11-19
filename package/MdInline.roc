@@ -1,9 +1,10 @@
 ## The inline pass: one line of inline content to HTML. The line is cut into
 ## pieces, which are text to escape, `*`/`_`/`~` runs, and html made here for a
-## code span, a same-origin `<img>` or `<video>` (MdMedia), a `[t](u)` link, a
-## same-origin `![alt](src)` image or an autolink (MdLinks), or the chat's `MSG_`
-## reference (MdChat). The runs are matched into `<em>`, `<strong>` and `<del>`
-## (MdEmphasis), and the pieces are written out. Pure.
+## code span (MdCodeSpan), a same-origin `<img>` or `<video>` (MdMedia), a
+## `[t](u)` link or a same-origin `![alt](src)` image (MdLinks), an autolink
+## (MdAutolink), or the chat's `MSG_` reference (MdChat). The runs are
+## matched into `<em>`, `<strong>` and `<del>` (MdEmphasis), and the pieces
+## are written out. Pure.
 ##
 ## **A BACKSLASH BEFORE ASCII PUNCTUATION MAKES IT TEXT** (CommonMark's
 ## backslash escapes): the backslash goes, and the character after it is a
@@ -13,20 +14,21 @@
 ## never through this pass); so is a fence's (MdFence).
 ##
 ## **LINEAR BY ITS CURSORS, AND CHARGED FOR EVERY STEP**: the walk holds
-## MdLinks's cursors (the first `]` and `)` ahead, and the floor below which
-## no email can start), which only ever move forward, so no suffix is
-## scanned again from every `[` or `_`. Each step and each byte an inner
+## MdLinks's cursors (the first `]` and `)` ahead) and MdAutolink's (the
+## floor below which no email can start), which only ever move forward, so no
+## suffix is scanned again from every `[` or `_`. Each step and each byte an inner
 ## scan reads is charged to the budget, and the walk stops as hostile the
 ## moment it is blown. The frozen work units (the judge's) are the
 ## charges' definition.
-import Ascii
 import Bytes
 import MdChat
+import MdCodeSpan
 import MdHtml
 import MdText
 import MdMedia
 import MdEmphasis
 import MdLinks
+import MdAutolink
 import MdSafety
 
 MdInline := [].{
@@ -48,54 +50,6 @@ MdInline := [].{
 		DocumentLabel(MdSafety.Images),
 		DocumentAlt,
 	]
-
-	## A reflowed paragraph's lines joined into one line of inline content, as
-	## CommonMark joins them. Each line comes with its trailing spaces. A line
-	## end outside a code span is one space, the spaces before it dropped. Inside
-	## a code span it is a space too, and the spaces before it are the code's.
-	## The spans are found as `html_onto` finds them, from each backtick run
-	## that a backslash does not escape.
-	reflow_lines : List(List(U8)) -> List(U8)
-	reflow_lines = |lines| {
-		var $joined = []
-		var $is_first = Bool.True
-		for line in lines {
-			$joined = if $is_first {
-				line
-			} else {
-				$joined.append('\n').concat(line)
-			}
-			$is_first = Bool.False
-		}
-		joined = $joined
-		len = joined.len()
-		var $out = []
-		var $i = 0
-		while $i < len {
-			c = MdText.byte_at(joined, $i)
-			if c == '\\' and is_escapable(joined, $i + 1) {
-				$out = $out.concat(MdText.cut(joined, { start: $i, end: $i + 2 }))
-				$i = $i + 2
-			} else if c == '`' {
-				scanned = code_span_at(joined, { at: $i, budget: MdText.unlimited })
-				end = match scanned.span {
-					Ok(span) => span.end
-					Err(NoClose) => $i + run_length(joined, { byte: '`', at: $i })
-				}
-				code = MdText.cut(joined, { start: $i, end })
-				$out = $out.concat(code.map(line_end_as_space))
-				$i = end
-			} else if c == '\n' {
-				kept = $out.len() - Bytes.count_back($out, |b| b == ' ' or b == '\t' or b == '\r')
-				$out = $out.take_first(kept).append(' ')
-				$i = $i + 1
-			} else {
-				$out = $out.append(c)
-				$i = $i + 1
-			}
-		}
-		$out
-	}
 
 	## `text` rendered onto `out`.
 	html_onto : {
@@ -161,20 +115,20 @@ MdInline := [].{
 			step = match reference {
 				Ok(ref) => Token(Html(ref.html), ref.end)
 				Err(NoRef) =>
-					if c == '\\' and is_escapable(text, $i + 1) {
+					if c == '\\' and MdText.is_escapable(text, $i + 1) {
 						Token(Text($i + 1, $i + 2), $i + 2)
 					} else if c == '<' {
 						match media_at(text, { start: $i, uploads }) {
 							Ok(media) => Token(Html(media.html), media.end)
 							Err(NotMedia) =>
 								match if is_document and reads_links {
-									MdLinks.angle_url_at(text, $i)
+									MdAutolink.angle_url_at(text, $i)
 								} else {
 									Err(NotALink)
 								} {
 									Ok(found) => Token(
 										Html(
-											MdLinks.autolink_html(
+											MdAutolink.autolink_html(
 												found.url,
 												{ kind: Url, outside },
 											),
@@ -185,12 +139,12 @@ MdInline := [].{
 								}
 						}
 					} else if c == '`' {
-						scanned = code_span_at(text, { at: $i, budget: $budget })
+						scanned = MdCodeSpan.span_at(text, { at: $i, budget: $budget })
 						$budget = scanned.budget
 						match scanned.span {
 							Ok(span) => Token(
 								Html(
-									code_html(
+									MdCodeSpan.span_html(
 										text,
 										{ start: span.content_start, end: span.content_end },
 									),
@@ -202,7 +156,7 @@ MdInline := [].{
 								# literal, and is skipped, so no shorter run inside it
 								# opens a span (CommonMark's runs are atomic). It stays
 								# in the pending text.
-								n = run_length(text, { byte: '`', at: $i })
+								n = Bytes.run_length(text, { byte: '`', at: $i })
 								$budget = MdText.charge($budget, n)
 								Skip($i + n)
 							}
@@ -326,7 +280,7 @@ MdInline := [].{
 							Err(NotALink) => Skip($i + 1)
 						}
 					} else if c == '*' or c == '_' or c == '~' {
-						n = run_length(text, { byte: c, at: $i })
+						n = Bytes.run_length(text, { byte: c, at: $i })
 						$budget = MdText.charge($budget, n)
 						run = MdEmphasis.delimiter_run(text, { start: $i, end: $i + n })
 						# A `~` run that can neither open nor close (one `~`, three,
@@ -338,8 +292,8 @@ MdInline := [].{
 							$runs = $runs.append(run)
 							Token(Run($runs.len() - 1), $i + n)
 						}
-					} else if reads_links and MdLinks.is_autolink_boundary(text, $i) {
-						found = MdLinks.autolink_at(
+					} else if reads_links and MdAutolink.is_autolink_boundary(text, $i) {
+						found = MdAutolink.autolink_at(
 							text,
 							{
 								at: $i,
@@ -358,7 +312,7 @@ MdInline := [].{
 							Ok(link) =>
 								Token(
 									Html(
-										MdLinks.autolink_html(
+										MdAutolink.autolink_html(
 											MdText.cut(text, { start: $i, end: link.end }),
 											{ kind: link.kind, outside },
 
@@ -422,24 +376,6 @@ is_refused_link = |
 	is_document,
 | MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_dest(url, is_document).src)
 
-## A code span's line end is a space (CommonMark).
-line_end_as_space : U8 -> U8
-line_end_as_space = |b|
-	if b == '\n' {
-		' '
-	} else {
-		b
-	}
-
-## Whether the byte at `i` is ASCII punctuation, which a backslash before it
-## escapes.
-is_escapable : List(U8), U64 -> Bool
-is_escapable = |text, i|
-	match text.get(i) {
-		Ok(c) => Ascii.is_punctuation(c)
-		Err(OutOfBounds) => Bool.False
-	}
-
 ## A piece of the line: text (a span of it, escaped when written), html made
 ## here, or a `*`/`_`/`~` run (by its index among the runs).
 Piece : [
@@ -478,18 +414,6 @@ media_at = |text, place|
 			}
 	}
 
-## A code span's html: its content `text[start..end]`, as CommonMark trims
-## it, escaped.
-code_html : List(U8), { start : U64, end : U64 } -> List(U8)
-code_html = |text, span| MdText.escape_onto(
-	MdHtml.code_open,
-	code_span_content(MdText.cut(text, span)),
-).concat(MdHtml.code_close)
-
-## How many `byte`s run from `at`.
-run_length : List(U8), { byte : U8, at : U64 } -> U64
-run_length = |text, { byte, at }| Bytes.count_while(text, { keep: |c| c == byte, at }) - at
-
 ## The pieces written out: text escaped, html as made, a run as its
 ## emphasis (MdEmphasis `run_onto`).
 emit : List(U8),
@@ -508,65 +432,6 @@ emit = |out, { text, pieces, runs }| {
 		}
 	}
 	$out
-}
-
-# ── code spans ──
-
-## The backtick run at `at` closed by a run of
-## exactly its length, its content's span, and the index past the close.
-code_span_at : List(U8),
-{ at : U64, budget : MdText.Budget } -> {
-	span : Try(
-		{
-			content_start : U64,
-			content_end : U64,
-			end : U64,
-		},
-		[NoClose],
-	),
-	budget : MdText.Budget,
-}
-code_span_at = |text, { at, budget }| {
-	len = text.len()
-	n = run_length(text, { byte: '`', at })
-	var $budget = MdText.charge(budget, n)
-	var $k = at + n
-	while $k < len {
-		$budget = MdText.charge($budget, 1)
-		if MdText.byte_at(text, $k) != '`' {
-			$k = $k + 1
-		} else {
-			m = run_length(text, { byte: '`', at: $k })
-			$budget = MdText.charge($budget, m)
-			if m == n {
-				return {
-					span: Ok({
-						content_start: at + n,
-						content_end: $k,
-						end: $k + m,
-					}),
-					budget: $budget,
-				}
-			} else {
-				# A run of the wrong length is content.
-				$k = $k + m
-			}
-		}
-	}
-	{ span: Err(NoClose), budget: $budget }
-}
-
-## One space off each end when both ends
-## are spaces and it is not all spaces.
-code_span_content : List(U8) -> List(U8)
-code_span_content = |content| {
-	n = content.len()
-	is_padded = content.first() == Ok(' ') and content.last() == Ok(' ')
-	if n >= 2 and is_padded and content.any(|c| c != ' ') {
-		MdText.cut(content, { start: 1, end: n - 1 })
-	} else {
-		content
-	}
 }
 
 inline : Str -> Str
@@ -591,11 +456,6 @@ expect inline("`a<b`") == "<code>a&lt;b</code>"
 expect inline("go to www.a.com, now") == "go to <a href=\"http://www.a.com\" target=\"_blank\" rel=\"noopener\">www.a.com</a>, now"
 expect inline("mail a.b@c.d.") == "mail <a href=\"mailto:a.b@c.d\">a.b@c.d</a>."
 expect inline("mail a.b@c.d- or a.b@c.d_") == "mail a.b@c.d- or a.b@c.d_"
-# A reflowed line end: one space outside a code span, the code's own inside.
-expect MdInline.reflow_lines(["a  ".to_utf8(), "b".to_utf8()]) == "a b".to_utf8()
-expect MdInline.reflow_lines(["`a  ".to_utf8(), "b`".to_utf8()]) == "`a   b`".to_utf8()
-expect MdInline.reflow_lines(["\\`a  ".to_utf8(), "b`".to_utf8()]) == "\\`a b`".to_utf8()
-expect MdInline.reflow_lines(["``a  ".to_utf8(), "b`".to_utf8()]) == "``a b`".to_utf8()
 # A host without a dot is no autolink: `localhost` is a word.
 expect inline("http://localhost:9100/x.md") == "http://localhost:9100/x.md"
 # The floor keys on a closer's can_open and its run's length as written

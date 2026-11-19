@@ -27,6 +27,10 @@ Bytes := [].{
 		_ => i
 	}
 
+	## How many `byte`s run from `at`.
+	run_length : List(U8), { byte : U8, at : U64 } -> U64
+	run_length = |s, { byte, at }| count_while(s, { keep: |c| c == byte, at }) - at
+
 	## How many bytes from the end keep `keep`.
 	count_back : List(U8), (U8 -> Bool) -> U64
 	count_back = |s, keep| count_back_from(s, { keep, kept: 0 })
