@@ -286,7 +286,10 @@ MdInline := [].{
 					} else if byte == '*' or byte == '_' or byte == '~' {
 						delimiter_length = Bytes.run_length(text, { byte, at: $i })
 						$budget = MdText.charge($budget, delimiter_length)
-						run = MdEmphasis.delimiter_run(text, { start: $i, end: $i + delimiter_length })
+						run = MdEmphasis.delimiter_run(
+							text,
+							{ start: $i, end: $i + delimiter_length },
+						)
 						# A `~` run that can neither open nor close (one `~`, three,
 						# `~~` between spaces) is text: on the stack it would only
 						# lengthen every look-back past it.

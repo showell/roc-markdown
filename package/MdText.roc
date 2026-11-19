@@ -85,7 +85,8 @@ MdText := [].{
 	## Space, tab, `\n`, `\r` and form feed; not a
 	## vertical tab, which `Ascii.is_whitespace` has.
 	is_space : U8 -> Bool
-	is_space = |byte| byte == ' ' or byte == '\t' or byte == '\n' or byte == '\r' or byte == form_feed
+	is_space = |byte|
+		byte == ' ' or byte == '\t' or byte == '\n' or byte == '\r' or byte == form_feed
 
 	## What `\b` reads as a word.
 	is_word_char : U8 -> Bool
@@ -93,7 +94,8 @@ MdText := [].{
 
 	## An HTML attribute's name.
 	is_attribute_name_char : U8 -> Bool
-	is_attribute_name_char = |byte| Ascii.is_alphanumeric(byte) or byte == '-' or byte == '_' or byte == ':'
+	is_attribute_name_char = |byte|
+		Ascii.is_alphanumeric(byte) or byte == '-' or byte == '_' or byte == ':'
 
 	## One digit or more, and nothing else.
 	is_all_digits : List(U8) -> Bool
@@ -101,7 +103,10 @@ MdText := [].{
 
 	## `bytes` is `lower`, a lowercase literal, in any case.
 	is_same_ignoring_case : List(U8), List(U8) -> Bool
-	is_same_ignoring_case = |bytes, lower| bytes.len() == lower.len() and bytes.map(Ascii.to_lowercase) == lower
+	is_same_ignoring_case = |
+		bytes,
+		lower,
+	| bytes.len() == lower.len() and bytes.map(Ascii.to_lowercase) == lower
 
 	## `bytes` from `at` begins with `prefix`, in
 	## any case.

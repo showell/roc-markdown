@@ -71,7 +71,12 @@ expect md("> | a |\n> | - |\n> | MSG_x_1 |\nlazy") == "<blockquote>\n<table>\n<t
 widgets : MdDocument.FenceHook
 widgets = |{ tag, args, body }|
 	if tag == "widget".to_utf8() {
-		Html(List.concat(List.concat("<iframe src=\"/w/".to_utf8(), args), "\"></iframe>\n".to_utf8()))
+		Html(
+			List.concat(
+				List.concat("<iframe src=\"/w/".to_utf8(), args),
+				"\"></iframe>\n".to_utf8(),
+			),
+		)
 	} else if tag == "dot".to_utf8() {
 		Html(List.concat(List.concat("<svg>".to_utf8(), body), "</svg>\n".to_utf8()))
 	} else if tag == "raw".to_utf8() {

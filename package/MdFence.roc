@@ -33,7 +33,10 @@ MdFence := [].{
 				if indent >= 4 or (fence_char != '`' and fence_char != '~') {
 					Err(NotAFence)
 				} else {
-					count = Bytes.count_while(line, { keep: |byte| byte == fence_char, at: indent }) - indent
+					count = Bytes.count_while(
+						line,
+						{ keep: |byte| byte == fence_char, at: indent },
+					) - indent
 					info = Bytes.trim(line.drop_first(indent + count), info_space)
 					is_backtick_info = fence_char == '`' and info.contains('`')
 					if count < 3 or count > MdChat.max_fence_run or is_backtick_info {
@@ -68,7 +71,9 @@ MdFence := [].{
 	args = |line, open_line| {
 		info = Bytes.trim(line.drop_first(open_line.indent + open_line.count), info_space)
 		Bytes.trim(
-			info.drop_first(Bytes.count_while(info, { keep: |byte| byte != ' ' and byte != '\t', at: 0 })),
+			info.drop_first(
+				Bytes.count_while(info, { keep: |byte| byte != ' ' and byte != '\t', at: 0 }),
+			),
 			info_space,
 		)
 	}
@@ -148,8 +153,14 @@ MdFence := [].{
 		if indent >= 4 {
 			Bool.False
 		} else {
-			fence_length = Bytes.count_while(line, { keep: |byte| byte == char, at: indent }) - indent
-			fence_length >= count and Bytes.trim(line.drop_first(indent + fence_length), info_space) == []
+			fence_length = Bytes.count_while(
+				line,
+				{ keep: |byte| byte == char, at: indent },
+			) - indent
+			fence_length >= count and Bytes.trim(
+				line.drop_first(indent + fence_length),
+				info_space,
+			) == []
 		}
 	}
 

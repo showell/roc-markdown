@@ -332,7 +332,10 @@ runs_without = |runs, index| {
 	match run.above {
 		At(above) => runs_with(
 			with_below,
-			{ at: above, delimiters: { ..MdEmphasis.indexed_run(with_below, above), below: run.below } },
+			{
+				at: above,
+				delimiters: { ..MdEmphasis.indexed_run(with_below, above), below: run.below },
+			},
 		)
 		Edge => with_below
 	}

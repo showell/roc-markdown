@@ -127,7 +127,10 @@ MdLinks := [].{
 	image_destination : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
 	image_destination = |url| {
 		destination = MdText.trim_line(url)
-		src_length = Bytes.count_while(destination, { keep: |byte| byte != ' ' and byte != '\t', at: 0 })
+		src_length = Bytes.count_while(
+			destination,
+			{ keep: |byte| byte != ' ' and byte != '\t', at: 0 },
+		)
 		titled_destination(destination.take_first(src_length), destination.drop_first(src_length))
 	}
 

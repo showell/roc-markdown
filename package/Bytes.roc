@@ -29,7 +29,10 @@ Bytes := [].{
 
 	## How many `byte`s run from `at`.
 	run_length : List(U8), { byte : U8, at : U64 } -> U64
-	run_length = |bytes, { byte, at }| count_while(bytes, { keep: |candidate| candidate == byte, at }) - at
+	run_length = |bytes, { byte, at }| count_while(
+		bytes,
+		{ keep: |candidate| candidate == byte, at },
+	) - at
 
 	## How many bytes from the end keep `keep`.
 	count_back : List(U8), (U8 -> Bool) -> U64
@@ -54,7 +57,10 @@ find_from : List(U8), { needle : List(U8), at : U64 } -> Try(U64, [NotFound])
 find_from = |bytes, { needle, at }|
 	if at + needle.len() > bytes.len() {
 		Err(NotFound)
-	} else if bytes.get(at) == needle.first() and bytes.sublist({ start: at, len: needle.len() }) == needle {
+	} else if bytes.get(at) == needle.first() and bytes.sublist({
+		start: at,
+		len: needle.len(),
+	}) == needle {
 		Ok(at)
 	} else {
 		find_from(bytes, { needle, at: at + 1 })

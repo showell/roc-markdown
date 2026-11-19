@@ -49,7 +49,10 @@ MdCodeSpan := [].{
 				$out = List.concat($out, code.map(line_end_as_space))
 				$i = end
 			} else if byte == '\n' {
-				kept = $out.len() - Bytes.count_back($out, |candidate| candidate == ' ' or candidate == '\t' or candidate == '\r')
+				kept = $out.len() - Bytes.count_back(
+					$out,
+					|candidate| candidate == ' ' or candidate == '\t' or candidate == '\r',
+				)
 				$out = $out.take_first(kept).append(' ')
 				$i = $i + 1
 			} else {

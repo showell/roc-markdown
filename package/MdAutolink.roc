@@ -65,7 +65,11 @@ MdAutolink := [].{
 			Bool.True
 		} else {
 			previous = MdText.byte_at(text, at - 1)
-			MdText.is_space(previous) or previous == '*' or previous == '_' or previous == '~' or previous == '('
+			MdText.is_space(previous)
+				or previous == '*'
+				or previous == '_'
+				or previous == '~'
+				or previous == '('
 		}
 
 	AutoKind : [Url, Www, Email]
@@ -166,7 +170,10 @@ url_end : List(U8),
 	budget : MdText.Budget,
 }
 url_end = |text, { start, budget }| {
-	scanned = Bytes.count_while(text, { keep: |byte| !MdText.is_space(byte) and byte != '<', at: start })
+	scanned = Bytes.count_while(
+		text,
+		{ keep: |byte| !MdText.is_space(byte) and byte != '<', at: start },
+	)
 	spent = MdText.charge(budget, scanned - start)
 	url = MdText.cut(text, { start, end: scanned })
 	host_start = match Bytes.find(url, { needle: MdSafety.scheme_end }) {
@@ -175,7 +182,10 @@ url_end = |text, { start, budget }| {
 	}
 	host_end = Bytes.count_while(
 		url,
-		{ keep: |byte| byte != '/' and byte != '?' and byte != '#' and byte != ':', at: host_start },
+		{
+			keep: |byte| byte != '/' and byte != '?' and byte != '#' and byte != ':',
+			at: host_start,
+		},
 	)
 	if !MdText.cut(url, { start: host_start, end: U64.max(host_start, host_end) }).contains('.') {
 		{ end: Err(NotALink), budget: spent }
@@ -222,7 +232,8 @@ email_end = |text, { start, budget }| {
 		domain_end = Bytes.count_while(
 			text,
 			{
-				keep: |byte| Ascii.is_alphanumeric(byte) or byte == '.' or byte == '-' or byte == '_',
+				keep: |byte|
+					Ascii.is_alphanumeric(byte) or byte == '.' or byte == '-' or byte == '_',
 				at: domain_start,
 			},
 		)
@@ -251,7 +262,8 @@ email_end = |text, { start, budget }| {
 }
 
 is_email_local_char : U8 -> Bool
-is_email_local_char = |byte| Ascii.is_alphanumeric(byte) or byte == '.' or byte == '_' or byte == '+' or byte == '-'
+is_email_local_char = |byte|
+	Ascii.is_alphanumeric(byte) or byte == '.' or byte == '_' or byte == '+' or byte == '-'
 
 trailing_punct : List(U8)
 trailing_punct = "?!.,:*_~'\"".to_utf8()

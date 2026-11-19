@@ -60,7 +60,10 @@ message_reference_end : List(U8), U64 -> Try(U64, [NoRef])
 message_reference_end = |text, at| {
 	length = text.len()
 	prefix_length = message_prefix.len()
-	if at + prefix_length > length or MdText.cut(text, { start: at, end: at + prefix_length }) != message_prefix {
+	if at + prefix_length > length or MdText.cut(
+		text,
+		{ start: at, end: at + prefix_length },
+	) != message_prefix {
 		Err(NoRef)
 	} else if at > 0 and MdText.is_word_char(MdText.byte_at(text, at - 1)) {
 		Err(NoRef)
@@ -131,8 +134,14 @@ expect MdChat.reference_at("MSG_Cobblestone.ChitChat_5.".to_utf8(), 0) == Ok({
 	html: "<a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>".to_utf8(),
 	end: 26,
 })
-expect MdChat.reference_at("MSG_a-1-.road-trip_9 x".to_utf8(), 0).map_ok(|reference| reference.end) == Ok(20)
-expect MdChat.reference_at("MSG_${"a".repeat(40)}.t_1".to_utf8(), 0).map_ok(|reference| reference.end) == Ok(48)
+expect MdChat.reference_at(
+	"MSG_a-1-.road-trip_9 x".to_utf8(),
+	0,
+).map_ok(|reference| reference.end) == Ok(20)
+expect MdChat.reference_at(
+	"MSG_${"a".repeat(40)}.t_1".to_utf8(),
+	0,
+).map_ok(|reference| reference.end) == Ok(48)
 # Not one: no number, a name too long, a channel not led by a letter, an
 # empty name, two dots, a word character after.
 expect MdChat.reference_at("MSG_x.y".to_utf8(), 0) == Err(NoRef)

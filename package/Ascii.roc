@@ -29,7 +29,8 @@ Ascii := [].{
 	## Rust `is_ascii_hexdigit`, C `isxdigit`. `Bool.False` for every byte
 	## from 128 to 255.
 	is_hex_digit : U8 -> Bool
-	is_hex_digit = |byte| is_digit(byte) or (byte >= 'A' and byte <= 'F') or (byte >= 'a' and byte <= 'f')
+	is_hex_digit = |byte|
+		is_digit(byte) or (byte >= 'A' and byte <= 'F') or (byte >= 'a' and byte <= 'f')
 
 	## `A`-`Z` and `a`-`z` (65-90, 97-122). Zig `isAlphabetic`, Rust
 	## `is_ascii_alphabetic`, C `isalpha`. `Bool.False` for every byte from
