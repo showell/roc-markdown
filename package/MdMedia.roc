@@ -1,7 +1,7 @@
 ## **THE ONE PLACE THE DIALECT LETS A MEMBER'S TAG THROUGH**: an uploaded
 ## `<img>` or `<video>`. A tag a member wrote is never passed on as written:
 ## it is scanned here, its attributes by name, the last of a name winning,
-## and REBUILT from MdSafety's allowlist (`media_attrs`, which also holds the
+## and REBUILT from MdSafety's allowlist (`media_attributes`, which also holds the
 ## uploads rule), each value escaped (MdHtml). A tag that does not parse cleanly, or that
 ## MdSafety refuses, is refused whole; the caller escapes it as text. Pure,
 ## over bytes: the renderer (MdRawHtml, MdInline) asks it, and it is exposed, so a
@@ -21,12 +21,12 @@ MdMedia := [].{
 	img_at : List(U8), { start : U64, uploads : MdSafety.Uploads } -> Try(Rebuilt, [NotSafe])
 	img_at = |raw, { start, uploads }| {
 		tag = scan(raw, { start, name: "img".to_utf8() })?
-		attrs = MdSafety.media_attrs({
+		attributes = MdSafety.media_attributes({
 			kind: Img,
-			value_of: |name| last_of(tag.attrs, name),
+			value_of: |name| last_of(tag.attributes, name),
 			uploads,
 		})?
-		Ok({ html: MdHtml.img(attrs), end: tag.end })
+		Ok({ html: MdHtml.img(attributes), end: tag.end })
 	}
 
 	## The `<video …></video>` pair at
@@ -36,13 +36,13 @@ MdMedia := [].{
 	video_at : List(U8), { start : U64, uploads : MdSafety.Uploads } -> Try(Rebuilt, [NotSafe])
 	video_at = |raw, { start, uploads }| {
 		tag = scan(raw, { start, name: "video".to_utf8() })?
-		attrs = MdSafety.media_attrs({
+		attributes = MdSafety.media_attributes({
 			kind: Video,
-			value_of: |name| last_of(tag.attrs, name),
+			value_of: |name| last_of(tag.attributes, name),
 			uploads,
 		})?
 		close = close_tag_end(raw, { at: skip_spaces(raw, tag.end), name: "video".to_utf8() })?
-		Ok({ html: MdHtml.video(attrs), end: close })
+		Ok({ html: MdHtml.video(attributes), end: close })
 	}
 
 	## The image tag `tag` (`<img …>`, from its `<`) rebuilt, or `Unsafe`:
@@ -60,7 +60,7 @@ MdMedia := [].{
 
 ## A start tag's attributes, each name as written, and the index past its
 ## `>`.
-Tag : { attrs : List((List(U8), List(U8))), end : U64 }
+Tag : { attributes : List((List(U8), List(U8))), end : U64 }
 
 ## `<name` (any case) at `start`,
 ## then a space, `>` or `/`; then each `name=value` up to the tag's `>`,
@@ -79,17 +79,17 @@ scan = |raw, { start, name }| {
 		if !MdText.is_space(d) and d != '>' and d != '/' {
 			Err(NotSafe)
 		} else {
-			attrs_from(raw, after)
+			attributes_from(raw, after)
 		}
 	}
 }
 
 ## TagScan's walk from `i`, just past the tag's name.
-attrs_from : List(U8), U64 -> Try(Tag, [NotSafe])
-attrs_from = |raw, from| {
+attributes_from : List(U8), U64 -> Try(Tag, [NotSafe])
+attributes_from = |raw, from| {
 	length = raw.len()
 	var $i = from
-	var $attrs = []
+	var $attributes = []
 	var $end = 0
 	while $i < length and $end == 0 {
 		c = MdText.byte_at(raw, $i)
@@ -99,7 +99,7 @@ attrs_from = |raw, from| {
 			$end = $i + 1
 		} else {
 			name_start = $i
-			while $i < length and MdText.is_attr_name_char(MdText.byte_at(raw, $i)) {
+			while $i < length and MdText.is_attribute_name_char(MdText.byte_at(raw, $i)) {
 				$i = $i + 1
 			}
 			if $i == name_start {
@@ -125,7 +125,7 @@ attrs_from = |raw, from| {
 					} else {
 						{}
 					}
-					$attrs = $attrs.append((
+					$attributes = $attributes.append((
 						name,
 						MdText.cut(raw, { start: value_start, end: close }),
 					))
@@ -137,10 +137,10 @@ attrs_from = |raw, from| {
 					) and MdText.byte_at(raw, $i) != '>' {
 						$i = $i + 1
 					}
-					$attrs = $attrs.append((name, MdText.cut(raw, { start: value_start, end: $i })))
+					$attributes = $attributes.append((name, MdText.cut(raw, { start: value_start, end: $i })))
 				}
 			} else {
-				$attrs = $attrs.append((name, []))
+				$attributes = $attributes.append((name, []))
 			}
 		}
 	}
@@ -148,7 +148,7 @@ attrs_from = |raw, from| {
 	if $end == 0 {
 		Err(NotSafe)
 	} else {
-		Ok({ attrs: $attrs, end: $end })
+		Ok({ attributes: $attributes, end: $end })
 	}
 }
 
@@ -186,7 +186,7 @@ close_tag_end = |raw, { at, name }| {
 
 ## The last value of attribute `name` (lowercase), in any case.
 last_of : List((List(U8), List(U8))), List(U8) -> Try(List(U8), [Absent])
-last_of = |attrs, name| match attrs.find_last(|(n, _)| MdText.is_same_ignoring_case(n, name)) {
+last_of = |attributes, name| match attributes.find_last(|(n, _)| MdText.is_same_ignoring_case(n, name)) {
 	Ok((_, v)) => Ok(v)
 	Err(NotFound) => Err(Absent)
 }

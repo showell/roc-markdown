@@ -154,7 +154,7 @@ MdLinks := [].{
 		uploads : MdSafety.Uploads,
 	} -> Try(List(U8), [NotSafe])
 	image = |{ src, alt, title, uploads }| {
-		attrs = MdSafety.media_attrs({
+		attributes = MdSafety.media_attributes({
 			kind: Img,
 			uploads,
 			value_of: |name|
@@ -171,7 +171,7 @@ MdLinks := [].{
 					Err(Absent)
 				},
 		})?
-		Ok(MdHtml.img(attrs))
+		Ok(MdHtml.img(attributes))
 	}
 
 	## A document's `![alt](src "title")`, the same tag `image` writes. The
@@ -188,13 +188,13 @@ MdLinks := [].{
 			Err(NotSafe)
 		} else {
 			named = [
-				{ name: "src".to_utf8(), attr_value: Is(src) },
-				{ name: "alt".to_utf8(), attr_value: Is(alt) },
+				{ name: "src".to_utf8(), attribute_value: Is(src) },
+				{ name: "alt".to_utf8(), attribute_value: Is(alt) },
 			]
 			Ok(
 				MdHtml.img(
 					match title {
-						Titled(t) => named.append({ name: "title".to_utf8(), attr_value: Is(t) })
+						Titled(t) => named.append({ name: "title".to_utf8(), attribute_value: Is(t) })
 						Untitled => named
 					},
 				),

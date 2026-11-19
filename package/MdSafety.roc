@@ -95,12 +95,12 @@ MdSafety := [].{
 	## src, and is a player: `controls` and `preload="metadata"`, never
 	## autoplay. Both keep width and height when all digits, which the page
 	## needs to hold the media's place while it loads.
-	media_attrs : {
+	media_attributes : {
 		kind : [Img, Video],
 		value_of : List(U8) -> Try(List(U8), [Absent]),
 		uploads : MdSafety.Uploads,
-	} -> Try(List(MdHtml.Attr), [NotSafe])
-	media_attrs = |{ kind, value_of, uploads }| {
+	} -> Try(List(MdHtml.Attribute), [NotSafe])
+	media_attributes = |{ kind, value_of, uploads }| {
 		src = match value_of("src".to_utf8()) {
 			Ok(v) => v
 			Err(Absent) => return Err(NotSafe)
@@ -110,12 +110,12 @@ MdSafety := [].{
 		} else {
 			kept = |names, keep| names.join_map(
 				|name| match value_of(name) {
-					Ok(v) if keep(v) => [{ name, attr_value: Is(v) }]
+					Ok(v) if keep(v) => [{ name, attribute_value: Is(v) }]
 					_ => []
 				},
 			)
 			player = if kind == Video {
-				video_player_attrs
+				video_player_attributes
 			} else {
 				[]
 			}
@@ -128,7 +128,7 @@ MdSafety := [].{
 			Ok(
 				[
 					player,
-					[{ name: "src".to_utf8(), attr_value: Is(src) }],
+					[{ name: "src".to_utf8(), attribute_value: Is(src) }],
 					texts,
 					kept(["width".to_utf8(), "height".to_utf8()], MdText.is_all_digits),
 				].join(),
@@ -222,10 +222,10 @@ has_encoded_separator = |src| {
 }
 
 ## A video is a player the reader starts: never autoplay.
-video_player_attrs : List(MdHtml.Attr)
-video_player_attrs = [
-	{ name: "controls".to_utf8(), attr_value: Bare },
-	{ name: "preload".to_utf8(), attr_value: Is("metadata".to_utf8()) },
+video_player_attributes : List(MdHtml.Attribute)
+video_player_attributes = [
+	{ name: "controls".to_utf8(), attribute_value: Bare },
+	{ name: "preload".to_utf8(), attribute_value: Is("metadata".to_utf8()) },
 ]
 
 dangerous_schemes : List(Str)

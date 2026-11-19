@@ -92,8 +92,8 @@ MdText := [].{
 	is_word_char = |c| Ascii.is_alphanumeric(c) or c == '_'
 
 	## An HTML attribute's name.
-	is_attr_name_char : U8 -> Bool
-	is_attr_name_char = |c| Ascii.is_alphanumeric(c) or c == '-' or c == '_' or c == ':'
+	is_attribute_name_char : U8 -> Bool
+	is_attribute_name_char = |c| Ascii.is_alphanumeric(c) or c == '-' or c == '_' or c == ':'
 
 	## One digit or more, and nothing else.
 	is_all_digits : List(U8) -> Bool

@@ -141,13 +141,13 @@ MdHtml := [].{
 		} else {
 			"<td"
 		}
-		attr = match align {
+		attribute = match align {
 			Plain => ""
 			Left => " align=\"left\""
 			Center => " align=\"center\""
 			Right => " align=\"right\""
 		}
-		List.concat(name.to_utf8(), attr.to_utf8()).append('>')
+		List.concat(name.to_utf8(), attribute.to_utf8()).append('>')
 	}
 
 	## The close of a `cell_open`.
@@ -208,7 +208,7 @@ MdHtml := [].{
 		['"'],
 		match title {
 			Untitled => []
-			Titled(text) => attrs_onto([], [{ name: "title".to_utf8(), attr_value: Is(text) }])
+			Titled(text) => attributes_onto([], [{ name: "title".to_utf8(), attribute_value: Is(text) }])
 		},
 		if tab == NewTab {
 			" target=\"_blank\" rel=\"noopener\"".to_utf8()
@@ -237,11 +237,11 @@ MdHtml := [].{
 
 	## One attribute of a rebuilt media tag: ` name`, or ` name="value"`,
 	## the value escaped.
-	Attr : { name : List(U8), attr_value : [Bare, Is(List(U8))] }
+	Attribute : { name : List(U8), attribute_value : [Bare, Is(List(U8))] }
 
 	## A member's `<img>`, rebuilt from the attributes MdSafety let through.
-	img : List(Attr) -> List(U8)
-	img = |attrs| attrs_onto("<img".to_utf8(), attrs).append('>')
+	img : List(Attribute) -> List(U8)
+	img = |attributes| attributes_onto("<img".to_utf8(), attributes).append('>')
 
 	## The text of html this renderer wrote, its markup gone: every tag
 	## dropped and the escapes MdText writes read back, so the text can be
@@ -280,8 +280,8 @@ MdHtml := [].{
 	}
 
 	## A member's `<video>`, rebuilt as a player with no fallback content.
-	video : List(Attr) -> List(U8)
-	video = |attrs| List.concat(attrs_onto("<video".to_utf8(), attrs), "></video>".to_utf8())
+	video : List(Attribute) -> List(U8)
+	video = |attributes| List.concat(attributes_onto("<video".to_utf8(), attributes), "></video>".to_utf8())
 }
 
 ## The escapes MdText writes, and the byte each stands for.
@@ -300,12 +300,12 @@ mark_byte = 1
 heading_digit : U64 -> U8
 heading_digit = |level| '0' + level.to_u8_wrap()
 
-attrs_onto : List(U8), List(MdHtml.Attr) -> List(U8)
-attrs_onto = |out, attrs| {
+attributes_onto : List(U8), List(MdHtml.Attribute) -> List(U8)
+attributes_onto = |out, attributes| {
 	var $out = out
-	for { name, attr_value } in attrs {
+	for { name, attribute_value } in attributes {
 		named = List.concat($out.append(' '), name)
-		$out = match attr_value {
+		$out = match attribute_value {
 			Bare => named
 			Is(v) => MdText.escape_onto(List.concat(named, ['=', '"']), v).append('"')
 		}
@@ -323,6 +323,6 @@ expect MdHtml.link_open({
 	title: Untitled,
 }) == "<a href=\"/a?b&amp;c\">".to_utf8()
 expect MdHtml.video([
-	{ name: "controls".to_utf8(), attr_value: Bare },
-	{ name: "src".to_utf8(), attr_value: Is("/v\".mp4".to_utf8()) },
+	{ name: "controls".to_utf8(), attribute_value: Bare },
+	{ name: "src".to_utf8(), attribute_value: Is("/v\".mp4".to_utf8()) },
 ]) == "<video controls src=\"/v&quot;.mp4\"></video>".to_utf8()
