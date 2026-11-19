@@ -111,11 +111,11 @@ MdInline := [].{
 			reference = if references == Linked {
 				MdChat.reference_at(text, $i)
 			} else {
-				Err(NoRef)
+				Err(NotAReference)
 			}
 			step = match reference {
 				Ok(chat_reference) => Token(Html(chat_reference.html), chat_reference.end)
-				Err(NoRef) =>
+				Err(NotAReference) =>
 					if byte == '\\' and MdText.is_escapable(text, $i + 1) {
 						Token(Text($i + 1, $i + 2), $i + 2)
 					} else if byte == '<' {

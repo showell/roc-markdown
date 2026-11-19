@@ -17,7 +17,7 @@ import MdText
 
 MdList := [].{
 
-	Kind : [Bullet(U8), Ordered({ start : U64, delim : U8 })]
+	Kind : [Bullet(U8), Ordered({ start : U64, delimiter : U8 })]
 
 	## A list item's marker: its kind, the column its content starts at (the
 	## item's indent), and what its own line holds of that content.
@@ -53,12 +53,12 @@ MdList := [].{
 						indent + 9,
 					)
 					match line.get(digits_end) {
-						Ok(delim) if delim == '.' or delim == ')' => {
+						Ok(delimiter) if delimiter == '.' or delimiter == ')' => {
 							start = MdText.cut(line, { start: indent, end: digits_end }).fold(
 								0,
 								|number, digit| number * 10 + (digit - '0').to_u64(),
 							)
-							Ok({ kind: Ordered({ start, delim }), marker_end: digits_end + 1 })
+							Ok({ kind: Ordered({ start, delimiter }), marker_end: digits_end + 1 })
 						}
 						_ => Err(NotAMarker)
 					}
@@ -339,7 +339,7 @@ expect fence_after(Open({ char: '`', count: 3 }), "````".to_utf8()) == Shut
 is_same_list : MdList.Marker, MdList.Marker -> Bool
 is_same_list = |marker, other| match (marker.kind, other.kind) {
 	(Bullet(x), Bullet(y)) => x == y
-	(Ordered(x), Ordered(y)) => x.delim == y.delim
+	(Ordered(x), Ordered(y)) => x.delimiter == y.delimiter
 	_ => Bool.False
 }
 

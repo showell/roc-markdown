@@ -69,8 +69,10 @@ MdTable := [].{
 		if line_end >= md.len() {
 			Err(NotATable)
 		} else {
-			delim_end = MdText.line_end(md, line_end + 1)
-			match delimiter_row_aligns(MdText.cut(md, { start: line_end + 1, end: delim_end })) {
+			delimiter_row_end = MdText.line_end(md, line_end + 1)
+			match delimiter_row_aligns(
+				MdText.cut(md, { start: line_end + 1, end: delimiter_row_end }),
+			) {
 				Err(NotADelimiter) => Err(NotATable)
 				Ok(aligns) => {
 					header_cells = cells(MdText.cut(md, { start: line_start, end: line_end }))
@@ -78,7 +80,7 @@ MdTable := [].{
 						Ok({
 							header_cells,
 							aligns,
-							body: MdText.next_line(md, delim_end),
+							body: MdText.next_line(md, delimiter_row_end),
 						})
 					} else {
 						Err(NotATable)
