@@ -138,7 +138,10 @@ MdLinks := [].{
 		destination = MdText.trim_line(url)
 		close = Bytes.count_while(destination, { keep: |c| c != '<' and c != '>', at: 1 })
 		if destination.first() == Ok('<') and destination.get(close) == Ok('>') {
-			titled_destination(MdText.cut(destination, { start: 1, end: close }), destination.drop_first(close + 1))
+			titled_destination(
+				MdText.cut(destination, { start: 1, end: close }),
+				destination.drop_first(close + 1),
+			)
 		} else {
 			image_destination(url)
 		}
@@ -194,7 +197,10 @@ MdLinks := [].{
 			Ok(
 				MdHtml.img(
 					match title {
-						Titled(t) => named.append({ name: "title".to_utf8(), attribute_value: Is(t) })
+						Titled(t) => named.append({
+							name: "title".to_utf8(),
+							attribute_value: Is(t),
+						})
 						Untitled => named
 					},
 				),
@@ -318,7 +324,11 @@ pair_closes = |text, { opener, closer, escapes }| {
 
 ## A destination's `src`, and what follows it read as a title. Anything else
 ## there is no destination.
-titled_destination : List(U8), List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
+titled_destination : List(U8),
+List(U8) -> Try(
+	{ src : List(U8), title : MdHtml.Title },
+	[NotAnImage],
+)
 titled_destination = |src, after| {
 	rest = MdText.trim_line(after)
 	n = rest.len()

@@ -69,6 +69,7 @@ MdInline := [].{
 		}
 		shows_images = references == Document(Shown) or references == DocumentLabel(Shown)
 		alt_as_text = references == DocumentLabel(AsLinks)
+		reads_images = references != DocumentAlt
 		outside = if is_document {
 			SameTab
 		} else {
@@ -161,7 +162,7 @@ MdInline := [].{
 								Skip($i + n)
 							}
 						}
-					} else if c == '!' and text.get($i + 1) == Ok('[') and references != DocumentAlt {
+					} else if c == '!' and text.get($i + 1) == Ok('[') and reads_images {
 						# `![alt](src)`: an image where its src is an upload, else
 						# the `!` is dropped and the `[` read as a link (MdSafety).
 						linked = MdLinks.link_at(
@@ -194,7 +195,10 @@ MdInline := [].{
 							Ok(found) => {
 								is_safe = !MdSafety.is_dangerous_url(found.destination.src)
 								is_shown = (shows_images or alt_as_text) and is_safe
-								if MdSafety.is_upload_url(found.destination.src, uploads) or is_shown {
+								if MdSafety.is_upload_url(
+									found.destination.src,
+									uploads,
+								) or is_shown {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.html_onto({
@@ -257,7 +261,7 @@ MdInline := [].{
 							# Refused: the whole link's source left in the
 							# pending text, nothing in it read (MdSafety).
 								Skip(link.end)
-							Ok(link) if is_document and MdLinks.document_destination(link.url).is_err() =>
+							Ok(link) if is_bad_link(link.url, is_document) =>
 							# A document's destination is CommonMark's: a space
 							# outside `<…>` and before no title makes no link.
 								Skip($i + 1)
@@ -369,12 +373,15 @@ link_destination = |url, is_document| match if is_document {
 	Err(NotAnImage) => { src: url, title: Untitled }
 }
 
+## A document's link whose destination CommonMark reads as none, as `a b`.
+is_bad_link : List(U8), Bool -> Bool
+is_bad_link = |url, is_document| is_document and MdLinks.document_destination(url).is_err()
+
 ## A browser would run the destination, as written or as `link_destination` reads it.
 is_refused_link : List(U8), Bool -> Bool
-is_refused_link = |
-	url,
-	is_document,
-| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_destination(url, is_document).src)
+is_refused_link = |url, is_document| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(
+	link_destination(url, is_document).src,
+)
 
 ## A piece of the line: text (a span of it, escaped when written), html made
 ## here, or a `*`/`_`/`~` run (by its index among the runs).

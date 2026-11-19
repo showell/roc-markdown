@@ -208,7 +208,10 @@ MdHtml := [].{
 		['"'],
 		match title {
 			Untitled => []
-			Titled(text) => attributes_onto([], [{ name: "title".to_utf8(), attribute_value: Is(text) }])
+			Titled(text) => attributes_onto(
+				[],
+				[{ name: "title".to_utf8(), attribute_value: Is(text) }],
+			)
 		},
 		if tab == NewTab {
 			" target=\"_blank\" rel=\"noopener\"".to_utf8()
@@ -281,7 +284,10 @@ MdHtml := [].{
 
 	## A member's `<video>`, rebuilt as a player with no fallback content.
 	video : List(Attribute) -> List(U8)
-	video = |attributes| List.concat(attributes_onto("<video".to_utf8(), attributes), "></video>".to_utf8())
+	video = |attributes| List.concat(
+		attributes_onto("<video".to_utf8(), attributes),
+		"></video>".to_utf8(),
+	)
 }
 
 ## The escapes MdText writes, and the byte each stands for.

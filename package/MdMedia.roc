@@ -137,7 +137,10 @@ attributes_from = |raw, from| {
 					) and MdText.byte_at(raw, $i) != '>' {
 						$i = $i + 1
 					}
-					$attributes = $attributes.append((name, MdText.cut(raw, { start: value_start, end: $i })))
+					$attributes = $attributes.append((
+						name,
+						MdText.cut(raw, { start: value_start, end: $i }),
+					))
 				}
 			} else {
 				$attributes = $attributes.append((name, []))
@@ -186,7 +189,10 @@ close_tag_end = |raw, { at, name }| {
 
 ## The last value of attribute `name` (lowercase), in any case.
 last_of : List((List(U8), List(U8))), List(U8) -> Try(List(U8), [Absent])
-last_of = |attributes, name| match attributes.find_last(|(n, _)| MdText.is_same_ignoring_case(n, name)) {
+last_of = |
+	attributes,
+	name,
+| match attributes.find_last(|(n, _)| MdText.is_same_ignoring_case(n, name)) {
 	Ok((_, v)) => Ok(v)
 	Err(NotFound) => Err(Absent)
 }
