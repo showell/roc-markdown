@@ -2,3 +2,4 @@
 -- beside its cookbook/words/accepted_terms.txt: one a line, each with its
 -- reason after `--`. tools/lints.shale hands it over as `accepted=`.
 args    -- a fence's info string after its language, as MdDocument.Fence names it for a hook (roc-apps' book builder reads the field)
+www     -- GFM's word, "extended www autolinks": MdAutolink's `Www` kind
