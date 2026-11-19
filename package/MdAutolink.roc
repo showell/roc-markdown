@@ -28,7 +28,7 @@ MdAutolink := [].{
 			text,
 			{ at: start, prefix: prefix.to_utf8() },
 		)
-		scheme_len = if is_prefixed("http://") {
+		scheme_length = if is_prefixed("http://") {
 			7
 		} else if is_prefixed("https://") {
 			8
@@ -39,7 +39,7 @@ MdAutolink := [].{
 			text,
 			{ keep: |c| c > ' ' and c != 0x7f and c != '<' and c != '>', at: start },
 		)
-		if scheme_len == 0 or close <= start + scheme_len or text.get(close) != Ok('>') {
+		if scheme_length == 0 or close <= start + scheme_length or text.get(close) != Ok('>') {
 			Err(NotALink)
 		} else {
 			Ok({ url: MdText.cut(text, { start, end: close }), end: close + 1 })

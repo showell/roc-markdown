@@ -18,7 +18,7 @@ MdQuote := [].{
 
 	## The line starts a quote: up to three spaces and a `>`.
 	is_quote_line : List(U8) -> Bool
-	is_quote_line = |line| quote_marker_len(line).is_ok()
+	is_quote_line = |line| quote_marker_length(line).is_ok()
 
 	## The quote from `line_start`, its `>` lines (and a
 	## paragraph's lazy lines, up to a blank one) stripped and rendered as
@@ -61,7 +61,7 @@ MdQuote := [].{
 			} else {
 				{}
 			}
-			match quote_marker_len(line) {
+			match quote_marker_length(line) {
 				Ok(marker_end) => {
 					stripped = without_marker(line, { marker_end, reading })
 					start = $inner.len()
@@ -111,8 +111,8 @@ MdQuote := [].{
 }
 
 ## Where a quote's `>` ends: after up to three spaces and the `>`.
-quote_marker_len : List(U8) -> Try(U64, [NotAQuote])
-quote_marker_len = |line| {
+quote_marker_length : List(U8) -> Try(U64, [NotAQuote])
+quote_marker_length = |line| {
 	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 	if indent >= 4 or line.get(indent) != Ok('>') {
 		Err(NotAQuote)
@@ -134,7 +134,7 @@ nests_text = |line, { is_block_start, is_code, reading }| {
 	var $content = line
 	var $is_nested = Bool.True
 	while $is_nested {
-		match quote_marker_len($content) {
+		match quote_marker_length($content) {
 			Ok(marker_end) => {
 				$content = without_marker($content, { marker_end, reading })
 			}

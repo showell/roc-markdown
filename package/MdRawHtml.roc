@@ -19,9 +19,9 @@ MdRawHtml := [].{
 	raw_html_onto = |out, { md, line_start, budget, uploads }| {
 		# CommonMark's type 7: only at a block's start, and up to a blank line,
 		# with no <p> and no newline added.
-		md_len = md.len()
+		md_length = md.len()
 		var $p = MdText.next_line(md, MdText.line_end(md, line_start))
-		while $p < md_len and !MdText.is_blank(
+		while $p < md_length and !MdText.is_blank(
 			MdText.cut(md, { start: $p, end: MdText.line_end(md, $p) }),
 		) {
 			$p = MdText.next_line(md, MdText.line_end(md, $p))

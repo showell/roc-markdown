@@ -127,8 +127,8 @@ MdLinks := [].{
 	image_destination : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
 	image_destination = |url| {
 		destination = MdText.trim_line(url)
-		src_len = Bytes.count_while(destination, { keep: |c| c != ' ' and c != '\t', at: 0 })
-		titled_destination(destination.take_first(src_len), destination.drop_first(src_len))
+		src_length = Bytes.count_while(destination, { keep: |c| c != ' ' and c != '\t', at: 0 })
+		titled_destination(destination.take_first(src_length), destination.drop_first(src_length))
 	}
 
 	## A document's destination, for its links and images alike: `image_destination`'s,
