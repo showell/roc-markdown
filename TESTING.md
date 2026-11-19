@@ -8,7 +8,7 @@ every case that moved. Each corpus's pass count is held to a ratchet, which
 only rises.
 
 ```
-zig build test                          # roc test, then the judge, the REPL's and the playground's tests
+zig build test                          # roc test package/MdSpec.roc, then the judge, the REPL's and the playground's tests
 zig build judge -- --also <corpus.jsonl> # the judge, with a private corpus too
 shale tools/verify.shale                # every check above, a PASS/FAIL checklist
 ```
@@ -71,7 +71,7 @@ rule, and never leaves the machine it lives on. **The judge prints counts
 and failing case ids, never a case's text,** so it can judge messages
 nobody else should read.
 
-`Md.render_document` is in no corpus. The expects beside it hold it, next to a
+`Md.render_document` is in no corpus. MdSpec's expects hold it, next to a
 chat's render of the same text.
 
 ## Re-freezing
@@ -85,6 +85,7 @@ moved without quoting it: "four tables, one link with parens".
 
 `tools/verify.shale` runs everything in one go and prints a checklist:
 - Shale's Roc recipes over every `.roc` file git tracks (`tools/lints.shale`),
+  a module's 500-line limit among them (a `*Spec.roc` has none),
   each count held at zero but the findings it names singly beside their
   reasons, with `tools/vocabulary.txt` as this repository's decided words;
 - the build and tests;
@@ -144,15 +145,18 @@ as its uploads rule, as roc-chat does).
 | Path | What |
 |---|---|
 | `package/main.roc` | the package and what it exposes |
-| `package/Md.roc` | the API, the modes, and the expects of whole messages and pages |
+| `package/Md.roc` | the API and the modes |
+| `package/MdSpec.roc` | the expects of whole messages and pages, and the test root: `roc test package/MdSpec.roc` reaches every module through Md |
 | `package/MdBlocks.roc` | the block dispatch and paragraphs |
 | `package/MdDialect.roc`, `MdIndent.roc` | what a chat and a document read differently, and how each counts an indent |
 | `package/MdList.roc`, `MdQuote.roc` | the container blocks, handed the dispatch by `MdBlocks` |
 | `package/MdTable.roc`, `MdTableBlock.roc` | a table's grammar, and the table rendered |
 | `package/MdFence.roc`, `MdHeading.roc`, `MdRawHtml.roc` | code fences, headings and raw HTML blocks |
-| `package/MdInline.roc` | the inline pass: a line's pieces and code spans |
+| `package/MdInline.roc` | the inline pass: a line's pieces |
+| `package/MdCodeSpan.roc` | code spans, and a reflowed paragraph's lines joined around them |
 | `package/MdEmphasis.roc` | the emphasis engine, CommonMark's delimiter stack |
-| `package/MdLinks.roc` | links and autolinks |
+| `package/MdLinks.roc` | links, their destinations, and markdown's images |
+| `package/MdAutolink.roc` | GFM's autolinks, and a document's `<http://…>` |
 | `package/MdMedia.roc` | a user's `<img>` and `<video>`, scanned and rebuilt |
 | `package/MdHtml.roc` | every tag and attribute the renderer writes |
 | `package/MdSafety.roc` | the URL and attribute rules |

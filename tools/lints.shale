@@ -1,7 +1,9 @@
 -- **SHALE'S ROC HUNTS OVER EVERY .roc FILE GIT TRACKS, EACH HELD AT ZERO**:
--- the recipes roc-apps' tools/quality.shale runs, with its settings, and
--- check_vocabulary over tools/vocabulary.txt. tools/verify.shale runs this
--- and takes its lines; on its own, from the repository's root:
+-- the recipes roc-apps' tools/quality.shale runs, with its settings,
+-- check_vocabulary over tools/vocabulary.txt, and check_module_size (a
+-- module is at most 500 lines, tests included; a `*Spec.roc` has no limit).
+-- tools/verify.shale runs this and takes its lines; on its own, from the
+-- repository's root:
 --
 --   shale tools/lints.shale
 --
@@ -45,6 +47,10 @@ const LINTS = {
   {recipe = "check_families", args = {}, checks = {{"family", "family"}, {"twin_name", "twin_name"}}},
   {recipe = "find_unused_imports", args = {}, checks = {{"unused_import", "unused_import"}}},
   {recipe = "check_name_types", args = {}, checks = {{"name_type", "name_type"}, {"bare_beside_unit", "bare_beside_unit"}, {"no_value", "no_value"}}},
+  -- Its summary counts the modules and the test files apart; together they
+  -- are the files it read.
+  {recipe = "check_module_size", args = {}, files = "([0-9]+) modules, ([0-9]+) test files",
+    checks = {{"module_size", "module_size"}, {"unneeded_exemption", "unneeded_exemption"}}},
 }
 
 -- **THE FINDINGS HELD AS NAMED EXCEPTIONS.** Each is one finding, by its
@@ -101,11 +107,13 @@ function judge_lint(lint, r, tracked, seen)
   for l in own do
     if starts_with(l, "refused: ") or starts_with(l, "not reached by ") then push(wrong, l) end
   end
-  local read_files = re_find(summary, "([0-9]+) files")
+  local read_files = re_find(summary, get(lint, "files", "([0-9]+) files"))
   if read_files == nil then
     push(wrong, "no file count in its summary: " .. summary)
-  elseif tonumber(read_files.group) ~= tracked then
-    push(wrong, "it read " .. read_files.group .. " files, and git tracks " .. tracked)
+  else
+    local n = 0
+    for g in read_files.groups do n = n + tonumber(g) end
+    if n ~= tracked then push(wrong, "it read " .. n .. " files, and git tracks " .. tracked) end
   end
   local held = {}
   for e in EXCEPTIONS do
