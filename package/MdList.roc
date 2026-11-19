@@ -38,16 +38,16 @@ MdList := [].{
 	} -> Try(Marker, [NotAMarker])
 	list_marker_at = |md, { line_start, reading }| {
 		line = MdText.cut(md, { start: line_start, end: MdText.line_end(md, line_start) })
-		n = line.len()
-		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
-		if indent >= 4 or indent >= n {
+		length = line.len()
+		indent = U64.min(Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 }), 4)
+		if indent >= 4 or indent >= length {
 			Err(NotAMarker)
 		} else {
-			c = MdText.byte_at(line, indent)
+			byte = MdText.byte_at(line, indent)
 			found =
-				if c == '-' or c == '+' or c == '*' {
-					Ok({ kind: Bullet(c), marker_end: indent + 1 })
-				} else if Ascii.is_digit(c) {
+				if byte == '-' or byte == '+' or byte == '*' {
+					Ok({ kind: Bullet(byte), marker_end: indent + 1 })
+				} else if Ascii.is_digit(byte) {
 					digits_end = U64.min(
 						Bytes.count_while(line, { keep: Ascii.is_digit, at: indent }),
 						indent + 9,
@@ -56,7 +56,7 @@ MdList := [].{
 						Ok(delim) if delim == '.' or delim == ')' => {
 							start = MdText.cut(line, { start: indent, end: digits_end }).fold(
 								0,
-								|number, d| number * 10 + (d - '0').to_u64(),
+								|number, digit| number * 10 + (digit - '0').to_u64(),
 							)
 							Ok({ kind: Ordered({ start, delim }), marker_end: digits_end + 1 })
 						}
@@ -84,9 +84,9 @@ MdList := [].{
 	## first item is not empty, and an ordered one only when it starts at 1.
 	is_list_interrupting : List(U8), { line_start : U64, reading : MdIndent.Reading } -> Bool
 	is_list_interrupting = |md, place| match list_marker_at(md, place) {
-		Ok(m) =>
-			m.first_line != [] and match m.kind {
-				Ordered(o) => o.start == 1
+		Ok(marker) =>
+			marker.first_line != [] and match marker.kind {
+				Ordered(ordered) => ordered.start == 1
 				Bullet(_) => Bool.True
 			}
 		Err(NotAMarker) => Bool.False
@@ -145,9 +145,9 @@ MdList := [].{
 				indent = MdIndent.columns_of(line, reading)
 				marker = list_marker_at(md, { line_start: $p, reading })
 				match marker {
-					Ok(m) if indent < $current_column => {
+					Ok(next_marker) if indent < $current_column => {
 						# `- - -` reads as a marker too, and a rule outranks one.
-						if !is_same_list(m, first) or is_rule(line) {
+						if !is_same_list(next_marker, first) or is_rule(line) {
 							break
 						} else {
 							{}
@@ -159,10 +159,10 @@ MdList := [].{
 							{}
 						}
 						$have_item = Bool.True
-						$current_column = m.content_column
+						$current_column = next_marker.content_column
 						$blanks = 0
-						$current_item = m.first_line.append('\n')
-						$fence = fence_after(Shut, m.first_line)
+						$current_item = next_marker.first_line.append('\n')
+						$fence = fence_after(Shut, next_marker.first_line)
 					}
 					_ =>
 						if $blanks > 0 and $current_item == ['\n'] {
@@ -198,7 +198,7 @@ MdList := [].{
 			$items
 		}
 		open = match first.kind {
-			Ordered(o) => MdHtml.ol_open(o.start)
+			Ordered(ordered) => MdHtml.ol_open(ordered.start)
 			Bullet(_) => MdHtml.ul_open
 		}
 		var $out = List.concat(out, open)
@@ -246,7 +246,7 @@ MdList := [].{
 ## with more, or a tab, its content is what follows one space.
 spaced_marker : List(U8), { kind : MdList.Kind, marker_end : U64 } -> MdList.Marker
 spaced_marker = |line, { kind, marker_end }| {
-	spaces = Bytes.count_while(line, { keep: |s| s == ' ', at: marker_end }) - marker_end
+	spaces = Bytes.count_while(line, { keep: |byte| byte == ' ', at: marker_end }) - marker_end
 	if marker_end >= line.len() {
 		{ kind, content_column: marker_end + 1, first_line: [] }
 	} else if spaces == 0 or spaces > 4 {
@@ -337,7 +337,7 @@ expect fence_after(Open({ char: '`', count: 3 }), "````".to_utf8()) == Shut
 
 ## The same bullet, or the same ordered delimiter.
 is_same_list : MdList.Marker, MdList.Marker -> Bool
-is_same_list = |a, b| match (a.kind, b.kind) {
+is_same_list = |marker, other| match (marker.kind, other.kind) {
 	(Bullet(x), Bullet(y)) => x == y
 	(Ordered(x), Ordered(y)) => x.delim == y.delim
 	_ => Bool.False

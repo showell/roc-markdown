@@ -20,7 +20,7 @@ import MdText
 
 MdChat := [].{
 
-	## A message reference at `i`: its link, and the index past it. Two forms,
+	## A message reference at `at`: its link, and the index past it. Two forms,
 	## each between word boundaries:
 	##   - `\bMSG_([A-Za-z0-9-]+_[0-9]+)\b`, a topic's message, on this page
 	##     only;
@@ -31,15 +31,15 @@ MdChat := [].{
 	## host's to decide. The pass reads one first, whole, as its `_`s would
 	## otherwise be read as emphasis and split it.
 	reference_at : List(U8), U64 -> Try({ html : List(U8), end : U64 }, [NoRef])
-	reference_at = |text, i|
-		if MdText.byte_at(text, i) != 'M' {
+	reference_at = |text, at|
+		if MdText.byte_at(text, at) != 'M' {
 			Err(NoRef)
 		} else {
-			end = message_reference_end(text, i)?
+			end = message_reference_end(text, at)?
 			Ok({
 				html: MdHtml.message_reference({
-					slug: MdText.cut(text, { start: i + message_prefix.len(), end }),
-					label: MdText.cut(text, { start: i, end }),
+					slug: MdText.cut(text, { start: at + message_prefix.len(), end }),
+					label: MdText.cut(text, { start: at, end }),
 				}),
 				end,
 			})
@@ -57,16 +57,16 @@ MdChat := [].{
 }
 
 message_reference_end : List(U8), U64 -> Try(U64, [NoRef])
-message_reference_end = |text, i| {
+message_reference_end = |text, at| {
 	length = text.len()
-	n = message_prefix.len()
-	if i + n > length or MdText.cut(text, { start: i, end: i + n }) != message_prefix {
+	prefix_length = message_prefix.len()
+	if at + prefix_length > length or MdText.cut(text, { start: at, end: at + prefix_length }) != message_prefix {
 		Err(NoRef)
-	} else if i > 0 and MdText.is_word_char(MdText.byte_at(text, i - 1)) {
+	} else if at > 0 and MdText.is_word_char(MdText.byte_at(text, at - 1)) {
 		Err(NoRef)
 	} else {
-		first_end = slug_end(text, i + n)?
-		topic_end = long_topic_end(text, { channel_start: i + n, first_end })?
+		first_end = slug_end(text, at + prefix_length)?
+		topic_end = long_topic_end(text, { channel_start: at + prefix_length, first_end })?
 		if topic_end >= length or MdText.byte_at(text, topic_end) != '_' {
 			Err(NoRef)
 		} else {
@@ -114,7 +114,7 @@ channel_name_max = 40
 
 ## A `MSG_` reference's slug.
 is_slug_char : U8 -> Bool
-is_slug_char = |c| Ascii.is_alphanumeric(c) or c == '-'
+is_slug_char = |byte| Ascii.is_alphanumeric(byte) or byte == '-'
 
 message_prefix : List(U8)
 message_prefix = "MSG_".to_utf8()
@@ -131,8 +131,8 @@ expect MdChat.reference_at("MSG_Cobblestone.ChitChat_5.".to_utf8(), 0) == Ok({
 	html: "<a href=\"#msg-Cobblestone.ChitChat_5\" class=\"msg-ref\">MSG_Cobblestone.ChitChat_5</a>".to_utf8(),
 	end: 26,
 })
-expect MdChat.reference_at("MSG_a-1-.road-trip_9 x".to_utf8(), 0).map_ok(|r| r.end) == Ok(20)
-expect MdChat.reference_at("MSG_${"a".repeat(40)}.t_1".to_utf8(), 0).map_ok(|r| r.end) == Ok(48)
+expect MdChat.reference_at("MSG_a-1-.road-trip_9 x".to_utf8(), 0).map_ok(|reference| reference.end) == Ok(20)
+expect MdChat.reference_at("MSG_${"a".repeat(40)}.t_1".to_utf8(), 0).map_ok(|reference| reference.end) == Ok(48)
 # Not one: no number, a name too long, a channel not led by a letter, an
 # empty name, two dots, a word character after.
 expect MdChat.reference_at("MSG_x.y".to_utf8(), 0) == Err(NoRef)

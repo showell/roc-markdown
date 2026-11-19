@@ -17,32 +17,32 @@ MdTable := [].{
 	## pass.
 	cells : List(U8) -> List(List(U8))
 	cells = |line| {
-		t = MdText.trim_line(line)
-		length = t.len()
+		trimmed = MdText.trim_line(line)
+		length = trimmed.len()
 		var $cells = []
 		var $cell = []
 		var $after_pipe = Bool.False
-		var $i = if t.first() == Ok('|') {
+		var $i = if trimmed.first() == Ok('|') {
 			1
 		} else {
 			0
 		}
 		while $i < length {
-			c = MdText.byte_at(t, $i)
+			byte = MdText.byte_at(trimmed, $i)
 			$after_pipe = Bool.False
-			if c == '\\' and t.get($i + 1) == Ok('|') {
+			if byte == '\\' and trimmed.get($i + 1) == Ok('|') {
 				$cell = $cell.append('|')
 				$i = $i + 2
-			} else if c == '\\' and $i + 1 < length {
-				$cell = List.concat($cell, [c, MdText.byte_at(t, $i + 1)])
+			} else if byte == '\\' and $i + 1 < length {
+				$cell = List.concat($cell, [byte, MdText.byte_at(trimmed, $i + 1)])
 				$i = $i + 2
-			} else if c == '|' {
+			} else if byte == '|' {
 				$cells = $cells.append(MdText.trim_line($cell))
 				$cell = []
 				$after_pipe = Bool.True
 				$i = $i + 1
 			} else {
-				$cell = $cell.append(c)
+				$cell = $cell.append(byte)
 				$i = $i + 1
 			}
 		}
@@ -109,20 +109,20 @@ MdTable := [].{
 
 delimiter_cell : List(U8) -> Try(MdTable.Align, [NotADelimiter])
 delimiter_cell = |cell| {
-	n = cell.len()
+	length = cell.len()
 	left = cell.first() == Ok(':')
-	l = if left {
+	left_width = if left {
 		1
 	} else {
 		0
 	}
-	right = n > l and cell.last() == Ok(':')
-	r = if right {
+	right = length > left_width and cell.last() == Ok(':')
+	right_width = if right {
 		1
 	} else {
 		0
 	}
-	dashes = cell.sublist({ start: l, len: n - l - r })
+	dashes = cell.sublist({ start: left_width, len: length - left_width - right_width })
 	if dashes == [] or !dashes.all(|c| c == '-') {
 		Err(NotADelimiter)
 	} else if left and right {

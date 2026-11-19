@@ -112,7 +112,7 @@ row_onto = |
 | {
 	var $out = List.concat(out, MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
-	var $k = 0
+	var $cell_index = 0
 	for align in columns_of_row({ cells, aligns, dialect }) {
 		$budget = MdText.charge($budget, 1)
 		if MdText.is_blown($budget) {
@@ -122,14 +122,14 @@ row_onto = |
 		}
 		cell = MdInline.html_onto({
 			out: List.concat($out, MdHtml.cell_open(tag, align)),
-			text: cells.get($k) ?? [],
+			text: cells.get($cell_index) ?? [],
 			references: MdDialect.inline_references(dialect),
 			budget: $budget,
 			uploads,
 		})?
 		$out = List.concat(cell.out, MdHtml.cell_close(tag))
 		$budget = cell.budget
-		$k = $k + 1
+		$cell_index = $cell_index + 1
 	}
 	Ok({ out: List.concat($out, MdHtml.tr_close), budget: $budget })
 }

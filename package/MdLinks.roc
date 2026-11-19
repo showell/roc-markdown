@@ -69,7 +69,7 @@ MdLinks := [].{
 			close_bracket = label.close
 			open_paren = close_bracket + 1
 			(table, scanned) = match closes {
-				Scanned(t) => (t, $budget)
+				Scanned(scanned_table) => (scanned_table, $budget)
 				Unscanned => (
 					pair_closes(
 						text,
@@ -127,7 +127,7 @@ MdLinks := [].{
 	image_destination : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
 	image_destination = |url| {
 		destination = MdText.trim_line(url)
-		src_length = Bytes.count_while(destination, { keep: |c| c != ' ' and c != '\t', at: 0 })
+		src_length = Bytes.count_while(destination, { keep: |byte| byte != ' ' and byte != '\t', at: 0 })
 		titled_destination(destination.take_first(src_length), destination.drop_first(src_length))
 	}
 
@@ -136,7 +136,7 @@ MdLinks := [].{
 	document_destination : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
 	document_destination = |url| {
 		destination = MdText.trim_line(url)
-		close = Bytes.count_while(destination, { keep: |c| c != '<' and c != '>', at: 1 })
+		close = Bytes.count_while(destination, { keep: |byte| byte != '<' and byte != '>', at: 1 })
 		if destination.first() == Ok('<') and destination.get(close) == Ok('>') {
 			titled_destination(
 				MdText.cut(destination, { start: 1, end: close }),
@@ -167,7 +167,7 @@ MdLinks := [].{
 					Ok(alt)
 				} else if name == "title".to_utf8() {
 					match title {
-						Titled(t) => Ok(t)
+						Titled(title_text) => Ok(title_text)
 						Untitled => Err(Absent)
 					}
 				} else {
@@ -197,9 +197,9 @@ MdLinks := [].{
 			Ok(
 				MdHtml.img(
 					match title {
-						Titled(t) => named.append({
+						Titled(title_text) => named.append({
 							name: "title".to_utf8(),
-							attribute_value: Is(t),
+							attribute_value: Is(title_text),
 						})
 						Untitled => named
 					},
@@ -298,16 +298,16 @@ pair_closes = |text, { opener, closer, escapes }| {
 	var $open = []
 	var $i = 0
 	while $i < length {
-		c = MdText.byte_at(text, $i)
-		if c == '\\' and escapes == Read {
+		byte = MdText.byte_at(text, $i)
+		if byte == '\\' and escapes == Read {
 			$i = $i + 1
-		} else if c == opener {
+		} else if byte == opener {
 			$open = $open.append($i)
-		} else if c == closer {
+		} else if byte == closer {
 			match $open.last() {
-				Ok(j) => {
+				Ok(open_at) => {
 					$closes = $closes.set(
-						j,
+						open_at,
 						$i,
 					) ?? crash "MdLinks.pair_closes: an opener past the line"
 					$open = $open.drop_last(1)
@@ -331,17 +331,17 @@ List(U8) -> Try(
 )
 titled_destination = |src, after| {
 	rest = MdText.trim_line(after)
-	n = rest.len()
-	if n == 0 {
+	length = rest.len()
+	if length == 0 {
 		Ok({ src, title: Untitled })
 	} else {
 		first = MdText.byte_at(rest, 0)
-		last = MdText.byte_at(rest, n - 1)
+		last = MdText.byte_at(rest, length - 1)
 		quoted = (first == '"' and last == '"')
 			or (first == '\'' and last == '\'')
 			or (first == '(' and last == ')')
-		if n >= 2 and quoted {
-			Ok({ src, title: Titled(MdText.cut(rest, { start: 1, end: n - 1 })) })
+		if length >= 2 and quoted {
+			Ok({ src, title: Titled(MdText.cut(rest, { start: 1, end: length - 1 })) })
 		} else {
 			Err(NotAnImage)
 		}

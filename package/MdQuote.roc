@@ -113,7 +113,7 @@ MdQuote := [].{
 ## Where a quote's `>` ends: after up to three spaces and the `>`.
 quote_marker_length : List(U8) -> Try(U64, [NotAQuote])
 quote_marker_length = |line| {
-	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+	indent = U64.min(Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 }), 4)
 	if indent >= 4 or line.get(indent) != Ok('>') {
 		Err(NotAQuote)
 	} else {

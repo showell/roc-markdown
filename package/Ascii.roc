@@ -23,25 +23,25 @@ Ascii := [].{
 	## `0`-`9` (48-57). Zig `isDigit`, Rust `is_ascii_digit`, C `isdigit`.
 	## `Bool.False` for every byte from 128 to 255.
 	is_digit : U8 -> Bool
-	is_digit = |c| c >= '0' and c <= '9'
+	is_digit = |byte| byte >= '0' and byte <= '9'
 
 	## `0`-`9`, `A`-`F` and `a`-`f` (48-57, 65-70, 97-102). Zig `isHex`,
 	## Rust `is_ascii_hexdigit`, C `isxdigit`. `Bool.False` for every byte
 	## from 128 to 255.
 	is_hex_digit : U8 -> Bool
-	is_hex_digit = |c| is_digit(c) or (c >= 'A' and c <= 'F') or (c >= 'a' and c <= 'f')
+	is_hex_digit = |byte| is_digit(byte) or (byte >= 'A' and byte <= 'F') or (byte >= 'a' and byte <= 'f')
 
 	## `A`-`Z` and `a`-`z` (65-90, 97-122). Zig `isAlphabetic`, Rust
 	## `is_ascii_alphabetic`, C `isalpha`. `Bool.False` for every byte from
 	## 128 to 255, so `é` (bytes 195 169) is no letter here.
 	is_letter : U8 -> Bool
-	is_letter = |c| (c >= 'A' and c <= 'Z') or (c >= 'a' and c <= 'z')
+	is_letter = |byte| (byte >= 'A' and byte <= 'Z') or (byte >= 'a' and byte <= 'z')
 
 	## `0`-`9`, `A`-`Z` and `a`-`z`: `is_digit` or `is_letter`. Zig
 	## `isAlphanumeric`, Rust `is_ascii_alphanumeric`, C `isalnum`.
 	## `Bool.False` for every byte from 128 to 255.
 	is_alphanumeric : U8 -> Bool
-	is_alphanumeric = |c| is_digit(c) or is_letter(c)
+	is_alphanumeric = |byte| is_digit(byte) or is_letter(byte)
 
 	## The six bytes of C's `isspace`, which Zig's `isWhitespace` and Go's
 	## `strings.Fields` share: space (32) and 9-13, which are `\t`, `\n`,
@@ -53,7 +53,7 @@ Ascii := [].{
 	## this. `Bool.False` for every byte from 128 to 255, so a no-break space
 	## (bytes 194 160) is not whitespace here.
 	is_whitespace : U8 -> Bool
-	is_whitespace = |c| c == ' ' or (c >= '\t' and c <= '\r')
+	is_whitespace = |byte| byte == ' ' or (byte >= '\t' and byte <= '\r')
 
 	## The 32 printable bytes that are neither letters, digits nor space:
 	## ``!"#$%&'()*+,-./`` (33-47), `:;<=>?@` (58-64), ``[\]^_` `` (91-96)
@@ -61,35 +61,35 @@ Ascii := [].{
 	## `is_ascii_punctuation`, C `ispunct`, Python `string.punctuation`.
 	## `Bool.False` for every byte from 128 to 255.
 	is_punctuation : U8 -> Bool
-	is_punctuation = |c| c > ' ' and c < del and !is_alphanumeric(c)
+	is_punctuation = |byte| byte > ' ' and byte < del and !is_alphanumeric(byte)
 
 	## 0-31 and DEL (127): every ASCII byte that is not printable. Zig
 	## `isControl`, Rust `is_ascii_control`, C `iscntrl`. `Bool.False` for
 	## every byte from 128 to 255.
 	is_control : U8 -> Bool
-	is_control = |c| c < ' ' or c == del
+	is_control = |byte| byte < ' ' or byte == del
 
 	## `A`-`Z` to `a`-`z`; every other byte, 128 to 255 included, unchanged.
 	## Zig `toLower`, Rust `to_ascii_lowercase`, C `tolower`, and the per-byte
 	## rule of `Str.with_ascii_lowercased`: an uppercase letter differs from
 	## its lowercase only in bit 5 (0x20).
 	to_lowercase : U8 -> U8
-	to_lowercase = |c|
-		if c >= 'A' and c <= 'Z' {
-			U8.bitwise_or(c, 0x20)
+	to_lowercase = |byte|
+		if byte >= 'A' and byte <= 'Z' {
+			U8.bitwise_or(byte, 0x20)
 		} else {
-			c
+			byte
 		}
 
 	## `a`-`z` to `A`-`Z`; every other byte, 128 to 255 included, unchanged.
 	## Zig `toUpper`, Rust `to_ascii_uppercase`, C `toupper`, and the per-byte
 	## rule of `Str.with_ascii_uppercased`.
 	to_uppercase : U8 -> U8
-	to_uppercase = |c|
-		if c >= 'a' and c <= 'z' {
-			U8.bitwise_xor(c, 0x20)
+	to_uppercase = |byte|
+		if byte >= 'a' and byte <= 'z' {
+			U8.bitwise_xor(byte, 0x20)
 		} else {
-			c
+			byte
 		}
 }
 
@@ -103,7 +103,7 @@ del = 127
 # ranges the code tests, and every check is held to it over all 256 bytes.
 
 all_bytes : List(U8)
-all_bytes = U8.to(0, 255).fold([], |bytes, b| bytes.append(b))
+all_bytes = U8.to(0, 255).fold([], |bytes, byte| bytes.append(byte))
 
 ascii : List(U8)
 ascii = all_bytes.take_first(128)

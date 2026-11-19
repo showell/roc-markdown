@@ -75,8 +75,8 @@ scan = |raw, { start, name }| {
 	) {
 		Err(NotSafe)
 	} else {
-		d = MdText.byte_at(raw, after)
-		if !MdText.is_space(d) and d != '>' and d != '/' {
+		next_byte = MdText.byte_at(raw, after)
+		if !MdText.is_space(next_byte) and next_byte != '>' and next_byte != '/' {
 			Err(NotSafe)
 		} else {
 			attributes_from(raw, after)
@@ -92,10 +92,10 @@ attributes_from = |raw, from| {
 	var $attributes = []
 	var $end = 0
 	while $i < length and $end == 0 {
-		c = MdText.byte_at(raw, $i)
-		if MdText.is_space(c) or c == '/' {
+		byte = MdText.byte_at(raw, $i)
+		if MdText.is_space(byte) or byte == '/' {
 			$i = $i + 1
-		} else if c == '>' {
+		} else if byte == '>' {
 			$end = $i + 1
 		} else {
 			name_start = $i
@@ -116,10 +116,10 @@ attributes_from = |raw, from| {
 				} else {
 					{}
 				}
-				q = MdText.byte_at(raw, $i)
-				if q == '"' or q == '\'' {
+				quote = MdText.byte_at(raw, $i)
+				if quote == '"' or quote == '\'' {
 					value_start = $i + 1
-					close = MdText.find_or_end(raw, { byte: q, at: value_start })
+					close = MdText.find_or_end(raw, { byte: quote, at: value_start })
 					if close >= length {
 						return Err(NotSafe)
 					} else {
@@ -168,21 +168,21 @@ skip_spaces = |raw, from| {
 ## before the `>`), and the index past it.
 close_tag_end : List(U8), { at : U64, name : List(U8) } -> Try(U64, [NotSafe])
 close_tag_end = |raw, { at, name }| {
-	n = name.len()
+	name_length = name.len()
 	opens_close = MdText.cut(raw, { start: at, end: at + 2 }) == ['<', '/']
-	if at + 2 + n > raw.len() or !opens_close {
+	if at + 2 + name_length > raw.len() or !opens_close {
 		Err(NotSafe)
 	} else if !MdText.is_same_ignoring_case(
-		MdText.cut(raw, { start: at + 2, end: at + 2 + n }),
+		MdText.cut(raw, { start: at + 2, end: at + 2 + name_length }),
 		name,
 	) {
 		Err(NotSafe)
 	} else {
-		i = skip_spaces(raw, at + 2 + n)
-		if i >= raw.len() or MdText.byte_at(raw, i) != '>' {
+		close_at = skip_spaces(raw, at + 2 + name_length)
+		if close_at >= raw.len() or MdText.byte_at(raw, close_at) != '>' {
 			Err(NotSafe)
 		} else {
-			Ok(i + 1)
+			Ok(close_at + 1)
 		}
 	}
 }
@@ -193,7 +193,7 @@ last_of = |
 	attributes,
 	name,
 | match attributes.find_last(|(n, _)| MdText.is_same_ignoring_case(n, name)) {
-	Ok((_, v)) => Ok(v)
+	Ok((_, value)) => Ok(value)
 	Err(NotFound) => Err(Absent)
 }
 
@@ -204,13 +204,13 @@ user_uploads = MdSafety.uploads_under("/user_uploads/".to_utf8())
 
 img : Str -> Str
 img = |raw| match MdMedia.img_at(raw.to_utf8(), { start: 0, uploads: user_uploads }) {
-	Ok(r) => Str.from_utf8(r.html) ?? crash "a test's text is UTF-8"
+	Ok(rendered) => Str.from_utf8(rendered.html) ?? crash "a test's text is UTF-8"
 	Err(NotSafe) => ""
 }
 
 video : Str -> Str
 video = |raw| match MdMedia.video_at(raw.to_utf8(), { start: 0, uploads: user_uploads }) {
-	Ok(r) => Str.from_utf8(r.html) ?? crash "a test's text is UTF-8"
+	Ok(rendered) => Str.from_utf8(rendered.html) ?? crash "a test's text is UTF-8"
 	Err(NotSafe) => ""
 }
 

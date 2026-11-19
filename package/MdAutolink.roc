@@ -37,7 +37,7 @@ MdAutolink := [].{
 		}
 		close = Bytes.count_while(
 			text,
-			{ keep: |c| c > ' ' and c != 0x7f and c != '<' and c != '>', at: start },
+			{ keep: |byte| byte > ' ' and byte != 0x7f and byte != '<' and byte != '>', at: start },
 		)
 		if scheme_length == 0 or close <= start + scheme_length or text.get(close) != Ok('>') {
 			Err(NotALink)
@@ -50,9 +50,9 @@ MdAutolink := [].{
 	## would otherwise take for an HTML tag.
 	is_angle_url_line : List(U8) -> Bool
 	is_angle_url_line = |line| {
-		t = MdText.trim_line(line)
-		match angle_url_at(t, 0) {
-			Ok(found) => found.end == t.len()
+		trimmed = MdText.trim_line(line)
+		match angle_url_at(trimmed, 0) {
+			Ok(found) => found.end == trimmed.len()
 			Err(NotALink) => Bool.False
 		}
 	}
@@ -60,12 +60,12 @@ MdAutolink := [].{
 	## An autolink starts only at the line's
 	## start, or after a space or one of `*`, `_`, `~` and `(`.
 	is_autolink_boundary : List(U8), U64 -> Bool
-	is_autolink_boundary = |text, i|
-		if i == 0 {
+	is_autolink_boundary = |text, at|
+		if at == 0 {
 			Bool.True
 		} else {
-			p = MdText.byte_at(text, i - 1)
-			MdText.is_space(p) or p == '*' or p == '_' or p == '~' or p == '('
+			previous = MdText.byte_at(text, at - 1)
+			MdText.is_space(previous) or previous == '*' or previous == '_' or previous == '~' or previous == '('
 		}
 
 	AutoKind : [Url, Www, Email]
@@ -92,37 +92,37 @@ MdAutolink := [].{
 			{ at, prefix: prefix.to_utf8() },
 		)
 		if starts_with("http://") or starts_with("https://") {
-			u = url_end(text, { start: at, budget })
+			url_scan = url_end(text, { start: at, budget })
 			{
-				link: u.end.map_ok(|end| { end, kind: Url }),
+				link: url_scan.end.map_ok(|end| { end, kind: Url }),
 				email_dead,
-				budget: u.budget,
+				budget: url_scan.budget,
 			}
 		} else if starts_with("www.") {
-			u = url_end(text, { start: at, budget })
+			url_scan = url_end(text, { start: at, budget })
 			{
-				link: u.end.map_ok(|end| { end, kind: Www }),
+				link: url_scan.end.map_ok(|end| { end, kind: Www }),
 				email_dead,
-				budget: u.budget,
+				budget: url_scan.budget,
 			}
 		} else if emails == Linked and at >= email_dead {
-			e = email_end(text, { start: at, budget })
-			match e.end {
+			email_scan = email_end(text, { start: at, budget })
+			match email_scan.end {
 				Ok(end) => {
 					link: Ok({ end, kind: Email }),
 					email_dead,
-					budget: e.budget,
+					budget: email_scan.budget,
 				}
 				Err(NotALink) => {
-					j = Bytes.count_while(text, { keep: is_email_local_char, at })
+					local_end = Bytes.count_while(text, { keep: is_email_local_char, at })
 					{
 						link: Err(NotALink),
-						email_dead: if j > at {
-							j
+						email_dead: if local_end > at {
+							local_end
 						} else {
 							at + 1
 						},
-						budget: MdText.charge(e.budget, j - at),
+						budget: MdText.charge(email_scan.budget, local_end - at),
 					}
 				}
 			}
@@ -166,16 +166,16 @@ url_end : List(U8),
 	budget : MdText.Budget,
 }
 url_end = |text, { start, budget }| {
-	scanned = Bytes.count_while(text, { keep: |c| !MdText.is_space(c) and c != '<', at: start })
+	scanned = Bytes.count_while(text, { keep: |byte| !MdText.is_space(byte) and byte != '<', at: start })
 	spent = MdText.charge(budget, scanned - start)
 	url = MdText.cut(text, { start, end: scanned })
 	host_start = match Bytes.find(url, { needle: MdSafety.scheme_end }) {
-		Ok(p) => p + 3
+		Ok(scheme_at) => scheme_at + 3
 		Err(NotFound) => 0
 	}
 	host_end = Bytes.count_while(
 		url,
-		{ keep: |c| c != '/' and c != '?' and c != '#' and c != ':', at: host_start },
+		{ keep: |byte| byte != '/' and byte != '?' and byte != '#' and byte != ':', at: host_start },
 	)
 	if !MdText.cut(url, { start: host_start, end: U64.max(host_start, host_end) }).contains('.') {
 		{ end: Err(NotALink), budget: spent }
@@ -184,10 +184,10 @@ url_end = |text, { start, budget }| {
 		var $closes = url.count_if(|c| c == ')')
 		var $end = scanned
 		while $end > start {
-			c = MdText.byte_at(text, $end - 1)
-			if trailing_punct.contains(c) {
+			byte = MdText.byte_at(text, $end - 1)
+			if trailing_punct.contains(byte) {
 				$end = $end - 1
-			} else if c == ')' and $closes > opens {
+			} else if byte == ')' and $closes > opens {
 				$end = $end - 1
 				$closes = $closes - 1
 			} else {
@@ -222,7 +222,7 @@ email_end = |text, { start, budget }| {
 		domain_end = Bytes.count_while(
 			text,
 			{
-				keep: |c| Ascii.is_alphanumeric(c) or c == '.' or c == '-' or c == '_',
+				keep: |byte| Ascii.is_alphanumeric(byte) or byte == '.' or byte == '-' or byte == '_',
 				at: domain_start,
 			},
 		)
@@ -251,7 +251,7 @@ email_end = |text, { start, budget }| {
 }
 
 is_email_local_char : U8 -> Bool
-is_email_local_char = |c| Ascii.is_alphanumeric(c) or c == '.' or c == '_' or c == '+' or c == '-'
+is_email_local_char = |byte| Ascii.is_alphanumeric(byte) or byte == '.' or byte == '_' or byte == '+' or byte == '-'
 
 trailing_punct : List(U8)
 trailing_punct = "?!.,:*_~'\"".to_utf8()

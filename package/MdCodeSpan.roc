@@ -35,11 +35,11 @@ MdCodeSpan := [].{
 		var $out = []
 		var $i = 0
 		while $i < length {
-			c = MdText.byte_at(joined, $i)
-			if c == '\\' and MdText.is_escapable(joined, $i + 1) {
+			byte = MdText.byte_at(joined, $i)
+			if byte == '\\' and MdText.is_escapable(joined, $i + 1) {
 				$out = List.concat($out, MdText.cut(joined, { start: $i, end: $i + 2 }))
 				$i = $i + 2
-			} else if c == '`' {
+			} else if byte == '`' {
 				scanned = MdCodeSpan.span_at(joined, { at: $i, budget: MdText.unlimited })
 				end = match scanned.span {
 					Ok(span) => span.end
@@ -48,12 +48,12 @@ MdCodeSpan := [].{
 				code = MdText.cut(joined, { start: $i, end })
 				$out = List.concat($out, code.map(line_end_as_space))
 				$i = end
-			} else if c == '\n' {
-				kept = $out.len() - Bytes.count_back($out, |b| b == ' ' or b == '\t' or b == '\r')
+			} else if byte == '\n' {
+				kept = $out.len() - Bytes.count_back($out, |candidate| candidate == ' ' or candidate == '\t' or candidate == '\r')
 				$out = $out.take_first(kept).append(' ')
 				$i = $i + 1
 			} else {
-				$out = $out.append(c)
+				$out = $out.append(byte)
 				$i = $i + 1
 			}
 		}
@@ -76,28 +76,28 @@ MdCodeSpan := [].{
 	}
 	span_at = |text, { at, budget }| {
 		length = text.len()
-		n = Bytes.run_length(text, { byte: '`', at })
-		var $budget = MdText.charge(budget, n)
-		var $k = at + n
+		opening_length = Bytes.run_length(text, { byte: '`', at })
+		var $budget = MdText.charge(budget, opening_length)
+		var $k = at + opening_length
 		while $k < length {
 			$budget = MdText.charge($budget, 1)
 			if MdText.byte_at(text, $k) != '`' {
 				$k = $k + 1
 			} else {
-				m = Bytes.run_length(text, { byte: '`', at: $k })
-				$budget = MdText.charge($budget, m)
-				if m == n {
+				closing_length = Bytes.run_length(text, { byte: '`', at: $k })
+				$budget = MdText.charge($budget, closing_length)
+				if closing_length == opening_length {
 					return {
 						span: Ok({
-							content_start: at + n,
+							content_start: at + opening_length,
 							content_end: $k,
-							end: $k + m,
+							end: $k + closing_length,
 						}),
 						budget: $budget,
 					}
 				} else {
 					# A run of the wrong length is content.
-					$k = $k + m
+					$k = $k + closing_length
 				}
 			}
 		}
@@ -115,21 +115,21 @@ MdCodeSpan := [].{
 
 ## A code span's line end is a space (CommonMark).
 line_end_as_space : U8 -> U8
-line_end_as_space = |b|
-	if b == '\n' {
+line_end_as_space = |byte|
+	if byte == '\n' {
 		' '
 	} else {
-		b
+		byte
 	}
 
 ## One space off each end when both ends
 ## are spaces and it is not all spaces.
 span_content : List(U8) -> List(U8)
 span_content = |content| {
-	n = content.len()
+	length = content.len()
 	is_padded = content.first() == Ok(' ') and content.last() == Ok(' ')
-	if n >= 2 and is_padded and content.any(|c| c != ' ') {
-		MdText.cut(content, { start: 1, end: n - 1 })
+	if length >= 2 and is_padded and content.any(|c| c != ' ') {
+		MdText.cut(content, { start: 1, end: length - 1 })
 	} else {
 		content
 	}

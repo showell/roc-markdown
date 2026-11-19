@@ -59,12 +59,12 @@ is_old_chat_upload = |path| {
 		[
 			root,
 			chat,
-			c,
+			conversation,
 			pair,
 			topic,
 			uploads,
 			file,
-		] if [root, chat, c, uploads] == dm_words => filled([pair, topic, file])
+		] if [root, chat, conversation, uploads] == dm_words => filled([pair, topic, file])
 		[
 			root,
 			channel,

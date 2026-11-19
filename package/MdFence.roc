@@ -26,16 +26,16 @@ MdFence := [].{
 	## string holds no backtick.
 	open : List(U8) -> Try(Open, [NotAFence])
 	open = |line| {
-		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+		indent = U64.min(Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 }), 4)
 		match line.get(indent) {
 			Err(_) => Err(NotAFence)
-			Ok(f) =>
-				if indent >= 4 or (f != '`' and f != '~') {
+			Ok(fence_char) =>
+				if indent >= 4 or (fence_char != '`' and fence_char != '~') {
 					Err(NotAFence)
 				} else {
-					count = Bytes.count_while(line, { keep: |c| c == f, at: indent }) - indent
+					count = Bytes.count_while(line, { keep: |byte| byte == fence_char, at: indent }) - indent
 					info = Bytes.trim(line.drop_first(indent + count), info_space)
-					is_backtick_info = f == '`' and info.contains('`')
+					is_backtick_info = fence_char == '`' and info.contains('`')
 					if count < 3 or count > MdChat.max_fence_run or is_backtick_info {
 						Err(NotAFence)
 					} else {
@@ -44,11 +44,11 @@ MdFence := [].{
 							info.take_first(
 								Bytes.count_while(
 									info,
-									{ keep: |c| c != ' ' and c != '\t', at: 0 },
+									{ keep: |byte| byte != ' ' and byte != '\t', at: 0 },
 								),
 							),
 						)
-						Ok({ char: f, count, indent, language })
+						Ok({ char: fence_char, count, indent, language })
 					}
 				}
 		}
@@ -68,7 +68,7 @@ MdFence := [].{
 	args = |line, open_line| {
 		info = Bytes.trim(line.drop_first(open_line.indent + open_line.count), info_space)
 		Bytes.trim(
-			info.drop_first(Bytes.count_while(info, { keep: |c| c != ' ' and c != '\t', at: 0 })),
+			info.drop_first(Bytes.count_while(info, { keep: |byte| byte != ' ' and byte != '\t', at: 0 })),
 			info_space,
 		)
 	}
@@ -144,12 +144,12 @@ MdFence := [].{
 	## `char`, then only whitespace (a close carries no info string).
 	is_close : List(U8), { char : U8, count : U64 } -> Bool
 	is_close = |line, { char, count }| {
-		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+		indent = U64.min(Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 }), 4)
 		if indent >= 4 {
 			Bool.False
 		} else {
-			n = Bytes.count_while(line, { keep: |c| c == char, at: indent }) - indent
-			n >= count and Bytes.trim(line.drop_first(indent + n), info_space) == []
+			fence_length = Bytes.count_while(line, { keep: |byte| byte == char, at: indent }) - indent
+			fence_length >= count and Bytes.trim(line.drop_first(indent + fence_length), info_space) == []
 		}
 	}
 
@@ -181,7 +181,7 @@ content_without_fence_indent = |{ content, indent }| {
 	while $i < length {
 		line_end = MdText.line_end(content, $i)
 		line = MdText.cut(content, { start: $i, end: line_end })
-		strip = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), indent)
+		strip = U64.min(Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 }), indent)
 		$out = List.concat($out, line.drop_first(strip)).append('\n')
 		$i = MdText.next_line(content, line_end)
 	}
@@ -241,7 +241,7 @@ expect MdFence.open("   ~~~ a b".to_utf8()) == Ok({
 	language: "a".to_utf8(),
 })
 expect MdFence.open("    ~~~".to_utf8()) == Err(NotAFence)
-expect MdFence.open("``` foo\\+bar\\x".to_utf8()).map_ok(|o| o.language) == Ok("foo+bar\\x".to_utf8())
+expect MdFence.open("``` foo\\+bar\\x".to_utf8()).map_ok(|fence| fence.language) == Ok("foo+bar\\x".to_utf8())
 expect !MdFence.is_close("~~~".to_utf8(), { char: '~', count: 4 })
 expect MdFence.is_close("~~~~".to_utf8(), { char: '~', count: 4 })
 expect MdFence.is_close("~~~~~".to_utf8(), { char: '~', count: 4 })

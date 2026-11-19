@@ -71,67 +71,67 @@ MdText := [].{
 		$out
 	}
 
-	## `s` from `start` up to `end`, a Zig slice `s[start..end]`.
+	## `bytes` from `start` up to `end`, a Zig slice `bytes[start..end]`.
 	cut : List(U8), { start : U64, end : U64 } -> List(U8)
-	cut = |s, { start, end }| s.sublist({ start, len: end - start })
+	cut = |bytes, { start, end }| bytes.sublist({ start, len: end - start })
 
-	## The byte at `i`, which the caller has checked is there.
+	## The byte at `at`, which the caller has checked is there.
 	byte_at : List(U8), U64 -> U8
-	byte_at = |s, i| match s.get(i) {
-		Ok(c) => c
+	byte_at = |bytes, at| match bytes.get(at) {
+		Ok(byte) => byte
 		Err(OutOfBounds) => crash "MdText.byte_at: a read past the end the caller checked"
 	}
 
 	## Space, tab, `\n`, `\r` and form feed; not a
 	## vertical tab, which `Ascii.is_whitespace` has.
 	is_space : U8 -> Bool
-	is_space = |c| c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == form_feed
+	is_space = |byte| byte == ' ' or byte == '\t' or byte == '\n' or byte == '\r' or byte == form_feed
 
 	## What `\b` reads as a word.
 	is_word_char : U8 -> Bool
-	is_word_char = |c| Ascii.is_alphanumeric(c) or c == '_'
+	is_word_char = |byte| Ascii.is_alphanumeric(byte) or byte == '_'
 
 	## An HTML attribute's name.
 	is_attribute_name_char : U8 -> Bool
-	is_attribute_name_char = |c| Ascii.is_alphanumeric(c) or c == '-' or c == '_' or c == ':'
+	is_attribute_name_char = |byte| Ascii.is_alphanumeric(byte) or byte == '-' or byte == '_' or byte == ':'
 
 	## One digit or more, and nothing else.
 	is_all_digits : List(U8) -> Bool
-	is_all_digits = |s| s != [] and s.all(Ascii.is_digit)
+	is_all_digits = |bytes| bytes != [] and bytes.all(Ascii.is_digit)
 
-	## `s` is `lower`, a lowercase literal, in any case.
+	## `bytes` is `lower`, a lowercase literal, in any case.
 	is_same_ignoring_case : List(U8), List(U8) -> Bool
-	is_same_ignoring_case = |s, lower| s.len() == lower.len() and s.map(Ascii.to_lowercase) == lower
+	is_same_ignoring_case = |bytes, lower| bytes.len() == lower.len() and bytes.map(Ascii.to_lowercase) == lower
 
-	## `s` from `at` begins with `prefix`, in
+	## `bytes` from `at` begins with `prefix`, in
 	## any case.
 	is_prefixed_ignoring_case : List(U8), { at : U64, prefix : List(U8) } -> Bool
-	is_prefixed_ignoring_case = |s, { at: i, prefix }| {
-		n = prefix.len()
-		if i + n > s.len() {
+	is_prefixed_ignoring_case = |bytes, { at, prefix }| {
+		prefix_length = prefix.len()
+		if at + prefix_length > bytes.len() {
 			Bool.False
 		} else {
 			cut(
-				s,
-				{ start: i, end: i + n },
+				bytes,
+				{ start: at, end: at + prefix_length },
 			).map(Ascii.to_lowercase) == prefix.map(Ascii.to_lowercase)
 		}
 	}
 
 	## The first `byte` at `at` or after, or the end.
 	find_or_end : List(U8), { byte : U8, at : U64 } -> U64
-	find_or_end = |s, wanted| Bytes.find_byte(s, wanted) ?? s.len()
+	find_or_end = |bytes, wanted| Bytes.find_byte(bytes, wanted) ?? bytes.len()
 
 	## Spaces, tabs and `\r` off both ends.
 	trim_line : List(U8) -> List(U8)
 	trim_line = |line| Bytes.trim(line, line_space)
 
-	## Whether the byte at `i` is ASCII punctuation, which a backslash before it
+	## Whether the byte at `at` is ASCII punctuation, which a backslash before it
 	## escapes (CommonMark's backslash escapes).
 	is_escapable : List(U8), U64 -> Bool
-	is_escapable = |text, i|
-		match text.get(i) {
-			Ok(c) => Ascii.is_punctuation(c)
+	is_escapable = |text, at|
+		match text.get(at) {
+			Ok(byte) => Ascii.is_punctuation(byte)
 			Err(OutOfBounds) => Bool.False
 		}
 
@@ -144,12 +144,12 @@ MdText := [].{
 		var $out = []
 		var $i = 0
 		while $i < length {
-			c = byte_at(text, $i)
-			if c == '\\' and is_escapable(text, $i + 1) {
+			byte = byte_at(text, $i)
+			if byte == '\\' and is_escapable(text, $i + 1) {
 				$out = $out.append(byte_at(text, $i + 1))
 				$i = $i + 2
 			} else {
-				$out = $out.append(c)
+				$out = $out.append(byte)
 				$i = $i + 1
 			}
 		}

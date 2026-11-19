@@ -179,11 +179,11 @@ block_at = |
 			Ok(open) => Ok(MdFence.fence_onto(out, { md, open, line, budget, dialect }))
 			Err(NotAFence) =>
 				match MdHeading.atx_heading(line) {
-					Ok(h) => MdHeading.heading_onto(
+					Ok(heading) => MdHeading.heading_onto(
 						out,
 						{
-							level: h.level,
-							content: h.content,
+							level: heading.level,
+							content: heading.content,
 							after: next,
 							budget,
 							uploads,
@@ -334,9 +334,9 @@ paragraph_onto = |
 	# A reflowed run's lines up to a hard break, each with its trailing spaces
 	# but the run's last, since a code span keeps them (MdCodeSpan.reflow_lines).
 	var $reflow = []
-	var $k = 0
+	var $line_index = 0
 	for line in $lines {
-		breaks = $k < last and ends_in_hard_break(line)
+		breaks = $line_index < last and ends_in_hard_break(line)
 		text = MdText.trim_line(
 			if breaks {
 				line.drop_last(1)
@@ -346,7 +346,7 @@ paragraph_onto = |
 		)
 		if wrap == Reflow {
 			$reflow = $reflow.append(
-				if breaks or $k == last {
+				if breaks or $line_index == last {
 					text
 				} else {
 					line.drop_first(Bytes.count_while(line, { keep: is_line_space, at: 0 }))
@@ -368,7 +368,7 @@ paragraph_onto = |
 			}
 		} else {
 			wrapped = MdInline.html_onto({
-				out: if $k == 0 {
+				out: if $line_index == 0 {
 					$out
 				} else {
 					List.concat($out, MdHtml.br)
@@ -381,7 +381,7 @@ paragraph_onto = |
 			$out = wrapped.out
 			$budget = wrapped.budget
 		}
-		$k = $k + 1
+		$line_index = $line_index + 1
 	}
 	if wrap == Reflow {
 		joined = MdInline.html_onto({
@@ -409,12 +409,12 @@ paragraph_onto = |
 
 ## The bytes `MdText.trim_line` takes off a line's ends.
 is_line_space : U8 -> Bool
-is_line_space = |c| c == ' ' or c == '\t' or c == '\r'
+is_line_space = |byte| byte == ' ' or byte == '\t' or byte == '\r'
 
 ## CommonMark's hard line break: the line, as written, ends in an odd run of
 ## backslashes (an even one is escaped backslashes).
 ends_in_hard_break : List(U8) -> Bool
-ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
+ends_in_hard_break = |line| Bytes.count_back(line, |byte| byte == '\\') % 2 == 1
 
 ## Inside a tight list item, a block after a bare
 ## paragraph starts on a line of its own.

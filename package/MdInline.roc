@@ -104,7 +104,7 @@ MdInline := [].{
 			} else {
 				{}
 			}
-			c = MdText.byte_at(text, $i)
+			byte = MdText.byte_at(text, $i)
 			# Each byte class's scan says what it found (a `Step`); the step is
 			# taken once, below. The chat's reference (MdChat) is read first,
 			# whole.
@@ -116,9 +116,9 @@ MdInline := [].{
 			step = match reference {
 				Ok(chat_reference) => Token(Html(chat_reference.html), chat_reference.end)
 				Err(NoRef) =>
-					if c == '\\' and MdText.is_escapable(text, $i + 1) {
+					if byte == '\\' and MdText.is_escapable(text, $i + 1) {
 						Token(Text($i + 1, $i + 2), $i + 2)
-					} else if c == '<' {
+					} else if byte == '<' {
 						match media_at(text, { start: $i, uploads }) {
 							Ok(media) => Token(Html(media.html), media.end)
 							Err(NotMedia) =>
@@ -139,7 +139,7 @@ MdInline := [].{
 									Err(NotALink) => Skip($i + 1)
 								}
 						}
-					} else if c == '`' {
+					} else if byte == '`' {
 						scanned = MdCodeSpan.span_at(text, { at: $i, budget: $budget })
 						$budget = scanned.budget
 						match scanned.span {
@@ -157,12 +157,12 @@ MdInline := [].{
 								# literal, and is skipped, so no shorter run inside it
 								# opens a span (CommonMark's runs are atomic). It stays
 								# in the pending text.
-								n = Bytes.run_length(text, { byte: '`', at: $i })
-								$budget = MdText.charge($budget, n)
-								Skip($i + n)
+								opening_length = Bytes.run_length(text, { byte: '`', at: $i })
+								$budget = MdText.charge($budget, opening_length)
+								Skip($i + opening_length)
 							}
 						}
-					} else if c == '!' and text.get($i + 1) == Ok('[') and reads_images {
+					} else if byte == '!' and text.get($i + 1) == Ok('[') and reads_images {
 						# `![alt](src)`: an image where its src is an upload, else
 						# the `!` is dropped and the `[` read as a link (MdSafety).
 						linked = MdLinks.link_at(
@@ -241,7 +241,7 @@ MdInline := [].{
 							}
 							Err(NotAnImage) => Skip($i + 1)
 						}
-					} else if c == '[' and reads_links {
+					} else if byte == '[' and reads_links {
 						linked = MdLinks.link_at(
 							text,
 							{
@@ -283,18 +283,18 @@ MdInline := [].{
 							}
 							Err(NotALink) => Skip($i + 1)
 						}
-					} else if c == '*' or c == '_' or c == '~' {
-						n = Bytes.run_length(text, { byte: c, at: $i })
-						$budget = MdText.charge($budget, n)
-						run = MdEmphasis.delimiter_run(text, { start: $i, end: $i + n })
+					} else if byte == '*' or byte == '_' or byte == '~' {
+						delimiter_length = Bytes.run_length(text, { byte, at: $i })
+						$budget = MdText.charge($budget, delimiter_length)
+						run = MdEmphasis.delimiter_run(text, { start: $i, end: $i + delimiter_length })
 						# A `~` run that can neither open nor close (one `~`, three,
 						# `~~` between spaces) is text: on the stack it would only
 						# lengthen every look-back past it.
-						if c == '~' and !run.can_open and !run.can_close {
-							Skip($i + n)
+						if byte == '~' and !run.can_open and !run.can_close {
+							Skip($i + delimiter_length)
 						} else {
 							$runs = $runs.append(run)
-							Token(Run($runs.len() - 1), $i + n)
+							Token(Run($runs.len() - 1), $i + delimiter_length)
 						}
 					} else if reads_links and MdAutolink.is_autolink_boundary(text, $i) {
 						found = MdAutolink.autolink_at(
@@ -435,7 +435,7 @@ emit = |out, { text, pieces, runs }| {
 		$out = match piece {
 			Text(start, end) => MdText.escape_onto($out, MdText.cut(text, { start, end }))
 			Html(html) => List.concat($out, html)
-			Run(k) => MdEmphasis.run_onto($out, MdEmphasis.indexed_run(runs, k))
+			Run(index) => MdEmphasis.run_onto($out, MdEmphasis.indexed_run(runs, index))
 		}
 	}
 	$out
@@ -449,7 +449,7 @@ inline = |text| match MdInline.html_onto({
 	budget: MdText.unlimited,
 	uploads: MdSafety.uploads_under("/user_uploads/".to_utf8()),
 }) {
-	Ok(r) => Str.from_utf8(r.out) ?? crash "a test's text is UTF-8"
+	Ok(rendered) => Str.from_utf8(rendered.out) ?? crash "a test's text is UTF-8"
 	Err(Hostile) => "hostile"
 }
 

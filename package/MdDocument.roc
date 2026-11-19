@@ -44,12 +44,12 @@ MdDocument := [].{
 		var $out = []
 		var $i = 0
 		while $i < length {
-			c = MdText.byte_at(md, $i)
-			is_line_end = c == '\r' and ($i + 1 == length or md.get($i + 1) == Ok('\n'))
+			byte = MdText.byte_at(md, $i)
+			is_line_end = byte == '\r' and ($i + 1 == length or md.get($i + 1) == Ok('\n'))
 			$out = if is_line_end {
 				$out
 			} else {
-				$out.append(c)
+				$out.append(byte)
 			}
 			$i = $i + 1
 		}
@@ -60,7 +60,7 @@ MdDocument := [].{
 	## `-`, `*` or `_`, with only spaces and tabs among them.
 	is_rule : List(U8) -> Bool
 	is_rule = |line| {
-		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 })
+		indent = Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 })
 		match line.get(indent) {
 			Ok(mark) if indent < 4 and (mark == '-' or mark == '*' or mark == '_') => {
 				body = MdText.trim_line(line)
@@ -163,7 +163,7 @@ code_line = |line|
 ## four, so spaces before a tab go with it.
 past_code_indent : List(U8) -> Try(List(U8), [NotCode])
 past_code_indent = |line| {
-	spaces = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
+	spaces = U64.min(Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 }), 4)
 	if spaces == 4 {
 		Ok(line.drop_first(4))
 	} else if line.get(spaces) == Ok('\t') {
@@ -195,7 +195,7 @@ marked_heading_at = |html, at| match [
 	Ok(level) => {
 		content_start = at + MdHtml.heading_mark(level).len()
 		match Bytes.find(html.drop_first(content_start), { needle: MdHtml.heading_close(level) }) {
-			Ok(n) => Ok({ level, content_start, content_end: content_start + n })
+			Ok(offset) => Ok({ level, content_start, content_end: content_start + offset })
 			Err(NotFound) => Err(NotMarked)
 		}
 	}
@@ -231,13 +231,13 @@ distinct_id : List(U8), Dict(List(U8), U64) -> { id : List(U8), ids : Dict(List(
 distinct_id = |base, ids| match ids.get(base) {
 	Err(KeyNotFound) => { id: base, ids: ids.insert(base, 1) }
 	Ok(last_tried) => {
-		var $n = last_tried + 1
-		var $id = List.concat(base, "-${$n.to_str()}".to_utf8())
+		var $suffix = last_tried + 1
+		var $id = List.concat(base, "-${$suffix.to_str()}".to_utf8())
 		while ids.contains($id) {
-			$n = $n + 1
-			$id = List.concat(base, "-${$n.to_str()}".to_utf8())
+			$suffix = $suffix + 1
+			$id = List.concat(base, "-${$suffix.to_str()}".to_utf8())
 		}
-		{ id: $id, ids: ids.insert($id, 1).insert(base, $n) }
+		{ id: $id, ids: ids.insert($id, 1).insert(base, $suffix) }
 	}
 }
 
@@ -310,7 +310,7 @@ expect MdDocument.with_heading_ids(
 # Headings of one name count up.
 expect MdDocument.with_heading_ids(
 	mark(1, "A").repeat(10).join(),
-).headings.last().map_ok(|h| h.id) == Ok("a-10".to_utf8())
+).headings.last().map_ok(|heading| heading.id) == Ok("a-10".to_utf8())
 expect MdDocument.with_heading_ids(mark(2, "a &amp; <code>b</code>")) == {
 	html: "<h2 id=\"a-b\">a &amp; <code>b</code></h2>\n".to_utf8(),
 	headings: [

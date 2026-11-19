@@ -10,7 +10,7 @@ MdIndent := [].{
 	## The columns of indent `line` starts with.
 	columns_of : List(U8), Reading -> U64
 	columns_of = |line, reading| match reading {
-		Spaces => Bytes.count_while(line, { keep: |c| c == ' ', at: 0 })
+		Spaces => Bytes.count_while(line, { keep: |byte| byte == ' ', at: 0 })
 		TabStops => column_after_indent(line, { at: 0, column: 0 })
 	}
 
@@ -30,22 +30,22 @@ MdIndent := [].{
 		TabStops => {
 			end = from + columns
 			var $column = from
-			var $i = 0
+			var $index = 0
 			while $column < end {
-				if text.get($i) == Ok('\t') and next_stop($column) > end {
-					rest = indent_end(text, $i)
-					spaces = column_after_indent(text, { at: $i, column: $column }) - end
+				if text.get($index) == Ok('\t') and next_stop($column) > end {
+					rest = indent_end(text, $index)
+					spaces = column_after_indent(text, { at: $index, column: $column }) - end
 					return List.concat(List.repeat(' ', spaces), text.drop_first(rest))
 				} else {
-					$column = if text.get($i) == Ok('\t') {
+					$column = if text.get($index) == Ok('\t') {
 						next_stop($column)
 					} else {
 						$column + 1
 					}
-					$i = $i + 1
+					$index = $index + 1
 				}
 			}
-			text.drop_first($i)
+			text.drop_first($index)
 		}
 	}
 
@@ -65,14 +65,14 @@ tab_stop : U64
 tab_stop = 4
 
 indent_end : List(U8), U64 -> U64
-indent_end = |text, at| Bytes.count_while(text, { keep: |c| c == ' ' or c == '\t', at })
+indent_end = |text, at| Bytes.count_while(text, { keep: |byte| byte == ' ' or byte == '\t', at })
 
 columns : Str -> U64
 columns = |line| MdIndent.columns_of(line.to_utf8(), TabStops)
 
 cut : Str, { columns : U64, from : U64 } -> Str
-cut = |line, { columns: n, from }| Str.from_utf8(
-	MdIndent.without_columns(line.to_utf8(), { columns: n, from, reading: TabStops }),
+cut = |line, { columns: width, from }| Str.from_utf8(
+	MdIndent.without_columns(line.to_utf8(), { columns: width, from, reading: TabStops }),
 ) ?? crash "MdIndent: a test's text is UTF-8"
 
 expect columns("a") == 0

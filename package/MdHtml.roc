@@ -258,10 +258,10 @@ MdHtml := [].{
 		var $out = []
 		var $i = 0
 		while $i < length {
-			c = MdText.byte_at(html, $i)
-			if c == '<' {
+			current = MdText.byte_at(html, $i)
+			if current == '<' {
 				$i = MdText.find_or_end(html, { byte: '>', at: $i }) + 1
-			} else if c == '&' {
+			} else if current == '&' {
 				match entities.find_first(
 					|e| MdText.is_prefixed_ignoring_case(html, { at: $i, prefix: e.0 }),
 				) {
@@ -270,12 +270,12 @@ MdHtml := [].{
 						$i = $i + written.len()
 					}
 					Err(NotFound) => {
-						$out = $out.append(c)
+						$out = $out.append(current)
 						$i = $i + 1
 					}
 				}
 			} else {
-				$out = $out.append(c)
+				$out = $out.append(current)
 				$i = $i + 1
 			}
 		}
@@ -313,7 +313,7 @@ attributes_onto = |out, attributes| {
 		named = List.concat($out.append(' '), name)
 		$out = match attribute_value {
 			Bare => named
-			Is(v) => MdText.escape_onto(List.concat(named, ['=', '"']), v).append('"')
+			Is(value) => MdText.escape_onto(List.concat(named, ['=', '"']), value).append('"')
 		}
 	}
 	$out

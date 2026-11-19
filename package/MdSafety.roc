@@ -47,9 +47,9 @@ MdSafety := [].{
 	## bytes so read count.
 	is_dangerous_url : List(U8) -> Bool
 	is_dangerous_url = |raw| {
-		start = Bytes.count_while(raw, { keep: |c| c <= ' ', at: 0 })
+		start = Bytes.count_while(raw, { keep: |byte| byte <= ' ', at: 0 })
 		trimmed = raw.drop_first(start)
-		kept = trimmed.drop_last(Bytes.count_back(trimmed, |c| c <= ' '))
+		kept = trimmed.drop_last(Bytes.count_back(trimmed, |byte| byte <= ' '))
 		var $seen = []
 		for c in kept {
 			if c == '\t' or c == '\n' or c == '\r' or $seen.len() == 32 {
@@ -80,10 +80,10 @@ MdSafety := [].{
 	## new tab. `#msg-…`, `/chat/…` and `mailto:` are not.
 	is_external_href : List(U8) -> Bool
 	is_external_href = |href| match Bytes.find(href, { needle: MdSafety.scheme_end }) {
-		Ok(p) =>
-			p > 0 and Ascii.is_letter(MdText.byte_at(href, 0)) and MdText.cut(
+		Ok(scheme_at) =>
+			scheme_at > 0 and Ascii.is_letter(MdText.byte_at(href, 0)) and MdText.cut(
 				href,
-				{ start: 1, end: p },
+				{ start: 1, end: scheme_at },
 			).all(|c| Ascii.is_alphanumeric(c) or c == '+' or c == '.' or c == '-')
 		Err(NotFound) => Bool.False
 	}
@@ -102,7 +102,7 @@ MdSafety := [].{
 	} -> Try(List(MdHtml.Attribute), [NotSafe])
 	media_attributes = |{ kind, value_of, uploads }| {
 		src = match value_of("src".to_utf8()) {
-			Ok(v) => v
+			Ok(value) => value
 			Err(Absent) => return Err(NotSafe)
 		}
 		if !MdSafety.is_upload_url(Bytes.trim(src, Bytes.zig_spaces), uploads) {
@@ -110,7 +110,7 @@ MdSafety := [].{
 		} else {
 			kept = |names, keep| names.join_map(
 				|name| match value_of(name) {
-					Ok(v) if keep(v) => [{ name, attribute_value: Is(v) }]
+					Ok(value) if keep(value) => [{ name, attribute_value: Is(value) }]
 					_ => []
 				},
 			)

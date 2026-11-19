@@ -29,7 +29,7 @@ options = { uploads: Md.uploads_under("/user_uploads/".to_utf8()) }
 ## **A MODE THE PAGE CANNOT NAME IS A CRASH**, never a render in some other
 ## mode.
 mode_of : U8 -> [Chat, Trusted, Reflow]
-mode_of = |n| match n {
+mode_of = |mode_number| match mode_number {
 	0 => Chat
 	1 => Trusted
 	2 => Reflow

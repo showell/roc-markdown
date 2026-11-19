@@ -65,11 +65,11 @@ MdRawHtml := [].{
 	## whitespace (CommonMark's type 7).
 	is_html_block_start : List(U8) -> Bool
 	is_html_block_start = |line| {
-		t = MdText.trim_line(line)
-		match t {
+		trimmed = MdText.trim_line(line)
+		match trimmed {
 			['<', second, ..] if Ascii.is_letter(second) or second == '/' =>
-				match html_tag_end(t) {
-					Ok(end) => MdText.is_blank(t.drop_first(end))
+				match html_tag_end(trimmed) {
+					Ok(end) => MdText.is_blank(trimmed.drop_first(end))
 					Err(Unterminated) => Bool.False
 				}
 			_ => Bool.False
@@ -77,22 +77,22 @@ MdRawHtml := [].{
 	}
 }
 
-## The index past the `>` closing the tag at `t[0]`,
+## The index past the `>` closing the tag at `tag[0]`,
 ## quoted values respected.
 html_tag_end : List(U8) -> Try(U64, [Unterminated])
-html_tag_end = |t| {
-	length = t.len()
+html_tag_end = |tag| {
+	length = tag.len()
 	var $i = 1
 	while $i < length {
-		c = MdText.byte_at(t, $i)
-		if c == '"' or c == '\'' {
-			close = MdText.find_or_end(t, { byte: c, at: $i + 1 })
+		byte = MdText.byte_at(tag, $i)
+		if byte == '"' or byte == '\'' {
+			close = MdText.find_or_end(tag, { byte, at: $i + 1 })
 			if close >= length {
 				return Err(Unterminated)
 			} else {
 				$i = close + 1
 			}
-		} else if c == '>' {
+		} else if byte == '>' {
 			return Ok($i + 1)
 		} else {
 			$i = $i + 1

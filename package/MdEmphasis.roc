@@ -58,27 +58,27 @@ MdEmphasis := [].{
 	## it: whether it may open and close, and nothing matched yet.
 	delimiter_run : List(U8), { start : U64, end : U64 } -> DelimiterRun
 	delimiter_run = |text, { start, end }| {
-		c = MdText.byte_at(text, start)
-		n = end - start
+		delimiter = MdText.byte_at(text, start)
+		length = end - start
 		flank = flanking(text, { start, end })
 		# An `_` run inside a word neither opens nor closes; a `~` run opens and
 		# closes only as `~~`.
-		is_star = c == '*'
-		is_strike = c == '~'
+		is_star = delimiter == '*'
+		is_strike = delimiter == '~'
 		can_open = if is_strike {
-			flank.left and n == 2
+			flank.left and length == 2
 		} else {
 			flank.left and (is_star or !flank.right or flank.before_punct)
 		}
 		can_close = if is_strike {
-			flank.right and n == 2
+			flank.right and length == 2
 		} else {
 			flank.right and (is_star or !flank.left or flank.after_punct)
 		}
 		{
-			char: c,
-			count: n,
-			original_count: n,
+			char: delimiter,
+			count: length,
+			original_count: length,
 			can_open,
 			can_close,
 			below: Edge,
@@ -97,19 +97,19 @@ MdEmphasis := [].{
 		[Hostile],
 	)
 	emphasis = |{ runs, budget }| {
-		n = runs.len()
+		run_count = runs.len()
 		var $runs = runs.map_with_index(
-			|run, k| {
+			|run, index| {
 				..run,
-				below: if k == 0 {
+				below: if index == 0 {
 					Edge
 				} else {
-					At(k - 1)
+					At(index - 1)
 				},
-				above: if k + 1 == n {
+				above: if index + 1 == run_count {
 					Edge
 				} else {
-					At(k + 1)
+					At(index + 1)
 				},
 			},
 		)
@@ -117,7 +117,7 @@ MdEmphasis := [].{
 		# The lowest opener a closer may look back to, by its floor key: an
 		# edge is the stack's bottom.
 		var $bottoms = List.repeat(Edge, floor_keys)
-		var $closer = if n == 0 {
+		var $closer = if run_count == 0 {
 			Edge
 		} else {
 			At(0)
@@ -225,9 +225,9 @@ MdEmphasis := [].{
 		Ok({ runs: $runs, budget: $budget })
 	}
 
-	## Run `k` of the line's runs.
+	## Run `index` of the line's runs.
 	indexed_run : List(DelimiterRun), U64 -> DelimiterRun
-	indexed_run = |runs, k| match runs.get(k) {
+	indexed_run = |runs, index| match runs.get(index) {
 		Ok(run) => run
 		Err(OutOfBounds) => crash "MdEmphasis: a run's index past the runs"
 	}
@@ -238,10 +238,10 @@ MdEmphasis := [].{
 	## matched.
 	run_onto : List(U8), DelimiterRun -> List(U8)
 	run_onto = |out, run| {
-		var $o = out
+		var $html = out
 		for use in run.closes {
-			$o = List.concat(
-				$o,
+			$html = List.concat(
+				$html,
 				if run.char == '~' {
 					MdHtml.del_close
 				} else if use == 2 {
@@ -251,12 +251,12 @@ MdEmphasis := [].{
 				},
 			)
 		}
-		$o = List.concat($o, List.repeat(run.char, run.count))
+		$html = List.concat($html, List.repeat(run.char, run.count))
 		var $n = run.opens.len()
 		while $n > 0 {
 			$n = $n - 1
-			$o = List.concat(
-				$o,
+			$html = List.concat(
+				$html,
 				if run.char == '~' {
 					MdHtml.del_open
 				} else if run.opens.get($n) == Ok(2) {
@@ -266,7 +266,7 @@ MdEmphasis := [].{
 				},
 			)
 		}
-		$o
+		$html
 	}
 }
 
@@ -275,7 +275,7 @@ Link : [Edge, At(U64)]
 
 index_of : Link -> U64
 index_of = |link| match link {
-	At(k) => k
+	At(index) => index
 	Edge => crash "MdEmphasis: the stack's edge read as a run"
 }
 
@@ -317,22 +317,22 @@ floor_key = |closer| {
 floor_keys : U64
 floor_keys = 18
 
-## Run `k` off the stack; its place among the
+## Run `index` off the stack; its place among the
 ## pieces, and its delimiters left, stay.
 runs_without : List(MdEmphasis.DelimiterRun), U64 -> List(MdEmphasis.DelimiterRun)
-runs_without = |runs, k| {
-	run = MdEmphasis.indexed_run(runs, k)
+runs_without = |runs, index| {
+	run = MdEmphasis.indexed_run(runs, index)
 	with_below = match run.below {
-		At(b) => runs_with(
+		At(below) => runs_with(
 			runs,
-			{ at: b, delimiters: { ..MdEmphasis.indexed_run(runs, b), above: run.above } },
+			{ at: below, delimiters: { ..MdEmphasis.indexed_run(runs, below), above: run.above } },
 		)
 		Edge => runs
 	}
 	match run.above {
-		At(a) => runs_with(
+		At(above) => runs_with(
 			with_below,
-			{ at: a, delimiters: { ..MdEmphasis.indexed_run(with_below, a), below: run.below } },
+			{ at: above, delimiters: { ..MdEmphasis.indexed_run(with_below, above), below: run.below } },
 		)
 		Edge => with_below
 	}
@@ -382,10 +382,10 @@ em = |line| {
 	var $text_start = 0
 	var $i = 0
 	while $i < length {
-		c = MdText.byte_at(text, $i)
-		if c == '*' or c == '_' or c == '~' {
+		byte = MdText.byte_at(text, $i)
+		if byte == '*' or byte == '_' or byte == '~' {
 			var $end = $i
-			while $end < length and MdText.byte_at(text, $end) == c {
+			while $end < length and MdText.byte_at(text, $end) == byte {
 				$end = $end + 1
 			}
 			$texts = $texts.append(MdText.cut(text, { start: $text_start, end: $i }))
@@ -397,14 +397,14 @@ em = |line| {
 		}
 	}
 	matched = match MdEmphasis.emphasis({ runs: $runs, budget: MdText.unlimited }) {
-		Ok(m) => m.runs
+		Ok(emphasized) => emphasized.runs
 		Err(Hostile) => crash "MdEmphasis: an unlimited budget blown"
 	}
 	var $out = []
-	var $k = 0
+	var $text_index = 0
 	for run in matched {
-		$out = MdEmphasis.run_onto(List.concat($out, $texts.get($k) ?? []), run)
-		$k = $k + 1
+		$out = MdEmphasis.run_onto(List.concat($out, $texts.get($text_index) ?? []), run)
+		$text_index = $text_index + 1
 	}
 	Str.from_utf8(
 		List.concat($out, MdText.cut(text, { start: $text_start, end: length })),
