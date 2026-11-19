@@ -309,7 +309,7 @@ expect MdDocument.with_heading_ids(
 ).headings.map(|h| h.id) == ["a".to_utf8(), "a-2".to_utf8(), "a-2-2".to_utf8(), "a-3".to_utf8()]
 # Headings of one name count up.
 expect MdDocument.with_heading_ids(
-	List.repeat(mark(1, "A"), 10).join(),
+	mark(1, "A").repeat(10).join(),
 ).headings.last().map_ok(|h| h.id) == Ok("a-10".to_utf8())
 expect MdDocument.with_heading_ids(mark(2, "a &amp; <code>b</code>")) == {
 	html: "<h2 id=\"a-b\">a &amp; <code>b</code></h2>\n".to_utf8(),

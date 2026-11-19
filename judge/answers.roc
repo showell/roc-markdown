@@ -19,10 +19,10 @@ answers = |text, rule| {
 	options = { uploads: uploads_of(rule) }
 	[
 		Md.render(text, options),
-		Str.to_utf8(U64.to_str(Md.work_units(text, options))),
+		Md.work_units(text, options).to_str().to_utf8(),
 		match Md.hostility(text, options) {
 			Renderable => []
-			TooMuchFormatting => Str.to_utf8(Md.too_much_formatting)
+			TooMuchFormatting => Md.too_much_formatting.to_utf8()
 		},
 		Md.render_trusted(text, options),
 		Md.render_trusted_reflow(text, options),
@@ -32,11 +32,11 @@ answers = |text, rule| {
 ## The rule a corpus names; a name the judge does not know is its bug.
 uploads_of : List(U8) -> (List(U8) -> Bool)
 uploads_of = |rule|
-	if rule == Str.to_utf8("user-uploads") {
-		Md.uploads_under(Str.to_utf8("/user_uploads/"))
-	} else if rule == Str.to_utf8("same-origin") {
+	if rule == "user-uploads".to_utf8() {
+		Md.uploads_under("/user_uploads/".to_utf8())
+	} else if rule == "same-origin".to_utf8() {
 		|_| Bool.True
-	} else if rule == Str.to_utf8("old-chat") {
+	} else if rule == "old-chat".to_utf8() {
 		is_old_chat_upload
 	} else {
 		crash "judge/answers.roc: no uploads rule of that name"
@@ -47,7 +47,7 @@ uploads_of = |rule|
 is_old_chat_upload : List(U8) -> Bool
 is_old_chat_upload = |path| {
 	word = Str.to_utf8
-	filled = |parts| List.all(parts, |p| !List.is_empty(p))
+	filled = |parts| parts.all(|p| !p.is_empty())
 	dm_words = [
 		[],
 		word("chat"),
@@ -55,7 +55,7 @@ is_old_chat_upload = |path| {
 		word("uploads"),
 	]
 	channel_words = [[], word("channel"), word("uploads")]
-	match List.split_on(path, '/') {
+	match path.split_on('/') {
 		[
 			root,
 			chat,
@@ -77,8 +77,8 @@ is_old_chat_upload = |path| {
 	}
 }
 
-expect is_old_chat_upload(Str.to_utf8("/chat/c/1_3/yo/uploads/abc.mp4"))
-expect is_old_chat_upload(Str.to_utf8("/channel/general/plans/uploads/x.png"))
-expect !is_old_chat_upload(Str.to_utf8("/chat/c/1_3/yo/upload"))
-expect !is_old_chat_upload(Str.to_utf8("/chat/c//yo/uploads/abc.mp4"))
-expect !is_old_chat_upload(Str.to_utf8("/user_uploads/a.png"))
+expect is_old_chat_upload("/chat/c/1_3/yo/uploads/abc.mp4".to_utf8())
+expect is_old_chat_upload("/channel/general/plans/uploads/x.png".to_utf8())
+expect !is_old_chat_upload("/chat/c/1_3/yo/upload".to_utf8())
+expect !is_old_chat_upload("/chat/c//yo/uploads/abc.mp4".to_utf8())
+expect !is_old_chat_upload("/user_uploads/a.png".to_utf8())

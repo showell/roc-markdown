@@ -14,17 +14,17 @@ answer = |text, mode| [
 		Trusted => Md.render_trusted(text, options)
 		Reflow => Md.render_trusted_reflow(text, options)
 	},
-	Str.to_utf8(U64.to_str(Md.work_units(text, options))),
+	Md.work_units(text, options).to_str().to_utf8(),
 	match Md.hostility(text, options) {
 		Renderable => []
-		TooMuchFormatting => Str.to_utf8(Md.too_much_formatting)
+		TooMuchFormatting => Md.too_much_formatting.to_utf8()
 	},
 ]
 
 ## **THE PLAYGROUND IS A HOST WHOSE UPLOADS ARE `/user_uploads/`**, where
 ## `zig build playground` puts its sample image, as roc-chat's are.
 options : Md.Options
-options = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")) }
+options = { uploads: Md.uploads_under("/user_uploads/".to_utf8()) }
 
 ## **A MODE THE PAGE CANNOT NAME IS A CRASH**, never a render in some other
 ## mode.
