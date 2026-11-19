@@ -12,7 +12,7 @@
 ##
 ## Where a chat keeps its uploads is no part of the dialect: the host names
 ## them in each render's options (Md.Options). Their markup is MdHtml's
-## (`msg_ref`, `chat_quote_open`). Pure.
+## (`message_reference`, `chat_quote_open`). Pure.
 import Ascii
 import Bytes
 import MdHtml
@@ -35,10 +35,10 @@ MdChat := [].{
 		if MdText.byte_at(text, i) != 'M' {
 			Err(NoRef)
 		} else {
-			end = msg_ref_end(text, i)?
+			end = message_reference_end(text, i)?
 			Ok({
-				html: MdHtml.msg_ref({
-					slug: MdText.cut(text, { start: i + msg_prefix.len(), end }),
+				html: MdHtml.message_reference({
+					slug: MdText.cut(text, { start: i + message_prefix.len(), end }),
 					label: MdText.cut(text, { start: i, end }),
 				}),
 				end,
@@ -56,11 +56,11 @@ MdChat := [].{
 	max_fence_run = 10
 }
 
-msg_ref_end : List(U8), U64 -> Try(U64, [NoRef])
-msg_ref_end = |text, i| {
+message_reference_end : List(U8), U64 -> Try(U64, [NoRef])
+message_reference_end = |text, i| {
 	length = text.len()
-	n = msg_prefix.len()
-	if i + n > length or MdText.cut(text, { start: i, end: i + n }) != msg_prefix {
+	n = message_prefix.len()
+	if i + n > length or MdText.cut(text, { start: i, end: i + n }) != message_prefix {
 		Err(NoRef)
 	} else if i > 0 and MdText.is_word_char(MdText.byte_at(text, i - 1)) {
 		Err(NoRef)
@@ -116,8 +116,8 @@ channel_name_max = 40
 is_slug_char : U8 -> Bool
 is_slug_char = |c| Ascii.is_alphanumeric(c) or c == '-'
 
-msg_prefix : List(U8)
-msg_prefix = "MSG_".to_utf8()
+message_prefix : List(U8)
+message_prefix = "MSG_".to_utf8()
 
 expect MdChat.reference_at("MSG_plans_3.".to_utf8(), 0) == Ok({
 	html: "<a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a>".to_utf8(),

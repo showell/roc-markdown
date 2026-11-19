@@ -224,8 +224,8 @@ MdHtml := [].{
 	## The chat's message reference (MdChat): a link to the message's anchor,
 	## `#msg-<slug>`, its label the reference as written. The slug grammar has
 	## no byte HTML gives a meaning, so both are written as they are.
-	msg_ref : { slug : List(U8), label : List(U8) } -> List(U8)
-	msg_ref = |{ slug, label }| [
+	message_reference : { slug : List(U8), label : List(U8) } -> List(U8)
+	message_reference = |{ slug, label }| [
 		"<a href=\"#msg-".to_utf8(),
 		slug,
 		"\" class=\"msg-ref\">".to_utf8(),
