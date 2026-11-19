@@ -87,11 +87,11 @@ scan = |raw, { start, name }| {
 ## TagScan's walk from `i`, just past the tag's name.
 attrs_from : List(U8), U64 -> Try(Tag, [NotSafe])
 attrs_from = |raw, from| {
-	len = raw.len()
+	length = raw.len()
 	var $i = from
 	var $attrs = []
 	var $end = 0
-	while $i < len and $end == 0 {
+	while $i < length and $end == 0 {
 		c = MdText.byte_at(raw, $i)
 		if MdText.is_space(c) or c == '/' {
 			$i = $i + 1
@@ -99,7 +99,7 @@ attrs_from = |raw, from| {
 			$end = $i + 1
 		} else {
 			name_start = $i
-			while $i < len and MdText.is_attr_name_char(MdText.byte_at(raw, $i)) {
+			while $i < length and MdText.is_attr_name_char(MdText.byte_at(raw, $i)) {
 				$i = $i + 1
 			}
 			if $i == name_start {
@@ -109,9 +109,9 @@ attrs_from = |raw, from| {
 			}
 			name = MdText.cut(raw, { start: name_start, end: $i })
 			$i = skip_spaces(raw, $i)
-			if $i < len and MdText.byte_at(raw, $i) == '=' {
+			if $i < length and MdText.byte_at(raw, $i) == '=' {
 				$i = skip_spaces(raw, $i + 1)
-				if $i >= len {
+				if $i >= length {
 					return Err(NotSafe)
 				} else {
 					{}
@@ -120,7 +120,7 @@ attrs_from = |raw, from| {
 				if q == '"' or q == '\'' {
 					value_start = $i + 1
 					close = MdText.find_or_end(raw, { byte: q, at: value_start })
-					if close >= len {
+					if close >= length {
 						return Err(NotSafe)
 					} else {
 						{}
@@ -132,7 +132,7 @@ attrs_from = |raw, from| {
 					$i = close + 1
 				} else {
 					value_start = $i
-					while $i < len and !MdText.is_space(
+					while $i < length and !MdText.is_space(
 						MdText.byte_at(raw, $i),
 					) and MdText.byte_at(raw, $i) != '>' {
 						$i = $i + 1

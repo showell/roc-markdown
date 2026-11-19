@@ -40,12 +40,12 @@ MdDocument := [].{
 	## hook. A lone `\r` inside a line stays.
 	with_plain_line_ends : List(U8) -> List(U8)
 	with_plain_line_ends = |md| {
-		len = md.len()
+		length = md.len()
 		var $out = []
 		var $i = 0
-		while $i < len {
+		while $i < length {
 			c = MdText.byte_at(md, $i)
-			is_line_end = c == '\r' and ($i + 1 == len or md.get($i + 1) == Ok('\n'))
+			is_line_end = c == '\r' and ($i + 1 == length or md.get($i + 1) == Ok('\n'))
 			$out = if is_line_end {
 				$out
 			} else {
@@ -87,11 +87,11 @@ MdDocument := [].{
 		budget : MdText.Budget,
 	} -> MdText.Block
 	indented_code_onto = |out, { md, line_start, budget }| {
-		len = md.len()
+		length = md.len()
 		var $body = []
 		var $blanks = []
 		var $p = line_start
-		while $p < len {
+		while $p < length {
 			eol = MdText.line_end(md, $p)
 			line = MdText.cut(md, { start: $p, end: eol })
 			if MdText.is_blank(line) {
@@ -118,13 +118,13 @@ MdDocument := [].{
 	## The render's `html` with every marked heading given its id.
 	with_heading_ids : List(U8) -> MdDocument.Page
 	with_heading_ids = |html| {
-		len = html.len()
+		length = html.len()
 		var $out = []
 		var $headings = []
 		var $ids = Dict.empty()
 		var $copied = 0
 		var $i = MdText.find_or_end(html, { byte: '<', at: 0 })
-		while $i < len {
+		while $i < length {
 			match marked_heading_at(html, $i) {
 				Ok({ level, content_start, content_end }) => {
 					text = MdHtml.plain_text(

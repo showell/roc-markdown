@@ -53,11 +53,11 @@ MdLinks := [].{
 		budget : MdText.Budget,
 	}
 	link_at = |text, { at, next_bracket, brackets, closes, budget }| {
-		len = text.len()
+		length = text.len()
 		label = label_end(text, { at, next_bracket, brackets, budget })
 		var $budget = label.budget
 		paren_at = label.close + 1
-		if label.close >= len or paren_at >= len or MdText.byte_at(text, paren_at) != '(' {
+		if label.close >= length or paren_at >= length or MdText.byte_at(text, paren_at) != '(' {
 			{
 				link: Err(NotALink),
 				next_bracket: label.next_bracket,
@@ -79,12 +79,12 @@ MdLinks := [].{
 							escapes: Unread,
 						},
 					),
-					MdText.charge($budget, len),
+					MdText.charge($budget, length),
 				)
 			}
 			$budget = scanned
-			close_paren = table.get(open_paren) ?? len
-			if close_paren >= len {
+			close_paren = table.get(open_paren) ?? length
+			if close_paren >= length {
 				{
 					link: Err(NotALink),
 					next_bracket: label.next_bracket,
@@ -235,12 +235,12 @@ label_end : List(U8),
 	budget : MdText.Budget,
 }
 label_end = |text, { at, next_bracket, brackets, budget }| {
-	len = text.len()
+	length = text.len()
 	match brackets {
 		FirstClose => {
 			var $next_bracket = next_bracket
 			var $budget = budget
-			while $next_bracket < len and $next_bracket < at + 1 {
+			while $next_bracket < length and $next_bracket < at + 1 {
 				from = $next_bracket
 				$next_bracket = MdText.find_or_end(text, { byte: ']', at: $next_bracket + 1 })
 				$budget = MdText.charge($budget, $next_bracket - from)
@@ -253,7 +253,7 @@ label_end = |text, { at, next_bracket, brackets, budget }| {
 			}
 		}
 		Balanced(Scanned(table)) => {
-			close: table.get(at) ?? len,
+			close: table.get(at) ?? length,
 			next_bracket,
 			brackets,
 			budget,
@@ -268,10 +268,10 @@ label_end = |text, { at, next_bracket, brackets, budget }| {
 				},
 			)
 			{
-				close: table.get(at) ?? len,
+				close: table.get(at) ?? length,
 				next_bracket,
 				brackets: Balanced(Scanned(table)),
-				budget: MdText.charge(budget, len),
+				budget: MdText.charge(budget, length),
 			}
 		}
 	}
@@ -287,11 +287,11 @@ pair_closes : List(U8),
 	escapes : [Read, Unread],
 } -> List(U64)
 pair_closes = |text, { opener, closer, escapes }| {
-	len = text.len()
-	var $closes = List.repeat(len, len)
+	length = text.len()
+	var $closes = List.repeat(length, length)
 	var $open = []
 	var $i = 0
-	while $i < len {
+	while $i < length {
 		c = MdText.byte_at(text, $i)
 		if c == '\\' and escapes == Read {
 			$i = $i + 1

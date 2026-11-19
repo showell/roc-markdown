@@ -180,10 +180,10 @@ MdSafety := [].{
 ## `%2e` (either case) read as the `.` a browser takes it for.
 dots_decoded : List(U8) -> List(U8)
 dots_decoded = |src| {
-	len = src.len()
+	length = src.len()
 	var $out = []
 	var $i = 0
-	while $i < len {
+	while $i < length {
 		if is_escape_of(src, { at: $i, hex: ['2', 'e'] }) {
 			$out = $out.append('.')
 			$i = $i + 3

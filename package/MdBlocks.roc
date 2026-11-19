@@ -63,7 +63,7 @@ MdBlocks := [].{
 			})?
 			Ok({ out: List.concat(flat.out, MdHtml.p_close), budget: flat.budget })
 		} else {
-			len = md.len()
+			length = md.len()
 			# A container's content is blocks one level deeper, in this render's
 			# wrap: the recursion MdList and MdQuote are handed, so they need no
 			# import of this module (a cycle) and the depth stays here.
@@ -80,7 +80,7 @@ MdBlocks := [].{
 			var $out = out
 			var $budget = budget
 			var $line_start = 0
-			while $line_start < len {
+			while $line_start < length {
 				$budget = MdText.charge($budget, 1)
 				if MdText.is_blown($budget) {
 					return Err(Hostile)
@@ -301,10 +301,10 @@ paragraph_onto = |
 		dialect,
 	},
 | {
-	len = md.len()
+	length = md.len()
 	var $lines = []
 	var $p = line_start
-	while $p < len {
+	while $p < length {
 		eol = MdText.line_end(md, $p)
 		line = MdText.cut(md, { start: $p, end: eol })
 		is_interrupted = MdFence.open_at(md, $p).is_ok()

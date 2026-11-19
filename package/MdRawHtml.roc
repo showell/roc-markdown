@@ -27,11 +27,11 @@ MdRawHtml := [].{
 			$p = MdText.next_line(md, MdText.line_end(md, $p))
 		}
 		raw = MdText.cut(md, { start: line_start, end: $p })
-		len = raw.len()
+		length = raw.len()
 		var $out = out
 		var $last = 0
 		var $i = 0
-		while $i < len {
+		while $i < length {
 			if MdText.byte_at(raw, $i) != '<' {
 				$i = $i + 1
 			} else {
@@ -56,7 +56,7 @@ MdRawHtml := [].{
 		}
 		{
 			out: MdText.escape_onto($out, raw.drop_first($last)),
-			budget: MdText.charge(budget, len),
+			budget: MdText.charge(budget, length),
 			after: $p,
 		}
 	}
@@ -81,13 +81,13 @@ MdRawHtml := [].{
 ## quoted values respected.
 html_tag_end : List(U8) -> Try(U64, [Unterminated])
 html_tag_end = |t| {
-	len = t.len()
+	length = t.len()
 	var $i = 1
-	while $i < len {
+	while $i < length {
 		c = MdText.byte_at(t, $i)
 		if c == '"' or c == '\'' {
 			close = MdText.find_or_end(t, { byte: c, at: $i + 1 })
-			if close >= len {
+			if close >= length {
 				return Err(Unterminated)
 			} else {
 				$i = close + 1

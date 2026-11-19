@@ -36,7 +36,7 @@ MdTableBlock := [].{
 	| match MdTable.table_at(md, line_start) {
 		Err(NotATable) => crash "MdTableBlock.table_onto: no table where the dispatcher found one"
 		Ok(table) => {
-			len = md.len()
+			length = md.len()
 			head = row_onto(
 				List.concat(out, MdHtml.table_open),
 				{
@@ -52,7 +52,7 @@ MdTableBlock := [].{
 			var $budget = head.budget
 			var $rows = 0
 			var $p = table.body
-			while $p < len and !ends_table(md, $p) {
+			while $p < length and !ends_table(md, $p) {
 				eol = MdText.line_end(md, $p)
 				row = row_onto(
 					if $rows == 0 {

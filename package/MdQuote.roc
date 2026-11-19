@@ -45,7 +45,7 @@ MdQuote := [].{
 			reading,
 		},
 	| {
-		len = md.len()
+		length = md.len()
 		var $inner = []
 		var $last_was_text = Bool.False
 		# A table's rows are no paragraph's, so no line is lazy after them:
@@ -53,7 +53,7 @@ MdQuote := [].{
 		var $in_table = Bool.False
 		var $prev_start = 0
 		var $p = line_start
-		while $p < len {
+		while $p < length {
 			eol = MdText.line_end(md, $p)
 			line = MdText.cut(md, { start: $p, end: eol })
 			if MdText.is_blank(line) {

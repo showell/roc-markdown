@@ -376,16 +376,16 @@ flanking = |text, { start, end }| {
 em : Str -> Str
 em = |line| {
 	text = line.to_utf8()
-	len = text.len()
+	length = text.len()
 	var $runs = []
 	var $texts = []
 	var $text_start = 0
 	var $i = 0
-	while $i < len {
+	while $i < length {
 		c = MdText.byte_at(text, $i)
 		if c == '*' or c == '_' or c == '~' {
 			var $end = $i
-			while $end < len and MdText.byte_at(text, $end) == c {
+			while $end < length and MdText.byte_at(text, $end) == c {
 				$end = $end + 1
 			}
 			$texts = $texts.append(MdText.cut(text, { start: $text_start, end: $i }))
@@ -407,7 +407,7 @@ em = |line| {
 		$k = $k + 1
 	}
 	Str.from_utf8(
-		List.concat($out, MdText.cut(text, { start: $text_start, end: len })),
+		List.concat($out, MdText.cut(text, { start: $text_start, end: length })),
 	) ?? crash "a test's text is UTF-8"
 }
 

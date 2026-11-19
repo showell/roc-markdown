@@ -31,10 +31,10 @@ MdCodeSpan := [].{
 			$is_first = Bool.False
 		}
 		joined = $joined
-		len = joined.len()
+		length = joined.len()
 		var $out = []
 		var $i = 0
-		while $i < len {
+		while $i < length {
 			c = MdText.byte_at(joined, $i)
 			if c == '\\' and MdText.is_escapable(joined, $i + 1) {
 				$out = List.concat($out, MdText.cut(joined, { start: $i, end: $i + 2 }))
@@ -75,11 +75,11 @@ MdCodeSpan := [].{
 		budget : MdText.Budget,
 	}
 	span_at = |text, { at, budget }| {
-		len = text.len()
+		length = text.len()
 		n = Bytes.run_length(text, { byte: '`', at })
 		var $budget = MdText.charge(budget, n)
 		var $k = at + n
-		while $k < len {
+		while $k < length {
 			$budget = MdText.charge($budget, 1)
 			if MdText.byte_at(text, $k) != '`' {
 				$k = $k + 1

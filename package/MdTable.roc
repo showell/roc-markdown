@@ -18,7 +18,7 @@ MdTable := [].{
 	cells : List(U8) -> List(List(U8))
 	cells = |line| {
 		t = MdText.trim_line(line)
-		len = t.len()
+		length = t.len()
 		var $cells = []
 		var $cell = []
 		var $after_pipe = Bool.False
@@ -27,13 +27,13 @@ MdTable := [].{
 		} else {
 			0
 		}
-		while $i < len {
+		while $i < length {
 			c = MdText.byte_at(t, $i)
 			$after_pipe = Bool.False
 			if c == '\\' and t.get($i + 1) == Ok('|') {
 				$cell = $cell.append('|')
 				$i = $i + 2
-			} else if c == '\\' and $i + 1 < len {
+			} else if c == '\\' and $i + 1 < length {
 				$cell = List.concat($cell, [c, MdText.byte_at(t, $i + 1)])
 				$i = $i + 2
 			} else if c == '|' {

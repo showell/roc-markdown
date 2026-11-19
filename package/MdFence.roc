@@ -94,11 +94,11 @@ MdFence := [].{
 			dialect,
 		},
 	| {
-		len = md.len()
-		var $content_end = len
-		var $after = len
+		length = md.len()
+		var $content_end = length
+		var $after = length
 		var $p = body_start
-		while $p < len {
+		while $p < length {
 			eol = MdText.line_end(md, $p)
 			if MdFence.is_close(
 				MdText.cut(md, { start: $p, end: eol }),
@@ -175,10 +175,10 @@ MdFence := [].{
 ## spaces.
 content_without_fence_indent : { content : List(U8), indent : U64 } -> List(U8)
 content_without_fence_indent = |{ content, indent }| {
-	len = content.len()
+	length = content.len()
 	var $out = []
 	var $i = 0
-	while $i < len {
+	while $i < length {
 		eol = MdText.line_end(content, $i)
 		line = MdText.cut(content, { start: $i, end: eol })
 		strip = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), indent)

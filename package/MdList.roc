@@ -123,7 +123,7 @@ MdList := [].{
 			reading,
 		},
 	| {
-		len = md.len()
+		length = md.len()
 		var $items = []
 		var $loose = Bool.False
 		var $cur = []
@@ -134,7 +134,7 @@ MdList := [].{
 		var $fence = Shut
 		var $blanks = 0
 		var $p = line_start
-		while $p < len {
+		while $p < length {
 			eol = MdText.line_end(md, $p)
 			line = MdText.cut(md, { start: $p, end: eol })
 			next = MdText.next_line(md, eol)
@@ -354,9 +354,9 @@ is_first_child_block : List(U8),
 	is_code : List(U8) -> Bool,
 } -> Bool
 is_first_child_block = |item, { is_block_start, is_code }| {
-	len = item.len()
+	length = item.len()
 	var $line_start = 0
-	while $line_start < len {
+	while $line_start < length {
 		eol = MdText.line_end(item, $line_start)
 		line = MdText.cut(item, { start: $line_start, end: eol })
 		if !MdText.is_blank(line) {

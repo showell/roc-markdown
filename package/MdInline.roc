@@ -60,7 +60,7 @@ MdInline := [].{
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
 	html_onto = |{ out, text, refs, budget, uploads }| {
-		len = text.len()
+		length = text.len()
 		is_document = refs != Linked and refs != InLabel
 		reads_links = match refs {
 			DocumentLabel(_) => Bool.False
@@ -96,7 +96,7 @@ MdInline := [].{
 		}
 		var $closes = Unscanned
 		var $email_dead = 0
-		while $i < len {
+		while $i < length {
 			$budget = MdText.charge($budget, 1)
 			if MdText.is_blown($budget) {
 				return Err(Hostile)
@@ -347,7 +347,7 @@ MdInline := [].{
 				}
 			}
 		}
-		pieces = with_pending_text($pieces, { text_start: $text_start, at: len })
+		pieces = with_pending_text($pieces, { text_start: $text_start, at: length })
 		matched = MdEmphasis.emphasis({ runs: $runs, budget: $budget })?
 		if MdText.is_blown(matched.budget) {
 			Err(Hostile)

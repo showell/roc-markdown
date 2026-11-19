@@ -251,10 +251,10 @@ MdHtml := [].{
 	## at its first `>` (one inside a value is `&gt;`).
 	plain_text : List(U8) -> List(U8)
 	plain_text = |html| {
-		len = html.len()
+		length = html.len()
 		var $out = []
 		var $i = 0
-		while $i < len {
+		while $i < length {
 			c = MdText.byte_at(html, $i)
 			if c == '<' {
 				$i = MdText.find_or_end(html, { byte: '>', at: $i }) + 1

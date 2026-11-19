@@ -140,10 +140,10 @@ MdText := [].{
 	## backslash. For text no inline pass reads (a fence's info string).
 	without_escapes : List(U8) -> List(U8)
 	without_escapes = |text| {
-		len = text.len()
+		length = text.len()
 		var $out = []
 		var $i = 0
-		while $i < len {
+		while $i < length {
 			c = byte_at(text, $i)
 			if c == '\\' and is_escapable(text, $i + 1) {
 				$out = $out.append(byte_at(text, $i + 1))

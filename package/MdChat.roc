@@ -58,20 +58,20 @@ MdChat := [].{
 
 msg_ref_end : List(U8), U64 -> Try(U64, [NoRef])
 msg_ref_end = |text, i| {
-	len = text.len()
+	length = text.len()
 	n = msg_prefix.len()
-	if i + n > len or MdText.cut(text, { start: i, end: i + n }) != msg_prefix {
+	if i + n > length or MdText.cut(text, { start: i, end: i + n }) != msg_prefix {
 		Err(NoRef)
 	} else if i > 0 and MdText.is_word_char(MdText.byte_at(text, i - 1)) {
 		Err(NoRef)
 	} else {
 		first_end = slug_end(text, i + n)?
 		topic_end = long_topic_end(text, { channel_start: i + n, first_end })?
-		if topic_end >= len or MdText.byte_at(text, topic_end) != '_' {
+		if topic_end >= length or MdText.byte_at(text, topic_end) != '_' {
 			Err(NoRef)
 		} else {
 			end = Bytes.count_while(text, { keep: Ascii.is_digit, at: topic_end + 1 })
-			ends_in_word = end < len and MdText.is_word_char(MdText.byte_at(text, end))
+			ends_in_word = end < length and MdText.is_word_char(MdText.byte_at(text, end))
 			if end == topic_end + 1 or ends_in_word {
 				Err(NoRef)
 			} else {
