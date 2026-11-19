@@ -135,9 +135,9 @@ MdList := [].{
 		var $blanks = 0
 		var $p = line_start
 		while $p < length {
-			eol = MdText.line_end(md, $p)
-			line = MdText.cut(md, { start: $p, end: eol })
-			next = MdText.next_line(md, eol)
+			line_end = MdText.line_end(md, $p)
+			line = MdText.cut(md, { start: $p, end: line_end })
+			next = MdText.next_line(md, line_end)
 			if MdText.is_blank(line) {
 				$blanks = $blanks + 1
 				$p = next
@@ -357,15 +357,15 @@ is_first_child_block = |item, { is_block_start, is_code }| {
 	length = item.len()
 	var $line_start = 0
 	while $line_start < length {
-		eol = MdText.line_end(item, $line_start)
-		line = MdText.cut(item, { start: $line_start, end: eol })
+		line_end = MdText.line_end(item, $line_start)
+		line = MdText.cut(item, { start: $line_start, end: line_end })
 		if !MdText.is_blank(line) {
 			return is_block_start(
 				item,
 				$line_start,
 			) or MdTable.is_table_at(item, $line_start) or is_code(line)
 		} else {
-			$line_start = MdText.next_line(item, eol)
+			$line_start = MdText.next_line(item, line_end)
 		}
 	}
 	Bool.False

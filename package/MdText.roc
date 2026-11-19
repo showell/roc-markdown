@@ -164,11 +164,11 @@ MdText := [].{
 	line_end : List(U8), U64 -> U64
 	line_end = |md, line_start| find_or_end(md, { byte: '\n', at: line_start })
 
-	## The start of the line after the one ending at `eol`.
+	## The start of the line after the one ending at `ended_at`.
 	next_line : List(U8), U64 -> U64
-	next_line = |md, eol|
-		if eol < md.len() {
-			eol + 1
+	next_line = |md, ended_at|
+		if ended_at < md.len() {
+			ended_at + 1
 		} else {
 			md.len()
 		}

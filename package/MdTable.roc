@@ -65,15 +65,15 @@ MdTable := [].{
 
 	table_at : List(U8), U64 -> Try(Table, [NotATable])
 	table_at = |md, line_start| {
-		eol = MdText.line_end(md, line_start)
-		if eol >= md.len() {
+		line_end = MdText.line_end(md, line_start)
+		if line_end >= md.len() {
 			Err(NotATable)
 		} else {
-			delim_end = MdText.line_end(md, eol + 1)
-			match delimiter_row_aligns(MdText.cut(md, { start: eol + 1, end: delim_end })) {
+			delim_end = MdText.line_end(md, line_end + 1)
+			match delimiter_row_aligns(MdText.cut(md, { start: line_end + 1, end: delim_end })) {
 				Err(NotADelimiter) => Err(NotATable)
 				Ok(aligns) => {
-					header_cells = cells(MdText.cut(md, { start: line_start, end: eol }))
+					header_cells = cells(MdText.cut(md, { start: line_start, end: line_end }))
 					if header_cells.len() == aligns.len() {
 						Ok({
 							header_cells,

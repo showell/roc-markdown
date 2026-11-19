@@ -87,9 +87,9 @@ MdBlocks := [].{
 				} else {
 					{}
 				}
-				eol = MdText.line_end(md, $line_start)
-				line = MdText.cut(md, { start: $line_start, end: eol })
-				next = MdText.next_line(md, eol)
+				line_end = MdText.line_end(md, $line_start)
+				line = MdText.cut(md, { start: $line_start, end: line_end })
+				next = MdText.next_line(md, line_end)
 				if MdText.is_blank(line) {
 					$line_start = next
 				} else {
@@ -305,8 +305,8 @@ paragraph_onto = |
 	var $lines = []
 	var $p = line_start
 	while $p < length {
-		eol = MdText.line_end(md, $p)
-		line = MdText.cut(md, { start: $p, end: eol })
+		line_end = MdText.line_end(md, $p)
+		line = MdText.cut(md, { start: $p, end: line_end })
 		is_interrupted = MdFence.open_at(md, $p).is_ok()
 			or MdHeading.atx_heading(line).is_ok()
 			or MdList.is_list_interrupting(
@@ -322,7 +322,7 @@ paragraph_onto = |
 			{}
 		}
 		$lines = $lines.append(line)
-		$p = MdText.next_line(md, eol)
+		$p = MdText.next_line(md, line_end)
 	}
 	last = $lines.len() - 1
 	var $out = if spacing == Tight {

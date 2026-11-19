@@ -92,8 +92,8 @@ MdDocument := [].{
 		var $blanks = []
 		var $p = line_start
 		while $p < length {
-			eol = MdText.line_end(md, $p)
-			line = MdText.cut(md, { start: $p, end: eol })
+			line_end = MdText.line_end(md, $p)
+			line = MdText.cut(md, { start: $p, end: line_end })
 			if MdText.is_blank(line) {
 				$blanks = List.concat($blanks, past_code_indent(line) ?? []).append('\n')
 			} else {
@@ -105,7 +105,7 @@ MdDocument := [].{
 					Err(NotCode) => break
 				}
 			}
-			$p = MdText.next_line(md, eol)
+			$p = MdText.next_line(md, line_end)
 		}
 		code = MdText.escape_onto(List.concat(out, MdHtml.code_block_open([])), $body)
 		{

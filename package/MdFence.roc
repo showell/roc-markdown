@@ -58,9 +58,9 @@ MdFence := [].{
 	## starts: the block dispatcher's (MdBlocks) question.
 	open_at : List(U8), U64 -> Try({ open : Open, body_start : U64 }, [NotAFence])
 	open_at = |md, line_start| {
-		eol = MdText.line_end(md, line_start)
-		fence = MdFence.open(MdText.cut(md, { start: line_start, end: eol }))?
-		Ok({ open: fence, body_start: MdText.next_line(md, eol) })
+		line_end = MdText.line_end(md, line_start)
+		fence = MdFence.open(MdText.cut(md, { start: line_start, end: line_end }))?
+		Ok({ open: fence, body_start: MdText.next_line(md, line_end) })
 	}
 
 	## The info string after the language, on the opening line `line`.
@@ -99,16 +99,16 @@ MdFence := [].{
 		var $after = length
 		var $p = body_start
 		while $p < length {
-			eol = MdText.line_end(md, $p)
+			line_end = MdText.line_end(md, $p)
 			if MdFence.is_close(
-				MdText.cut(md, { start: $p, end: eol }),
+				MdText.cut(md, { start: $p, end: line_end }),
 				{ char: fence.char, count: fence.count },
 			) {
 				$content_end = $p
-				$after = MdText.next_line(md, eol)
+				$after = MdText.next_line(md, line_end)
 				break
 			} else {
-				$p = MdText.next_line(md, eol)
+				$p = MdText.next_line(md, line_end)
 			}
 		}
 		content = MdText.cut(md, { start: body_start, end: $content_end })
@@ -179,11 +179,11 @@ content_without_fence_indent = |{ content, indent }| {
 	var $out = []
 	var $i = 0
 	while $i < length {
-		eol = MdText.line_end(content, $i)
-		line = MdText.cut(content, { start: $i, end: eol })
+		line_end = MdText.line_end(content, $i)
+		line = MdText.cut(content, { start: $i, end: line_end })
 		strip = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), indent)
 		$out = List.concat($out, line.drop_first(strip)).append('\n')
-		$i = MdText.next_line(content, eol)
+		$i = MdText.next_line(content, line_end)
 	}
 	$out
 }

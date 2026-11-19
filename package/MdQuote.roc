@@ -54,8 +54,8 @@ MdQuote := [].{
 		var $prev_start = 0
 		var $p = line_start
 		while $p < length {
-			eol = MdText.line_end(md, $p)
-			line = MdText.cut(md, { start: $p, end: eol })
+			line_end = MdText.line_end(md, $p)
+			line = MdText.cut(md, { start: $p, end: line_end })
 			if MdText.is_blank(line) {
 				break
 			} else {
@@ -94,7 +94,7 @@ MdQuote := [].{
 						break
 					}
 			}
-			$p = MdText.next_line(md, eol)
+			$p = MdText.next_line(md, line_end)
 		}
 		quoted = nested({
 			out: List.concat(out, MdHtml.blockquote_open),

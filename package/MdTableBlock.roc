@@ -53,7 +53,7 @@ MdTableBlock := [].{
 			var $rows = 0
 			var $p = table.body
 			while $p < length and !ends_table(md, $p) {
-				eol = MdText.line_end(md, $p)
+				line_end = MdText.line_end(md, $p)
 				row = row_onto(
 					if $rows == 0 {
 						List.concat($out, MdHtml.tbody_open)
@@ -61,7 +61,7 @@ MdTableBlock := [].{
 						$out
 					},
 					{
-						cells: MdTable.cells(MdText.cut(md, { start: $p, end: eol })),
+						cells: MdTable.cells(MdText.cut(md, { start: $p, end: line_end })),
 						aligns: table.aligns,
 						tag: Td,
 						budget: $budget,
@@ -72,7 +72,7 @@ MdTableBlock := [].{
 				$out = row.out
 				$budget = row.budget
 				$rows = $rows + 1
-				$p = MdText.next_line(md, eol)
+				$p = MdText.next_line(md, line_end)
 			}
 			Ok({
 				out: (
