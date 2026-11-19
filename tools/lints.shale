@@ -54,10 +54,17 @@ const LINTS = {
 }
 
 -- **THE FINDINGS HELD AS NAMED EXCEPTIONS.** Each is one finding, by its
--- file, its check and the name it reports. There are none: Md's four
--- renders, the package's API, answer `world_verb` in the code, with a `##`
--- doc saying who calls them by name (hunt_names reads it).
-const EXCEPTIONS = {}
+-- file, its check and the name it reports. Md's four renders, the package's
+-- API, answer `world_verb` in the code instead, with a `##` doc saying who
+-- calls them by name (hunt_names reads it).
+--
+-- The test root, package/Specs.roc, imports each `package/*Spec.roc` only
+-- so `roc test` and Roc's checker reach it, never using a name of it:
+-- exactly one `unused_import` a Spec, by the Spec's name. A Spec added
+-- needs its line here, which SPEC_EXCEPTIONS' check below says.
+const EXCEPTIONS = {
+  {recipe = "find_unused_imports", path = "package/Specs.roc", check = "unused_import", name = "MdSpec"},
+}
 
 const FINDING_RE = "^([^ :]+\\.roc):[0-9]+(?::[0-9]+)?: ([a-z_]+(?: [a-z_]+)?): "
 
@@ -138,6 +145,25 @@ function judge_lint(lint, r, tracked, seen)
   return wrong
 end
 
+-- Every Spec has its exception, and every Specs.roc exception is a Spec.
+function spec_exceptions_wrong()
+  local wrong = {}
+  local specs = {}
+  for p in glob("package/*Spec.roc") do
+    local name = sub(basename(p), 1, #basename(p) - 4)
+    specs[name] = true
+    local found = false
+    for e in EXCEPTIONS do
+      if e.path == "package/Specs.roc" and e.check == "unused_import" and e.name == name then found = true end
+    end
+    if not found then push(wrong, name .. " has no unused_import exception in package/Specs.roc") end
+  end
+  for e in EXCEPTIONS do
+    if e.path == "package/Specs.roc" and not has_key(specs, e.name) then push(wrong, e.name .. " is no package/*Spec.roc") end
+  end
+  return wrong
+end
+
 local tracked = 0
 for f in lines(trim(must(run({"git", "ls-files", "*.roc"}, {cwd = ".", timeout_ms = 30000, whole = 1000000})).out)) do
   if f ~= "" then tracked = tracked + 1 end
@@ -165,5 +191,10 @@ for e in EXCEPTIONS do
     failed = failed + 1
     print("FAIL  roc recipe exception " .. key .. ": found " .. get(seen, key, 0) .. " times, held at once")
   end
+end
+local spec_wrong = spec_exceptions_wrong()
+for w in spec_wrong do
+  failed = failed + 1
+  print("FAIL  roc recipe exception: " .. w)
 end
 if failed > 0 then fail("lints: " .. failed .. " failed") end

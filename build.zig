@@ -5,7 +5,7 @@ const std = @import("std");
 /// through the package (judge/answers.roc on judge/platform/, built to an
 /// archive by the pinned Roc).
 ///
-///   zig build test                     roc test package/MdSpec.roc, then the judge
+///   zig build test                     roc test package/Specs.roc, then the judge
 ///   zig build judge -- --also <corpus> the judge, with a private corpus
 ///   zig build repl                     markdown at a prompt, or piped
 ///   zig build playground               the web playground, zig-out/playground/
@@ -50,11 +50,12 @@ pub fn build(b: *std.Build) void {
     b.step("repl", "Type markdown, see the package's answers (:help at the prompt)").dependOn(&repl.step);
 
     // **ONE COMMAND RUNS EVERY TEST**: the package's own expects, then the
-    // judge over the committed corpora. package/MdSpec.roc is the test
-    // root: no module imports it, and it reaches the whole package through
-    // Md, so it runs every expect package/main.roc does and its own besides.
-    const tests = b.step("test", "Every test: roc test package/MdSpec.roc, then the judge");
-    const roc_test = b.addSystemCommand(&.{ roc, "test", "package/MdSpec.roc" });
+    // judge over the committed corpora. package/Specs.roc is the test
+    // root, an app (so shale's typed recipes can read it) whose one import
+    // is MdSpec, which reaches the whole package through Md: it runs every
+    // expect package/main.roc does and MdSpec's besides.
+    const tests = b.step("test", "Every test: roc test package/Specs.roc, then the judge");
+    const roc_test = b.addSystemCommand(&.{ roc, "test", "package/Specs.roc" });
     roc_test.setCwd(b.path("."));
     for (rocInputs(b)) |f| roc_test.addFileInput(b.path(f));
     roc_test.has_side_effects = true;

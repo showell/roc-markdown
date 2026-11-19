@@ -1,10 +1,10 @@
 ## These are Md's tests: whole messages and pages through the package's API,
 ## block by block, in a chat's modes and a document's, the two beside each
 ## other where they read the same text differently. They moved out of Md.roc
-## to keep the front door small. This module is the package's test root:
-## nothing imports it, and it reaches every module through Md, so
-## `roc test package/MdSpec.roc` (`zig build test`) runs its expects and every
-## module's own.
+## to keep the front door small. No module of the package imports it; the
+## test root, the app package/Specs.roc, does, and it reaches every module
+## through Md, so `roc test package/Specs.roc` (`zig build test`) runs its
+## expects and every module's own.
 import Md
 import MdDocument
 

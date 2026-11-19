@@ -8,7 +8,7 @@ every case that moved. Each corpus's pass count is held to a ratchet, which
 only rises.
 
 ```
-zig build test                          # roc test package/MdSpec.roc, then the judge, the REPL's and the playground's tests
+zig build test                          # roc test package/Specs.roc, then the judge, the REPL's and the playground's tests
 zig build judge -- --also <corpus.jsonl> # the judge, with a private corpus too
 shale tools/verify.shale                # every check above, a PASS/FAIL checklist
 ```
@@ -147,7 +147,8 @@ as its uploads rule, as roc-chat does).
 |---|---|
 | `package/main.roc` | the package and what it exposes |
 | `package/Md.roc` | the API and the modes |
-| `package/MdSpec.roc` | the expects of whole messages and pages, and the test root: `roc test package/MdSpec.roc` reaches every module through Md |
+| `package/MdSpec.roc` | the expects of whole messages and pages; it reaches every module through Md |
+| `package/Specs.roc`, `specs_platform.roc` | the test root, an app importing MdSpec so shale's typed recipes can read it: `roc test package/Specs.roc` |
 | `package/MdBlocks.roc` | the block dispatch and paragraphs |
 | `package/MdDialect.roc`, `MdIndent.roc` | what a chat and a document read differently, and how each counts an indent |
 | `package/MdList.roc`, `MdQuote.roc` | the container blocks, handed the dispatch by `MdBlocks` |
