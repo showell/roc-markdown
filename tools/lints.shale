@@ -1,7 +1,15 @@
 -- **SHALE'S ROC HUNTS OVER EVERY .roc FILE GIT TRACKS, EACH HELD AT ZERO**:
 -- the recipes roc-apps' tools/quality.shale runs, with its settings,
--- check_vocabulary over tools/vocabulary.txt, and check_module_size (a
--- module is at most 500 lines, tests included; a `*Spec.roc` has no limit).
+-- check_vocabulary over tools/vocabulary.txt, find_unclear_names with the
+-- project's own short terms in tools/accepted_terms.txt, and
+-- check_module_size (a module is at most 500 lines, tests included; a
+-- `*Spec.roc` has no limit).
+--
+-- **find_unclear_names NEEDS SHALE'S `unclear-names` BRANCH UNTIL IT
+-- MERGES**: its stricter `abbreviation` (parameters, locals and short words)
+-- and its `accepted=` are there alone, and master's recipe stops on the
+-- `accepted=` it doesn't read. Until then, run this with a SHALE_MOUNTS file
+-- whose `cookbook` is that branch's checkout.
 -- tools/verify.shale runs this and takes its lines; on its own, from the
 -- repository's root:
 --
@@ -43,7 +51,7 @@ const LINTS = {
   }},
   {recipe = "check_stacking", args = {}, checks = {{"to stack", "stack"}, {"to unstack", "unstack"}, {"long", "long"}}},
   {recipe = "check_vocabulary", args = {"words=tools/vocabulary.txt"}, checks = {{"retired_name", "retired_name"}, {"retired_comment", "retired_comment"}}},
-  {recipe = "find_unclear_names", args = {}, checks = {{"pure_mutator", "pure_mutator"}, {"abbreviation", "abbreviation"}, {"module_doc", "module_doc"}}},
+  {recipe = "find_unclear_names", args = {"accepted=tools/accepted_terms.txt"}, checks = {{"pure_mutator", "pure_mutator"}, {"abbreviation", "abbreviation"}, {"module_doc", "module_doc"}}},
   {recipe = "check_families", args = {}, checks = {{"family", "family"}, {"twin_name", "twin_name"}}},
   {recipe = "find_unused_imports", args = {}, checks = {{"unused_import", "unused_import"}}},
   {recipe = "check_name_types", args = {}, checks = {{"name_type", "name_type"}, {"bare_beside_unit", "bare_beside_unit"}, {"no_value", "no_value"}}},
