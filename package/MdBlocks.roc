@@ -94,7 +94,7 @@ MdBlocks := [].{
 					$line_start = next
 				} else {
 					block = block_at(
-						tight_sep($out, spacing),
+						tight_separator($out, spacing),
 						{
 							md,
 							line_start: $line_start,
@@ -418,8 +418,8 @@ ends_in_hard_break = |line| Bytes.count_back(line, |c| c == '\\') % 2 == 1
 
 ## Inside a tight list item, a block after a bare
 ## paragraph starts on a line of its own.
-tight_sep : List(U8), [Tight, Loose] -> List(U8)
-tight_sep = |out, spacing|
+tight_separator : List(U8), [Tight, Loose] -> List(U8)
+tight_separator = |out, spacing|
 	if spacing == Tight and out != [] and out.last() != Ok('\n') {
 		out.append('\n')
 	} else {

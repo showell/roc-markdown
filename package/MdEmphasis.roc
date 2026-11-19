@@ -45,7 +45,7 @@ MdEmphasis := [].{
 	DelimiterRun : {
 		char : U8,
 		count : U64,
-		orig : U64,
+		original_count : U64,
 		can_open : Bool,
 		can_close : Bool,
 		below : Link,
@@ -78,7 +78,7 @@ MdEmphasis := [].{
 		{
 			char: c,
 			count: n,
-			orig: n,
+			original_count: n,
 			can_open,
 			can_close,
 			below: Edge,
@@ -123,14 +123,14 @@ MdEmphasis := [].{
 			At(0)
 		}
 		while $closer != Edge {
-			ci = index_of($closer)
+			closer_index = index_of($closer)
 			$budget = MdText.charge($budget, 1)
 			if MdText.is_blown($budget) {
 				return Err(Hostile)
 			} else {
 				{}
 			}
-			closer = MdEmphasis.indexed_run($runs, ci)
+			closer = MdEmphasis.indexed_run($runs, closer_index)
 			if !closer.can_close {
 				$closer = closer.above
 			} else {
@@ -152,8 +152,8 @@ MdEmphasis := [].{
 					is_both = closer.can_open or opener.can_close
 					odd = closer.char != '~'
 						and is_both
-						and closer.orig % 3 != 0
-						and (opener.orig + closer.orig) % 3 == 0
+						and closer.original_count % 3 != 0
+						and (opener.original_count + closer.original_count) % 3 == 0
 					if opener.can_open and opener.char == closer.char and !odd {
 						$found = Bool.True
 						break
@@ -163,8 +163,8 @@ MdEmphasis := [].{
 					$opener = opener.below
 				}
 				if $found {
-					oi = index_of($opener)
-					opener = MdEmphasis.indexed_run($runs, oi)
+					opener_index = index_of($opener)
+					opener = MdEmphasis.indexed_run($runs, opener_index)
 					use = if opener.count >= 2 and closer.count >= 2 {
 						2
 					} else {
@@ -174,11 +174,11 @@ MdEmphasis := [].{
 					$runs = runs_with(
 						$runs,
 						{
-							at: oi,
+							at: opener_index,
 							delimiters: {
 								..opener,
 								count: opener.count - use,
-								above: At(ci),
+								above: At(closer_index),
 								opens: opener.opens.append(use),
 							},
 						},
@@ -186,23 +186,23 @@ MdEmphasis := [].{
 					$runs = runs_with(
 						$runs,
 						{
-							at: ci,
+							at: closer_index,
 							delimiters: {
 								..closer,
 								count: closer.count - use,
-								below: At(oi),
+								below: At(opener_index),
 								closes: closer.closes.append(use),
 							},
 						},
 					)
 					if opener.count == use {
-						$runs = runs_without($runs, oi)
+						$runs = runs_without($runs, opener_index)
 					} else {
 						{}
 					}
 					if closer.count == use {
-						above = MdEmphasis.indexed_run($runs, ci).above
-						$runs = runs_without($runs, ci)
+						above = MdEmphasis.indexed_run($runs, closer_index).above
+						$runs = runs_without($runs, closer_index)
 						$closer = above
 					} else {
 						{}
@@ -215,7 +215,7 @@ MdEmphasis := [].{
 						closer.below,
 					) ?? crash "MdEmphasis: a bottom's slot past the floor keys"
 					if !closer.can_open {
-						$runs = runs_without($runs, ci)
+						$runs = runs_without($runs, closer_index)
 					} else {
 						{}
 					}
@@ -309,7 +309,7 @@ floor_key = |closer| {
 	} else {
 		2
 	}
-	(opens + closer.orig % 3) * 3 + character
+	(opens + closer.original_count % 3) * 3 + character
 }
 
 ## The floor keys: three characters (`*`, `_`, `~`), by can_open, by length

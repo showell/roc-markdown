@@ -56,7 +56,7 @@ MdList := [].{
 						Ok(delim) if delim == '.' or delim == ')' => {
 							start = MdText.cut(line, { start: indent, end: digits_end }).fold(
 								0,
-								|acc, d| acc * 10 + (d - '0').to_u64(),
+								|number, d| number * 10 + (d - '0').to_u64(),
 							)
 							Ok({ kind: Ordered({ start, delim }), marker_end: digits_end + 1 })
 						}
@@ -126,9 +126,9 @@ MdList := [].{
 		length = md.len()
 		var $items = []
 		var $loose = Bool.False
-		var $cur = []
+		var $current_item = []
 		var $have_item = Bool.False
-		var $cur_column = first.content_column
+		var $current_column = first.content_column
 		# The fence open at the end of the current item's content, if any: a
 		# blank line inside it is the code's, and loosens nothing.
 		var $fence = Shut
@@ -145,7 +145,7 @@ MdList := [].{
 				indent = MdIndent.columns_of(line, reading)
 				marker = list_marker_at(md, { line_start: $p, reading })
 				match marker {
-					Ok(m) if indent < $cur_column => {
+					Ok(m) if indent < $current_column => {
 						# `- - -` reads as a marker too, and a rule outranks one.
 						if !is_same_list(m, first) or is_rule(line) {
 							break
@@ -153,38 +153,38 @@ MdList := [].{
 							{}
 						}
 						if $have_item {
-							$items = $items.append($cur)
+							$items = $items.append($current_item)
 							$loose = $loose or $blanks > 0
 						} else {
 							{}
 						}
 						$have_item = Bool.True
-						$cur_column = m.content_column
+						$current_column = m.content_column
 						$blanks = 0
-						$cur = m.first_line.append('\n')
+						$current_item = m.first_line.append('\n')
 						$fence = fence_after(Shut, m.first_line)
 					}
 					_ =>
-						if $blanks > 0 and $cur == ['\n'] {
+						if $blanks > 0 and $current_item == ['\n'] {
 							# An item that begins empty takes no content past a
 							# blank line: it stays empty, and the list ends.
 							break
-						} else if indent >= $cur_column and $have_item {
+						} else if indent >= $current_column and $have_item {
 							# An indented line: the item's own, its nested blocks.
 							# The blank lines before it are the item's too: they
 							# part its paragraphs and stay in its fences.
 							$loose = $loose or ($blanks > 0 and $fence == Shut)
-							$cur = List.concat($cur, List.repeat('\n', $blanks))
+							$current_item = List.concat($current_item, List.repeat('\n', $blanks))
 							$blanks = 0
 							dedented = MdIndent.without_columns(
 								line,
-								{ columns: $cur_column, from: 0, reading },
+								{ columns: $current_column, from: 0, reading },
 							)
 							$fence = fence_after($fence, dedented)
-							$cur = List.concat($cur, dedented).append('\n')
+							$current_item = List.concat($current_item, dedented).append('\n')
 						} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
 							# A lazy continuation of the item's paragraph.
-							$cur = List.concat($cur, line).append('\n')
+							$current_item = List.concat($current_item, line).append('\n')
 						} else {
 							break
 						}
@@ -193,7 +193,7 @@ MdList := [].{
 			}
 		}
 		items = if $have_item {
-			$items.append($cur)
+			$items.append($current_item)
 		} else {
 			$items
 		}

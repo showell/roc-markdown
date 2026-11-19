@@ -51,7 +51,7 @@ MdQuote := [].{
 		# A table's rows are no paragraph's, so no line is lazy after them:
 		# the table is open from its delimiter row to a blank line or a block.
 		var $in_table = Bool.False
-		var $prev_start = 0
+		var $previous_start = 0
 		var $p = line_start
 		while $p < length {
 			line_end = MdText.line_end(md, $p)
@@ -79,16 +79,16 @@ MdQuote := [].{
 						$in_table or (
 							$last_was_text and MdTable.is_table_at(
 								$inner,
-								$prev_start,
+								$previous_start,
 							)
 						)
 					)
 					$last_was_text = !ends_text and !$in_table
-					$prev_start = start
+					$previous_start = start
 				}
 				Err(NotAQuote) =>
 					if $last_was_text and !is_block_start(md, $p) {
-						$prev_start = $inner.len()
+						$previous_start = $inner.len()
 						$inner = List.concat($inner, line).append('\n')
 					} else {
 						break
