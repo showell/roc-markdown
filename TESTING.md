@@ -15,7 +15,8 @@ shale tools/verify.shale                # every check above, a PASS/FAIL checkli
 
 The Roc is pinned (`roc-version`): `-Droc=<path>`, else `~/tools/roc-<pin>/roc`
 (pins live side by side while projects move one at a time), else `roc` on
-the PATH. The showell/roc-apps release `toolchain-2026-11-07` carries it.
+the PATH. It is the pin roc-apps, roc-chat and roc-types share; no
+showell/roc-apps toolchain release carries it yet.
 Zig is 0.17.
 
 ## The corpora
