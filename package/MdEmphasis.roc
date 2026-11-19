@@ -240,7 +240,8 @@ MdEmphasis := [].{
 	run_onto = |out, run| {
 		var $o = out
 		for use in run.closes {
-			$o = $o.concat(
+			$o = List.concat(
+				$o,
 				if run.char == '~' {
 					MdHtml.del_close
 				} else if use == 2 {
@@ -250,11 +251,12 @@ MdEmphasis := [].{
 				},
 			)
 		}
-		$o = $o.concat(List.repeat(run.char, run.count))
+		$o = List.concat($o, List.repeat(run.char, run.count))
 		var $n = run.opens.len()
 		while $n > 0 {
 			$n = $n - 1
-			$o = $o.concat(
+			$o = List.concat(
+				$o,
 				if run.char == '~' {
 					MdHtml.del_open
 				} else if run.opens.get($n) == Ok(2) {
@@ -401,11 +403,11 @@ em = |line| {
 	var $out = []
 	var $k = 0
 	for run in matched {
-		$out = MdEmphasis.run_onto($out.concat($texts.get($k) ?? []), run)
+		$out = MdEmphasis.run_onto(List.concat($out, $texts.get($k) ?? []), run)
 		$k = $k + 1
 	}
 	Str.from_utf8(
-		$out.concat(MdText.cut(text, { start: $text_start, end: len })),
+		List.concat($out, MdText.cut(text, { start: $text_start, end: len })),
 	) ?? crash "a test's text is UTF-8"
 }
 

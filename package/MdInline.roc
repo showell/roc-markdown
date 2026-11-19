@@ -275,7 +275,7 @@ MdInline := [].{
 									uploads,
 								})?
 								$budget = label.budget
-								Token(Html(label.out.concat(MdHtml.link_close)), link.end)
+								Token(Html(List.concat(label.out, MdHtml.link_close)), link.end)
 							}
 							Err(NotALink) => Skip($i + 1)
 						}
@@ -427,7 +427,7 @@ emit = |out, { text, pieces, runs }| {
 	for piece in pieces {
 		$out = match piece {
 			Text(start, end) => MdText.escape_onto($out, MdText.cut(text, { start, end }))
-			Html(html) => $out.concat(html)
+			Html(html) => List.concat($out, html)
 			Run(k) => MdEmphasis.run_onto($out, MdEmphasis.indexed_run(runs, k))
 		}
 	}

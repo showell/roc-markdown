@@ -76,7 +76,7 @@ Ascii := [].{
 	to_lowercase : U8 -> U8
 	to_lowercase = |c|
 		if c >= 'A' and c <= 'Z' {
-			c.bitwise_or(0x20)
+			U8.bitwise_or(c, 0x20)
 		} else {
 			c
 		}
@@ -87,7 +87,7 @@ Ascii := [].{
 	to_uppercase : U8 -> U8
 	to_uppercase = |c|
 		if c >= 'a' and c <= 'z' {
-			c.bitwise_xor(0x20)
+			U8.bitwise_xor(c, 0x20)
 		} else {
 			c
 		}
@@ -139,7 +139,7 @@ printable : List(U8)
 printable = [[' '], punctuation, digits, letters].join()
 
 letters : List(U8)
-letters = uppers.concat(lowers)
+letters = List.concat(uppers, lowers)
 
 # The 33 control bytes, stated as ASCII less the printables.
 controls : List(U8)
@@ -157,7 +157,7 @@ expect controls.len() == 33
 expect all_bytes.keep_if(Ascii.is_digit) == digits
 expect all_bytes.keep_if(Ascii.is_hex_digit) == "0123456789ABCDEFabcdef".to_utf8()
 expect all_bytes.keep_if(Ascii.is_letter) == letters
-expect all_bytes.keep_if(Ascii.is_alphanumeric) == digits.concat(letters)
+expect all_bytes.keep_if(Ascii.is_alphanumeric) == List.concat(digits, letters)
 expect all_bytes.keep_if(Ascii.is_whitespace) == whitespace
 expect all_bytes.keep_if(Ascii.is_punctuation) == punctuation
 expect all_bytes.keep_if(Ascii.is_control) == controls

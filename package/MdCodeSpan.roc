@@ -26,7 +26,7 @@ MdCodeSpan := [].{
 			$joined = if $is_first {
 				line
 			} else {
-				$joined.append('\n').concat(line)
+				List.concat($joined.append('\n'), line)
 			}
 			$is_first = Bool.False
 		}
@@ -37,7 +37,7 @@ MdCodeSpan := [].{
 		while $i < len {
 			c = MdText.byte_at(joined, $i)
 			if c == '\\' and MdText.is_escapable(joined, $i + 1) {
-				$out = $out.concat(MdText.cut(joined, { start: $i, end: $i + 2 }))
+				$out = List.concat($out, MdText.cut(joined, { start: $i, end: $i + 2 }))
 				$i = $i + 2
 			} else if c == '`' {
 				scanned = MdCodeSpan.span_at(joined, { at: $i, budget: MdText.unlimited })
@@ -46,7 +46,7 @@ MdCodeSpan := [].{
 					Err(NoClose) => $i + Bytes.run_length(joined, { byte: '`', at: $i })
 				}
 				code = MdText.cut(joined, { start: $i, end })
-				$out = $out.concat(code.map(line_end_as_space))
+				$out = List.concat($out, code.map(line_end_as_space))
 				$i = end
 			} else if c == '\n' {
 				kept = $out.len() - Bytes.count_back($out, |b| b == ' ' or b == '\t' or b == '\r')
@@ -107,10 +107,10 @@ MdCodeSpan := [].{
 	## A code span's html: its content `text[start..end]`, as CommonMark trims
 	## it, escaped.
 	span_html : List(U8), { start : U64, end : U64 } -> List(U8)
-	span_html = |text, span| MdText.escape_onto(
-		MdHtml.code_open,
-		span_content(MdText.cut(text, span)),
-	).concat(MdHtml.code_close)
+	span_html = |text, span| {
+		content = span_content(MdText.cut(text, span))
+		List.concat(MdText.escape_onto(MdHtml.code_open, content), MdHtml.code_close)
+	}
 }
 
 ## A code span's line end is a space (CommonMark).

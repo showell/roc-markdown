@@ -34,7 +34,7 @@ MdTable := [].{
 				$cell = $cell.append('|')
 				$i = $i + 2
 			} else if c == '\\' and $i + 1 < len {
-				$cell = $cell.concat([c, MdText.byte_at(t, $i + 1)])
+				$cell = List.concat($cell, [c, MdText.byte_at(t, $i + 1)])
 				$i = $i + 2
 			} else if c == '|' {
 				$cells = $cells.append(MdText.trim_line($cell))

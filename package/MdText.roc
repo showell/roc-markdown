@@ -60,11 +60,11 @@ MdText := [].{
 		var $out = out
 		for c in text {
 			$out = match c {
-				'&' => $out.concat(amp)
-				'<' => $out.concat(lt)
-				'>' => $out.concat(gt)
-				'"' => $out.concat(quot)
-				'\'' => $out.concat(apos)
+				'&' => List.concat($out, amp)
+				'<' => List.concat($out, lt)
+				'>' => List.concat($out, gt)
+				'"' => List.concat($out, quot)
+				'\'' => List.concat($out, apos)
 				_ => $out.append(c)
 			}
 		}

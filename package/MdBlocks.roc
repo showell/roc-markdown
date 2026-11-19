@@ -55,13 +55,13 @@ MdBlocks := [].{
 				out
 			}
 			flat = MdInline.html_onto({
-				out: start.concat(MdHtml.p_open),
+				out: List.concat(start, MdHtml.p_open),
 				text: md,
 				refs: MdDialect.inline_refs(dialect),
 				budget,
 				uploads,
 			})?
-			Ok({ out: flat.out.concat(MdHtml.p_close), budget: flat.budget })
+			Ok({ out: List.concat(flat.out, MdHtml.p_close), budget: flat.budget })
 		} else {
 			len = md.len()
 			# A container's content is blocks one level deeper, in this render's
@@ -170,7 +170,7 @@ block_at = |
 		Ok(MdDocument.indented_code_onto(out, { md, line_start, budget }))
 	} else if is_rule(line) {
 		Ok({
-			out: out.concat(MdHtml.hr),
+			out: List.concat(out, MdHtml.hr),
 			budget,
 			after: next,
 		})
@@ -328,7 +328,7 @@ paragraph_onto = |
 	var $out = if spacing == Tight {
 		out
 	} else {
-		out.concat(MdHtml.p_open)
+		List.concat(out, MdHtml.p_open)
 	}
 	var $budget = budget
 	# A reflowed run's lines up to a hard break, each with its trailing spaces
@@ -360,7 +360,7 @@ paragraph_onto = |
 					budget: $budget,
 					uploads,
 				})?
-				$out = broke.out.concat(MdHtml.br)
+				$out = List.concat(broke.out, MdHtml.br)
 				$budget = broke.budget
 				$reflow = []
 			} else {
@@ -371,7 +371,7 @@ paragraph_onto = |
 				out: if $k == 0 {
 					$out
 				} else {
-					$out.concat(MdHtml.br)
+					List.concat($out, MdHtml.br)
 				},
 				text,
 				refs: MdDialect.inline_refs(dialect),
@@ -400,7 +400,7 @@ paragraph_onto = |
 		out: if spacing == Tight {
 			$out
 		} else {
-			$out.concat(MdHtml.p_close)
+			List.concat($out, MdHtml.p_close)
 		},
 		budget: $budget,
 		after: $p,

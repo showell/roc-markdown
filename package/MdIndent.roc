@@ -35,7 +35,7 @@ MdIndent := [].{
 				if text.get($i) == Ok('\t') and next_stop($column) > end {
 					rest = indent_end(text, $i)
 					spaces = column_after_indent(text, { at: $i, column: $column }) - end
-					return List.repeat(' ', spaces).concat(text.drop_first(rest))
+					return List.concat(List.repeat(' ', spaces), text.drop_first(rest))
 				} else {
 					$column = if text.get($i) == Ok('\t') {
 						next_stop($column)

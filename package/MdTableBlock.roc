@@ -38,7 +38,7 @@ MdTableBlock := [].{
 		Ok(table) => {
 			len = md.len()
 			head = row_onto(
-				out.concat(MdHtml.table_open),
+				List.concat(out, MdHtml.table_open),
 				{
 					cells: table.header_cells,
 					aligns: table.aligns,
@@ -48,7 +48,7 @@ MdTableBlock := [].{
 					dialect,
 				},
 			)?
-			var $out = head.out.concat(MdHtml.thead_close)
+			var $out = List.concat(head.out, MdHtml.thead_close)
 			var $budget = head.budget
 			var $rows = 0
 			var $p = table.body
@@ -56,7 +56,7 @@ MdTableBlock := [].{
 				eol = MdText.line_end(md, $p)
 				row = row_onto(
 					if $rows == 0 {
-						$out.concat(MdHtml.tbody_open)
+						List.concat($out, MdHtml.tbody_open)
 					} else {
 						$out
 					},
@@ -79,7 +79,7 @@ MdTableBlock := [].{
 					if $rows == 0 {
 						$out
 					} else {
-						$out.concat(MdHtml.tbody_close)
+						List.concat($out, MdHtml.tbody_close)
 					}
 				).concat(MdHtml.table_close),
 				budget: $budget,
@@ -110,7 +110,7 @@ row_onto = |
 		dialect,
 	},
 | {
-	var $out = out.concat(MdHtml.tr_open)
+	var $out = List.concat(out, MdHtml.tr_open)
 	var $budget = MdText.charge(budget, 1)
 	var $k = 0
 	for align in columns_of_row({ cells, aligns, dialect }) {
@@ -121,17 +121,17 @@ row_onto = |
 			{}
 		}
 		cell = MdInline.html_onto({
-			out: $out.concat(MdHtml.cell_open(tag, align)),
+			out: List.concat($out, MdHtml.cell_open(tag, align)),
 			text: cells.get($k) ?? [],
 			refs: MdDialect.inline_refs(dialect),
 			budget: $budget,
 			uploads,
 		})?
-		$out = cell.out.concat(MdHtml.cell_close(tag))
+		$out = List.concat(cell.out, MdHtml.cell_close(tag))
 		$budget = cell.budget
 		$k = $k + 1
 	}
-	Ok({ out: $out.concat(MdHtml.tr_close), budget: $budget })
+	Ok({ out: List.concat($out, MdHtml.tr_close), budget: $budget })
 }
 
 ## The alignments a row is written by. A chat's row stops at the header's width,
@@ -145,7 +145,7 @@ columns_of_row : {
 columns_of_row = |{ cells, aligns, dialect }| match dialect {
 	Chat => aligns
 	Document(_) => {
-		extra_cells = cells.len().max(aligns.len()) - aligns.len()
-		aligns.concat(List.repeat(Plain, extra_cells))
+		extra_cells = U64.max(cells.len(), aligns.len()) - aligns.len()
+		List.concat(aligns, List.repeat(Plain, extra_cells))
 	}
 }

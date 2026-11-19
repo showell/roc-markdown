@@ -26,7 +26,7 @@ MdFence := [].{
 	## string holds no backtick.
 	open : List(U8) -> Try(Open, [NotAFence])
 	open = |line| {
-		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 		match line.get(indent) {
 			Err(_) => Err(NotAFence)
 			Ok(f) =>
@@ -113,15 +113,15 @@ MdFence := [].{
 		}
 		content = MdText.cut(md, { start: body_start, end: $content_end })
 		body = content_without_fence_indent({ content, indent: fence.indent })
-		code = || MdText.escape_onto(
-			MdHtml.code_block_open(fence.lang),
-			body,
-		).concat(MdHtml.code_block_close)
+		code = || List.concat(
+			MdText.escape_onto(MdHtml.code_block_open(fence.lang), body),
+			MdHtml.code_block_close,
+		)
 		block = match dialect {
-			Chat if MdChat.is_quote_fence(fence.lang) => MdText.escape_onto(
-				MdHtml.chat_quote_open,
-				body,
-			).concat(MdHtml.chat_quote_close)
+			Chat if MdChat.is_quote_fence(fence.lang) => List.concat(
+				MdText.escape_onto(MdHtml.chat_quote_open, body),
+				MdHtml.chat_quote_close,
+			)
 			Chat => code()
 			Document(options) =>
 				match (options.fence)({
@@ -134,7 +134,7 @@ MdFence := [].{
 				}
 		}
 		{
-			out: out.concat(block),
+			out: List.concat(out, block),
 			budget: MdText.charge(budget, content.len()),
 			after: $after,
 		}
@@ -144,7 +144,7 @@ MdFence := [].{
 	## `char`, then only whitespace (a close carries no info string).
 	is_close : List(U8), { char : U8, count : U64 } -> Bool
 	is_close = |line, { char, count }| {
-		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 		if indent >= 4 {
 			Bool.False
 		} else {
@@ -181,8 +181,8 @@ content_without_fence_indent = |{ content, indent }| {
 	while $i < len {
 		eol = MdText.line_end(content, $i)
 		line = MdText.cut(content, { start: $i, end: eol })
-		strip = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(indent)
-		$out = $out.concat(line.drop_first(strip)).append('\n')
+		strip = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), indent)
+		$out = List.concat($out, line.drop_first(strip)).append('\n')
 		$i = MdText.next_line(content, eol)
 	}
 	$out

@@ -95,11 +95,11 @@ MdDocument := [].{
 			eol = MdText.line_end(md, $p)
 			line = MdText.cut(md, { start: $p, end: eol })
 			if MdText.is_blank(line) {
-				$blanks = $blanks.concat(past_code_indent(line) ?? []).append('\n')
+				$blanks = List.concat($blanks, past_code_indent(line) ?? []).append('\n')
 			} else {
 				match code_line(line) {
 					Ok(code) => {
-						$body = $body.concat($blanks).concat(code).append('\n')
+						$body = List.concat(List.concat($body, $blanks), code).append('\n')
 						$blanks = []
 					}
 					Err(NotCode) => break
@@ -107,11 +107,9 @@ MdDocument := [].{
 			}
 			$p = MdText.next_line(md, eol)
 		}
+		code = MdText.escape_onto(List.concat(out, MdHtml.code_block_open([])), $body)
 		{
-			out: MdText.escape_onto(
-				out.concat(MdHtml.code_block_open([])),
-				$body,
-			).concat(MdHtml.code_block_close),
+			out: List.concat(code, MdHtml.code_block_close),
 			budget: MdText.charge(budget, $body.len()),
 			after: $p,
 		}
@@ -134,9 +132,10 @@ MdDocument := [].{
 					)
 					given = distinct_id(slug(text), $ids)
 					id = given.id
-					$out = $out.concat(
-						MdText.cut(html, { start: $copied, end: $i }),
-					).concat(MdHtml.heading_open_with_id(level, id))
+					$out = List.concat(
+						List.concat($out, MdText.cut(html, { start: $copied, end: $i })),
+						MdHtml.heading_open_with_id(level, id),
+					)
 					$headings = $headings.append({ level, id, text })
 					$ids = given.ids
 					$copied = content_start
@@ -147,7 +146,7 @@ MdDocument := [].{
 				}
 			}
 		}
-		{ html: $out.concat(html.drop_first($copied)), headings: $headings }
+		{ html: List.concat($out, html.drop_first($copied)), headings: $headings }
 	}
 }
 
@@ -164,7 +163,7 @@ code_line = |line|
 ## four, so spaces before a tab go with it.
 past_code_indent : List(U8) -> Try(List(U8), [NotCode])
 past_code_indent = |line| {
-	spaces = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+	spaces = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 	if spaces == 4 {
 		Ok(line.drop_first(4))
 	} else if line.get(spaces) == Ok('\t') {
@@ -233,10 +232,10 @@ distinct_id = |base, ids| match ids.get(base) {
 	Err(KeyNotFound) => { id: base, ids: ids.insert(base, 1) }
 	Ok(last_tried) => {
 		var $n = last_tried + 1
-		var $id = base.concat("-${$n.to_str()}".to_utf8())
+		var $id = List.concat(base, "-${$n.to_str()}".to_utf8())
 		while ids.contains($id) {
 			$n = $n + 1
-			$id = base.concat("-${$n.to_str()}".to_utf8())
+			$id = List.concat(base, "-${$n.to_str()}".to_utf8())
 		}
 		{ id: $id, ids: ids.insert($id, 1).insert(base, $n) }
 	}
@@ -246,7 +245,7 @@ mark : U64, Str -> List(U8)
 mark = |
 	level,
 	text,
-| MdHtml.heading_mark(level).concat(text.to_utf8()).concat(MdHtml.heading_close(level))
+| List.concat(List.concat(MdHtml.heading_mark(level), text.to_utf8()), MdHtml.heading_close(level))
 
 # Rules: each mark, at and around its limits of length and indent.
 expect MdDocument.is_rule("---".to_utf8())
@@ -301,7 +300,12 @@ expect MdDocument.with_plain_line_ends("\r".to_utf8()) == []
 
 # The third heading's own name is the second's, and stays distinct.
 expect MdDocument.with_heading_ids(
-	mark(1, "A").concat(mark(2, "A")).concat(mark(2, "A 2")).concat(mark(2, "A")),
+	[
+		mark(1, "A"),
+		mark(2, "A"),
+		mark(2, "A 2"),
+		mark(2, "A"),
+	].join(),
 ).headings.map(|h| h.id) == ["a".to_utf8(), "a-2".to_utf8(), "a-2-2".to_utf8(), "a-3".to_utf8()]
 # Headings of one name count up.
 expect MdDocument.with_heading_ids(

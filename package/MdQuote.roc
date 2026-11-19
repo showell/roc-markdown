@@ -65,7 +65,7 @@ MdQuote := [].{
 				Ok(marker_end) => {
 					stripped = without_marker(line, { marker_end, reading })
 					start = $inner.len()
-					$inner = $inner.concat(stripped).append('\n')
+					$inner = List.concat($inner, stripped).append('\n')
 					# Indented text after a paragraph is that paragraph's, not code.
 					starts_code = !$last_was_text and is_code(stripped)
 					# A nested quote or list item whose innermost content is text
@@ -89,7 +89,7 @@ MdQuote := [].{
 				Err(NotAQuote) =>
 					if $last_was_text and !is_block_start(md, $p) {
 						$prev_start = $inner.len()
-						$inner = $inner.concat(line).append('\n')
+						$inner = List.concat($inner, line).append('\n')
 					} else {
 						break
 					}
@@ -97,13 +97,13 @@ MdQuote := [].{
 			$p = MdText.next_line(md, eol)
 		}
 		quoted = nested({
-			out: out.concat(MdHtml.blockquote_open),
+			out: List.concat(out, MdHtml.blockquote_open),
 			md: $inner,
 			spacing: Loose,
 			budget,
 		})?
 		Ok({
-			out: quoted.out.concat(MdHtml.blockquote_close),
+			out: List.concat(quoted.out, MdHtml.blockquote_close),
 			budget: quoted.budget,
 			after: $p,
 		})
@@ -113,7 +113,7 @@ MdQuote := [].{
 ## Where a quote's `>` ends: after up to three spaces and the `>`.
 quote_marker_len : List(U8) -> Try(U64, [NotAQuote])
 quote_marker_len = |line| {
-	indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+	indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 	if indent >= 4 or line.get(indent) != Ok('>') {
 		Err(NotAQuote)
 	} else {

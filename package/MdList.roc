@@ -39,7 +39,7 @@ MdList := [].{
 	list_marker_at = |md, { line_start, reading }| {
 		line = MdText.cut(md, { start: line_start, end: MdText.line_end(md, line_start) })
 		n = line.len()
-		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 		if indent >= 4 or indent >= n {
 			Err(NotAMarker)
 		} else {
@@ -48,10 +48,10 @@ MdList := [].{
 				if c == '-' or c == '+' or c == '*' {
 					Ok({ kind: Bullet(c), marker_end: indent + 1 })
 				} else if Ascii.is_digit(c) {
-					digits_end = Bytes.count_while(
-						line,
-						{ keep: Ascii.is_digit, at: indent },
-					).min(indent + 9)
+					digits_end = U64.min(
+						Bytes.count_while(line, { keep: Ascii.is_digit, at: indent }),
+						indent + 9,
+					)
 					match line.get(digits_end) {
 						Ok(delim) if delim == '.' or delim == ')' => {
 							start = MdText.cut(line, { start: indent, end: digits_end }).fold(
@@ -174,17 +174,17 @@ MdList := [].{
 							# The blank lines before it are the item's too: they
 							# part its paragraphs and stay in its fences.
 							$loose = $loose or ($blanks > 0 and $fence == Shut)
-							$cur = $cur.concat(List.repeat('\n', $blanks))
+							$cur = List.concat($cur, List.repeat('\n', $blanks))
 							$blanks = 0
 							dedented = MdIndent.without_columns(
 								line,
 								{ columns: $cur_column, from: 0, reading },
 							)
 							$fence = fence_after($fence, dedented)
-							$cur = $cur.concat(dedented).append('\n')
+							$cur = List.concat($cur, dedented).append('\n')
 						} else if $blanks == 0 and $have_item and !is_block_start(md, $p) {
 							# A lazy continuation of the item's paragraph.
-							$cur = $cur.concat(line).append('\n')
+							$cur = List.concat($cur, line).append('\n')
 						} else {
 							break
 						}
@@ -201,7 +201,7 @@ MdList := [].{
 			Ordered(o) => MdHtml.ol_open(o.start)
 			Bullet(_) => MdHtml.ul_open
 		}
-		var $out = out.concat(open)
+		var $out = List.concat(out, open)
 		var $budget = budget
 		for item in items {
 			# Each item renders into a buffer of its own, so its tight
@@ -225,9 +225,9 @@ MdList := [].{
 			})?
 			# Appended in place, `$out` unique and first: a List.join of it
 			# copies every byte so far, once an item.
-			$out = $out.concat(MdHtml.li_open)
-			$out = $out.concat(inner.out)
-			$out = $out.concat(MdHtml.li_close)
+			$out = List.concat($out, MdHtml.li_open)
+			$out = List.concat($out, inner.out)
+			$out = List.concat($out, MdHtml.li_close)
 			$budget = inner.budget
 		}
 		close = match first.kind {
@@ -235,7 +235,7 @@ MdList := [].{
 			Bullet(_) => MdHtml.ul_close
 		}
 		Ok({
-			out: $out.concat(close),
+			out: List.concat($out, close),
 			budget: $budget,
 			after: $p,
 		})

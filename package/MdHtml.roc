@@ -35,10 +35,11 @@ MdHtml := [].{
 	## A document's heading with its id.
 	heading_open_with_id : U64, List(U8) -> List(U8)
 	heading_open_with_id = |level, id| [
-		'<',
-		'h',
-		heading_digit(level),
-	].concat(" id=\"".to_utf8()).concat(id).concat(['"', '>'])
+		['<', 'h', heading_digit(level)],
+		" id=\"".to_utf8(),
+		id,
+		['"', '>'],
+	].join()
 
 	## A document's heading before it has its id, which MdDocument looks for.
 	## An author's `<` is always escaped, and a control byte keeps it from a
@@ -63,7 +64,10 @@ MdHtml := [].{
 		if lang == [] {
 			"<pre><code>".to_utf8()
 		} else {
-			MdText.escape_onto("<pre><code class=\"language-".to_utf8(), lang).concat(['"', '>'])
+			List.concat(
+				MdText.escape_onto("<pre><code class=\"language-".to_utf8(), lang),
+				['"', '>'],
+			)
 		}
 
 	code_block_close : List(U8)
@@ -143,7 +147,7 @@ MdHtml := [].{
 			Center => " align=\"center\""
 			Right => " align=\"right\""
 		}
-		name.to_utf8().concat(attr.to_utf8()).append('>')
+		List.concat(name.to_utf8(), attr.to_utf8()).append('>')
 	}
 
 	## The close of a `cell_open`.
@@ -277,7 +281,7 @@ MdHtml := [].{
 
 	## A member's `<video>`, rebuilt as a player with no fallback content.
 	video : List(Attr) -> List(U8)
-	video = |attrs| attrs_onto("<video".to_utf8(), attrs).concat("></video>".to_utf8())
+	video = |attrs| List.concat(attrs_onto("<video".to_utf8(), attrs), "></video>".to_utf8())
 }
 
 ## The escapes MdText writes, and the byte each stands for.
@@ -300,10 +304,10 @@ attrs_onto : List(U8), List(MdHtml.Attr) -> List(U8)
 attrs_onto = |out, attrs| {
 	var $out = out
 	for { name, attr_value } in attrs {
-		named = $out.append(' ').concat(name)
+		named = List.concat($out.append(' '), name)
 		$out = match attr_value {
 			Bare => named
-			Is(v) => MdText.escape_onto(named.concat(['=', '"']), v).append('"')
+			Is(v) => MdText.escape_onto(List.concat(named, ['=', '"']), v).append('"')
 		}
 	}
 	$out

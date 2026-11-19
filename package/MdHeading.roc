@@ -12,7 +12,7 @@ MdHeading := [].{
 	## a tab or the line's end; a closing run of `#` is no content.
 	atx_heading : List(U8) -> Try({ level : U64, content : List(U8) }, [NotAHeading])
 	atx_heading = |line| {
-		indent = Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }).min(4)
+		indent = U64.min(Bytes.count_while(line, { keep: |c| c == ' ', at: 0 }), 4)
 		level_end = Bytes.count_while(line, { keep: |c| c == '#', at: indent })
 		level = level_end - indent
 		# The marks end the line, or a space or a tab follows them.
@@ -72,7 +72,7 @@ MdHeading := [].{
 			uploads,
 		})?
 		Ok({
-			out: heading.out.concat(MdHtml.heading_close(level)),
+			out: List.concat(heading.out, MdHtml.heading_close(level)),
 			budget: heading.budget,
 			after,
 		})

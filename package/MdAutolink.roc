@@ -142,17 +142,17 @@ MdAutolink := [].{
 				title: Untitled,
 			})
 			Www => MdHtml.link_open({
-				href: "http://".to_utf8().concat(link),
+				href: List.concat("http://".to_utf8(), link),
 				tab: outside,
 				title: Untitled,
 			})
 			Email => MdHtml.link_open({
-				href: "mailto:".to_utf8().concat(link),
+				href: List.concat("mailto:".to_utf8(), link),
 				tab: SameTab,
 				title: Untitled,
 			})
 		}
-		MdText.escape_onto(head, link).concat(MdHtml.link_close)
+		List.concat(MdText.escape_onto(head, link), MdHtml.link_close)
 	}
 }
 
@@ -177,7 +177,7 @@ url_end = |text, { start, budget }| {
 		url,
 		{ keep: |c| c != '/' and c != '?' and c != '#' and c != ':', at: host_start },
 	)
-	if !MdText.cut(url, { start: host_start, end: host_start.max(host_end) }).contains('.') {
+	if !MdText.cut(url, { start: host_start, end: U64.max(host_start, host_end) }).contains('.') {
 		{ end: Err(NotALink), budget: spent }
 	} else {
 		opens = url.count_if(|c| c == '(')

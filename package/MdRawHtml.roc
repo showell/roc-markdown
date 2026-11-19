@@ -41,10 +41,10 @@ MdRawHtml := [].{
 				}
 				match safe {
 					Ok(tag) => {
-						$out = MdText.escape_onto(
-							$out,
-							MdText.cut(raw, { start: $last, end: $i }),
-						).concat(tag.html)
+						$out = List.concat(
+							MdText.escape_onto($out, MdText.cut(raw, { start: $last, end: $i })),
+							tag.html,
+						)
 						$i = tag.end
 						$last = tag.end
 					}
