@@ -11,8 +11,8 @@ MdDialect := [].{
 	Dialect : [Chat, Document(MdDocument.PageOptions)]
 
 	## How the inline pass reads a dialect's text.
-	inline_refs : Dialect -> MdInline.Refs
-	inline_refs = |dialect| match dialect {
+	inline_references : Dialect -> MdInline.References
+	inline_references = |dialect| match dialect {
 		Chat => Linked
 		Document(options) => Document(options.images)
 	}

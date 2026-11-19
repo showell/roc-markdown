@@ -43,7 +43,7 @@ MdInline := [].{
 	## second `<a>`: links and URLs stay text, and an image that would be a link
 	## is its alt. `DocumentAlt` is an image's alt, which reads neither links nor
 	## images. So a label costs at most two more passes, however its brackets nest.
-	Refs : [
+	References : [
 		Linked,
 		InLabel,
 		Document(MdSafety.Images),
@@ -55,33 +55,33 @@ MdInline := [].{
 	html_onto : {
 		out : List(U8),
 		text : List(U8),
-		refs : Refs,
+		references : References,
 		budget : MdText.Budget,
 		uploads : MdSafety.Uploads,
 	} -> Try(MdText.Rendered, [Hostile])
-	html_onto = |{ out, text, refs, budget, uploads }| {
+	html_onto = |{ out, text, references, budget, uploads }| {
 		length = text.len()
-		is_document = refs != Linked and refs != InLabel
-		reads_links = match refs {
+		is_document = references != Linked and references != InLabel
+		reads_links = match references {
 			DocumentLabel(_) => Bool.False
 			DocumentAlt => Bool.False
 			_ => Bool.True
 		}
-		shows_images = refs == Document(Shown) or refs == DocumentLabel(Shown)
-		alt_as_text = refs == DocumentLabel(AsLinks)
+		shows_images = references == Document(Shown) or references == DocumentLabel(Shown)
+		alt_as_text = references == DocumentLabel(AsLinks)
 		outside = if is_document {
 			SameTab
 		} else {
 			NewTab
 		}
-		label_refs = match refs {
+		label_references = match references {
 			Document(images) => DocumentLabel(images)
 			_ => InLabel
 		}
-		alt_refs = if is_document {
+		alt_references = if is_document {
 			DocumentAlt
 		} else {
-			label_refs
+			label_references
 		}
 		var $budget = budget
 		var $pieces = []
@@ -107,13 +107,13 @@ MdInline := [].{
 			# Each byte class's scan says what it found (a `Step`); the step is
 			# taken once, below. The chat's reference (MdChat) is read first,
 			# whole.
-			reference = if refs == Linked {
+			reference = if references == Linked {
 				MdChat.reference_at(text, $i)
 			} else {
 				Err(NoRef)
 			}
 			step = match reference {
-				Ok(ref) => Token(Html(ref.html), ref.end)
+				Ok(chat_reference) => Token(Html(chat_reference.html), chat_reference.end)
 				Err(NoRef) =>
 					if c == '\\' and MdText.is_escapable(text, $i + 1) {
 						Token(Text($i + 1, $i + 2), $i + 2)
@@ -161,7 +161,7 @@ MdInline := [].{
 								Skip($i + n)
 							}
 						}
-					} else if c == '!' and text.get($i + 1) == Ok('[') and refs != DocumentAlt {
+					} else if c == '!' and text.get($i + 1) == Ok('[') and references != DocumentAlt {
 						# `![alt](src)`: an image where its src is an upload, else
 						# the `!` is dropped and the `[` read as a link (MdSafety).
 						linked = MdLinks.link_at(
@@ -200,7 +200,7 @@ MdInline := [].{
 									alt = MdInline.html_onto({
 										out: [],
 										text: MdText.cut(text, found.link.label),
-										refs: alt_refs,
+										references: alt_references,
 										budget: $budget,
 										uploads,
 									})?
@@ -270,7 +270,7 @@ MdInline := [].{
 										{ outside, title: destination.title },
 									),
 									text: MdText.cut(text, link.label),
-									refs: label_refs,
+									references: label_references,
 									budget: $budget,
 									uploads,
 								})?
@@ -438,7 +438,7 @@ inline : Str -> Str
 inline = |text| match MdInline.html_onto({
 	out: [],
 	text: text.to_utf8(),
-	refs: Linked,
+	references: Linked,
 	budget: MdText.unlimited,
 	uploads: MdSafety.uploads_under("/user_uploads/".to_utf8()),
 }) {

@@ -57,7 +57,7 @@ MdBlocks := [].{
 			flat = MdInline.html_onto({
 				out: List.concat(start, MdHtml.p_open),
 				text: md,
-				refs: MdDialect.inline_refs(dialect),
+				references: MdDialect.inline_references(dialect),
 				budget,
 				uploads,
 			})?
@@ -356,7 +356,7 @@ paragraph_onto = |
 				broke = MdInline.html_onto({
 					out: $out,
 					text: MdCodeSpan.reflow_lines($reflow),
-					refs: MdDialect.inline_refs(dialect),
+					references: MdDialect.inline_references(dialect),
 					budget: $budget,
 					uploads,
 				})?
@@ -374,7 +374,7 @@ paragraph_onto = |
 					List.concat($out, MdHtml.br)
 				},
 				text,
-				refs: MdDialect.inline_refs(dialect),
+				references: MdDialect.inline_references(dialect),
 				budget: $budget,
 				uploads,
 			})?
@@ -387,7 +387,7 @@ paragraph_onto = |
 		joined = MdInline.html_onto({
 			out: $out,
 			text: MdCodeSpan.reflow_lines($reflow),
-			refs: MdDialect.inline_refs(dialect),
+			references: MdDialect.inline_references(dialect),
 			budget: $budget,
 			uploads,
 		})?

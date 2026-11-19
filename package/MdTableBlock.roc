@@ -123,7 +123,7 @@ row_onto = |
 		cell = MdInline.html_onto({
 			out: List.concat($out, MdHtml.cell_open(tag, align)),
 			text: cells.get($k) ?? [],
-			refs: MdDialect.inline_refs(dialect),
+			references: MdDialect.inline_references(dialect),
 			budget: $budget,
 			uploads,
 		})?

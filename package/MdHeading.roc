@@ -67,7 +67,7 @@ MdHeading := [].{
 				},
 			),
 			text: content,
-			refs: MdDialect.inline_refs(dialect),
+			references: MdDialect.inline_references(dialect),
 			budget,
 			uploads,
 		})?
