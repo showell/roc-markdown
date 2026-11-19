@@ -60,12 +60,12 @@ MdHtml := [].{
 	## A code block's opening, its language (escaped) as a `language-` class
 	## when it has one.
 	code_block_open : List(U8) -> List(U8)
-	code_block_open = |lang|
-		if lang == [] {
+	code_block_open = |language|
+		if language == [] {
 			"<pre><code>".to_utf8()
 		} else {
 			List.concat(
-				MdText.escape_onto("<pre><code class=\"language-".to_utf8(), lang),
+				MdText.escape_onto("<pre><code class=\"language-".to_utf8(), language),
 				['"', '>'],
 			)
 		}

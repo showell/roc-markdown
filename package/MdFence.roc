@@ -16,7 +16,7 @@ MdFence := [].{
 		char : U8,
 		count : U64,
 		indent : U64,
-		lang : List(U8),
+		language : List(U8),
 	}
 
 	## Up to three spaces, 3 to 10 of '`' or '~'
@@ -40,7 +40,7 @@ MdFence := [].{
 						Err(NotAFence)
 					} else {
 						# The language's backslash escapes are CommonMark's (`foo\+bar`).
-						lang = MdText.without_escapes(
+						language = MdText.without_escapes(
 							info.take_first(
 								Bytes.count_while(
 									info,
@@ -48,7 +48,7 @@ MdFence := [].{
 								),
 							),
 						)
-						Ok({ char: f, count, indent, lang })
+						Ok({ char: f, count, indent, language })
 					}
 				}
 		}
@@ -114,18 +114,18 @@ MdFence := [].{
 		content = MdText.cut(md, { start: body_start, end: $content_end })
 		body = content_without_fence_indent({ content, indent: fence.indent })
 		code = || List.concat(
-			MdText.escape_onto(MdHtml.code_block_open(fence.lang), body),
+			MdText.escape_onto(MdHtml.code_block_open(fence.language), body),
 			MdHtml.code_block_close,
 		)
 		block = match dialect {
-			Chat if MdChat.is_quote_fence(fence.lang) => List.concat(
+			Chat if MdChat.is_quote_fence(fence.language) => List.concat(
 				MdText.escape_onto(MdHtml.chat_quote_open, body),
 				MdHtml.chat_quote_close,
 			)
 			Chat => code()
 			Document(options) =>
 				match (options.fence)({
-					tag: fence.lang,
+					tag: fence.language,
 					args: MdFence.args(line, fence),
 					body,
 				}) {
@@ -197,13 +197,13 @@ expect MdFence.open("~~~~ quote".to_utf8()) == Ok({
 	char: '~',
 	count: 4,
 	indent: 0,
-	lang: "quote".to_utf8(),
+	language: "quote".to_utf8(),
 })
 expect MdFence.open("```zig".to_utf8()) == Ok({
 	char: '`',
 	count: 3,
 	indent: 0,
-	lang: "zig".to_utf8(),
+	language: "zig".to_utf8(),
 })
 expect MdFence.args(
 	"  ```widget  big sky ".to_utf8(),
@@ -211,7 +211,7 @@ expect MdFence.args(
 		char: '`',
 		count: 3,
 		indent: 2,
-		lang: "widget".to_utf8(),
+		language: "widget".to_utf8(),
 	},
 ) == "big sky".to_utf8()
 expect MdFence.args(
@@ -220,7 +220,7 @@ expect MdFence.args(
 		char: '`',
 		count: 3,
 		indent: 0,
-		lang: "widget".to_utf8(),
+		language: "widget".to_utf8(),
 	},
 ) == []
 expect MdFence.open("plain text".to_utf8()) == Err(NotAFence)
@@ -230,7 +230,7 @@ expect MdFence.open(List.repeat('~', 10)) == Ok({
 	char: '~',
 	count: 10,
 	indent: 0,
-	lang: [],
+	language: [],
 })
 expect MdFence.open(List.repeat('~', 11)) == Err(NotAFence)
 expect MdFence.open(List.repeat('`', 15)) == Err(NotAFence)
@@ -238,10 +238,10 @@ expect MdFence.open("   ~~~ a b".to_utf8()) == Ok({
 	char: '~',
 	count: 3,
 	indent: 3,
-	lang: "a".to_utf8(),
+	language: "a".to_utf8(),
 })
 expect MdFence.open("    ~~~".to_utf8()) == Err(NotAFence)
-expect MdFence.open("``` foo\\+bar\\x".to_utf8()).map_ok(|o| o.lang) == Ok("foo+bar\\x".to_utf8())
+expect MdFence.open("``` foo\\+bar\\x".to_utf8()).map_ok(|o| o.language) == Ok("foo+bar\\x".to_utf8())
 expect !MdFence.is_close("~~~".to_utf8(), { char: '~', count: 4 })
 expect MdFence.is_close("~~~~".to_utf8(), { char: '~', count: 4 })
 expect MdFence.is_close("~~~~~".to_utf8(), { char: '~', count: 4 })

@@ -48,7 +48,7 @@ MdChat := [].{
 	## The quote-reply: a fence whose language is `quote` holds a quoted
 	## message, rendered as preformatted text and not as code.
 	is_quote_fence : List(U8) -> Bool
-	is_quote_fence = |lang| lang == "quote".to_utf8()
+	is_quote_fence = |language| language == "quote".to_utf8()
 
 	## Eight quote-reply levels, plus 2: a level-8 quote-reply
 	## opens with 10 characters, and a longer run is no fence (MdFence).
