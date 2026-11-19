@@ -124,23 +124,23 @@ MdLinks := [].{
 	## destination and title, the title in `"…"`, `'…'` or `(…)`), its ends'
 	## spaces dropped. Anything after the src that is no title is no image.
 	## (A chat's link reads no title: it stays in the destination.)
-	image_dest : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
-	image_dest = |url| {
-		dest = MdText.trim_line(url)
-		src_len = Bytes.count_while(dest, { keep: |c| c != ' ' and c != '\t', at: 0 })
-		titled_dest(dest.take_first(src_len), dest.drop_first(src_len))
+	image_destination : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
+	image_destination = |url| {
+		destination = MdText.trim_line(url)
+		src_len = Bytes.count_while(destination, { keep: |c| c != ' ' and c != '\t', at: 0 })
+		titled_destination(destination.take_first(src_len), destination.drop_first(src_len))
 	}
 
-	## A document's destination, for its links and images alike: `image_dest`'s,
+	## A document's destination, for its links and images alike: `image_destination`'s,
 	## or CommonMark's `<a b>`, whose brackets let a src hold a space.
-	document_dest : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
-	document_dest = |url| {
-		dest = MdText.trim_line(url)
-		close = Bytes.count_while(dest, { keep: |c| c != '<' and c != '>', at: 1 })
-		if dest.first() == Ok('<') and dest.get(close) == Ok('>') {
-			titled_dest(MdText.cut(dest, { start: 1, end: close }), dest.drop_first(close + 1))
+	document_destination : List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
+	document_destination = |url| {
+		destination = MdText.trim_line(url)
+		close = Bytes.count_while(destination, { keep: |c| c != '<' and c != '>', at: 1 })
+		if destination.first() == Ok('<') and destination.get(close) == Ok('>') {
+			titled_destination(MdText.cut(destination, { start: 1, end: close }), destination.drop_first(close + 1))
 		} else {
-			image_dest(url)
+			image_destination(url)
 		}
 	}
 
@@ -318,8 +318,8 @@ pair_closes = |text, { opener, closer, escapes }| {
 
 ## A destination's `src`, and what follows it read as a title. Anything else
 ## there is no destination.
-titled_dest : List(U8), List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
-titled_dest = |src, after| {
+titled_destination : List(U8), List(U8) -> Try({ src : List(U8), title : MdHtml.Title }, [NotAnImage])
+titled_destination = |src, after| {
 	rest = MdText.trim_line(after)
 	n = rest.len()
 	if n == 0 {

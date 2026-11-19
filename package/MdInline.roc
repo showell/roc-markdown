@@ -181,20 +181,20 @@ MdInline := [].{
 						image = match linked.link {
 							Ok(link) =>
 								match if is_document {
-									MdLinks.document_dest(link.url)
+									MdLinks.document_destination(link.url)
 								} else {
-									MdLinks.image_dest(link.url)
+									MdLinks.image_destination(link.url)
 								} {
-									Ok(dest) => Ok({ link, dest })
+									Ok(destination) => Ok({ link, destination })
 									Err(NotAnImage) => Err(NotAnImage)
 								}
 							Err(NotALink) => Err(NotAnImage)
 						}
 						match image {
 							Ok(found) => {
-								is_safe = !MdSafety.is_dangerous_url(found.dest.src)
+								is_safe = !MdSafety.is_dangerous_url(found.destination.src)
 								is_shown = (shows_images or alt_as_text) and is_safe
-								if MdSafety.is_upload_url(found.dest.src, uploads) or is_shown {
+								if MdSafety.is_upload_url(found.destination.src, uploads) or is_shown {
 									# The alt is the label's inline content, its markup
 									# gone (MdHtml.plain_text).
 									alt = MdInline.html_onto({
@@ -211,15 +211,15 @@ MdInline := [].{
 											Ok(MdText.escape_onto([], text_alt))
 										} else if shows_images {
 											MdLinks.shown_image({
-												src: found.dest.src,
+												src: found.destination.src,
 												alt: text_alt,
-												title: found.dest.title,
+												title: found.destination.title,
 											})
 										} else {
 											MdLinks.image({
-												src: found.dest.src,
+												src: found.destination.src,
 												alt: text_alt,
-												title: found.dest.title,
+												title: found.destination.title,
 												uploads,
 											})
 										}
@@ -227,7 +227,7 @@ MdInline := [].{
 										Html(html ?? crash "MdInline.html_onto: an image the rules above let through"),
 										found.link.end,
 									)
-								} else if MdSafety.is_dangerous_url(found.dest.src) {
+								} else if MdSafety.is_dangerous_url(found.destination.src) {
 									# Refused: the whole image's source, `!` and all,
 									# left in the pending text (MdSafety).
 									Skip(found.link.end)
@@ -257,17 +257,17 @@ MdInline := [].{
 							# Refused: the whole link's source left in the
 							# pending text, nothing in it read (MdSafety).
 								Skip(link.end)
-							Ok(link) if is_document and MdLinks.document_dest(link.url).is_err() =>
+							Ok(link) if is_document and MdLinks.document_destination(link.url).is_err() =>
 							# A document's destination is CommonMark's: a space
 							# outside `<…>` and before no title makes no link.
 								Skip($i + 1)
 							Ok(link) => {
 								# The label is a line of its own, rendered inside the `<a>`.
-								dest = link_dest(link.url, is_document)
+								destination = link_destination(link.url, is_document)
 								label = MdInline.html_onto({
 									out: MdLinks.link_open(
-										dest.src,
-										{ outside, title: dest.title },
+										destination.src,
+										{ outside, title: destination.title },
 									),
 									text: MdText.cut(text, link.label),
 									refs: label_refs,
@@ -359,22 +359,22 @@ MdInline := [].{
 
 ## What a link's destination says. A chat reads it whole, and a document reads a
 ## title and `<a b>` from it, or whole when it is neither.
-link_dest : List(U8), Bool -> { src : List(U8), title : MdHtml.Title }
-link_dest = |url, is_document| match if is_document {
-	MdLinks.document_dest(url)
+link_destination : List(U8), Bool -> { src : List(U8), title : MdHtml.Title }
+link_destination = |url, is_document| match if is_document {
+	MdLinks.document_destination(url)
 } else {
 	Err(NotAnImage)
 } {
-	Ok(dest) => dest
+	Ok(destination) => destination
 	Err(NotAnImage) => { src: url, title: Untitled }
 }
 
-## A browser would run the destination, as written or as `link_dest` reads it.
+## A browser would run the destination, as written or as `link_destination` reads it.
 is_refused_link : List(U8), Bool -> Bool
 is_refused_link = |
 	url,
 	is_document,
-| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_dest(url, is_document).src)
+| MdSafety.is_dangerous_url(url) or MdSafety.is_dangerous_url(link_destination(url, is_document).src)
 
 ## A piece of the line: text (a span of it, escaped when written), html made
 ## here, or a `*`/`_`/`~` run (by its index among the runs).
