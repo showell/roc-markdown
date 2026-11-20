@@ -10,6 +10,8 @@ Roc app can import it. It is the dialect of Gopher Chat (lynrummy.com), and
 every answer it gives is frozen and checked case by case
 ([TESTING.md](TESTING.md)).
 
+The code here was written by AI coding agents (Claude), with human supervision.
+
 **Try it:** [the playground](https://roc.lynrummy.com/markdown/) runs this
 package, compiled to WebAssembly, as you type. It has dense examples to edit.
 
