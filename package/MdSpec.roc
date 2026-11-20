@@ -28,8 +28,8 @@ coloring = {
 		},
 }
 
-colored : Str -> Str
-colored = |text| Str.from_utf8(Md.render(text.to_utf8(), coloring)) ?? crash "a test's text is UTF-8"
+colored_html : Str -> Str
+colored_html = |text| Str.from_utf8(Md.render(text.to_utf8(), coloring)) ?? crash "a test's text is UTF-8"
 
 # A host that colors every block it is offered, to show which it is.
 coloring_all : Md.Options
@@ -61,11 +61,11 @@ expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
 # quote-reply is never offered; a fence in a list and an unclosed fence are
 # offered their bodies less the fence's indent. The budget is the same
 # whatever the hook does.
-expect colored("```roc\na<b & c\n```\nafter") == "<pre><code class=\"language-roc\"><i>a&lt;b &amp; c\n</i></code></pre>\n<p>after</p>\n"
-expect colored("```zig\na<b\n```") == md("```zig\na<b\n```")
-expect colored("```\na<b\n```") == "<pre><code>a&lt;b\n</code></pre>\n"
-expect colored("- x\n\n  ```roc\n  a\n   b\n  ```") == "<ul>\n<li>\n<p>x</p>\n<pre><code class=\"language-roc\"><i>a\n b\n</i></code></pre>\n</li>\n</ul>\n"
-expect colored("```roc\na") == "<pre><code class=\"language-roc\"><i>a\n</i></code></pre>\n"
+expect colored_html("```roc\na<b & c\n```\nafter") == "<pre><code class=\"language-roc\"><i>a&lt;b &amp; c\n</i></code></pre>\n<p>after</p>\n"
+expect colored_html("```zig\na<b\n```") == md("```zig\na<b\n```")
+expect colored_html("```\na<b\n```") == "<pre><code>a&lt;b\n</code></pre>\n"
+expect colored_html("- x\n\n  ```roc\n  a\n   b\n  ```") == "<ul>\n<li>\n<p>x</p>\n<pre><code class=\"language-roc\"><i>a\n b\n</i></code></pre>\n</li>\n</ul>\n"
+expect colored_html("```roc\na") == "<pre><code class=\"language-roc\"><i>a\n</i></code></pre>\n"
 expect Str.from_utf8(Md.render("```quote\n<hi>\n```".to_utf8(), coloring_all)) == Ok(md("```quote\n<hi>\n```"))
 expect Str.from_utf8(Md.render("```a\"b\nz\n```".to_utf8(), coloring_all)) == Ok("<pre><code class=\"language-a&quot;b\">X</code></pre>\n")
 expect Md.work_units("```roc\na<b\n```".to_utf8(), coloring) == Md.work_units("```roc\na<b\n```".to_utf8(), chat)
