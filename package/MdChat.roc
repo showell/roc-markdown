@@ -8,7 +8,9 @@
 ##   - the fence's renderer (MdFence), for a fence that is a quote-reply
 ##     (`is_quote_fence`);
 ##   - the fence's grammar (MdFence), for the longest run that opens one
-##     (`max_fence_run`).
+##     (`max_fence_run`);
+##   - the fence's renderer (MdFence), for a code block's body, which the
+##     host's code hook (`CodeHook`, in Md.Options) may color.
 ##
 ## Where a chat keeps its uploads is no part of the dialect: the host names
 ## them in each render's options (Md.Options). Their markup is MdHtml's
@@ -49,6 +51,16 @@ MdChat := [].{
 	## message, rendered as preformatted text and not as code.
 	is_quote_fence : List(U8) -> Bool
 	is_quote_fence = |language| language == "quote".to_utf8()
+
+	## A chat's code block as the host's code hook sees it: the first word of
+	## its info string, and its body, less the fence's own indent. A
+	## quote-reply is never one.
+	CodeBlock : { language : List(U8), body : List(U8) }
+
+	## The host's answer for a code block. `Colored` is the block's inner
+	## HTML, the host's own and unescaped, which the renderer puts inside its
+	## own `<pre><code>`; `Plain` leaves the body to the renderer's escape.
+	CodeHook : CodeBlock -> [Colored(List(U8)), Plain]
 
 	## Eight quote-reply levels, plus 2: a level-8 quote-reply
 	## opens with 10 characters, and a longer run is no fence (MdFence).

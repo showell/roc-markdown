@@ -26,7 +26,8 @@
 --   - the strikethrough, backslash and image shapes linear too;
 --   - `zig fmt --check` and `roc fmt --check` clean;
 --   - roc-chat's `roc test` against this package (roc-chat's `chat=`
---     branch, default main, cloned beside a copy of package/);
+--     branch, default main, cloned beside a copy of package/ and
+--     roc-syntax-color's main, the other package it names);
 --   - the judge's CPU time.
 --
 -- budget: steps=200000000 arena_bytes=1000000000 changes=10000 change_bytes=200000000 read_bytes=1000000000
@@ -202,14 +203,18 @@ say(rf.code == 0, "roc fmt --check package judge playground (" .. rf.ms .. " ms)
 
 -- ── roc-chat against this package ──
 -- roc-chat's app names `../../roc-markdown/package/main.roc`: a copy of
--- package/ in .zig-cache/verify/roc-markdown, roc-chat's main beside it.
+-- package/ in .zig-cache/verify/roc-markdown, roc-chat's main beside it,
+-- and roc-chat's other package, roc-syntax-color's main, beside them too.
 local beside = scratch_dir .. "/roc-markdown/package"
 mkdir(beside)
 for name in ls("package") do replace(beside .. "/" .. name, read("package/" .. name)) end
 local chat_branch = arg("chat", "main")
 local clone = run({"git", "clone", "-q", "--depth", "1", "--branch", chat_branch, "https://github.com/showell/roc-chat", real(scratch_dir) .. "/roc-chat"}, {cwd = ".", timeout_ms = 300000, tail = 10})
+local colors = run({"git", "clone", "-q", "--depth", "1", "https://github.com/showell/roc-syntax-color", real(scratch_dir) .. "/roc-syntax-color"}, {cwd = ".", timeout_ms = 300000, tail = 10})
 if clone.code ~= 0 then
   say(false, "roc-chat cloned (exit " .. clone.code .. ": " .. trim(clone.out) .. ")")
+elseif colors.code ~= 0 then
+  say(false, "roc-syntax-color cloned (exit " .. colors.code .. ": " .. trim(colors.out) .. ")")
 else
   local rt = run({pinned_roc(scratch_dir .. "/roc-chat/roc-version"), "test", "app/main.roc"}, {cwd = scratch_dir .. "/roc-chat", timeout_ms = 600000, tail = 5})
   say(rt.code == 0, "roc-chat's roc test against this package (exit " .. rt.code .. ", clone " .. clone.ms .. " ms, test " .. rt.ms .. " ms: " .. trim(rt.out) .. ")")

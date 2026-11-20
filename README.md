@@ -96,6 +96,12 @@ setext headings, raw HTML or entity references.
   renderer judges the src as a URL (same origin, no `..`, no encoded `/`),
   then asks the host's rule. There is no default: `Md.no_uploads` renders
   no media.
+- **The host may color its code blocks, in the same options** (`code`): the
+  hook is given a block's language and body and answers `Colored(html)`,
+  which goes inside the renderer's own `<pre><code class="language-…">`, or
+  `Plain`, the renderer's escape. A quote-reply is never offered. The HTML
+  is the host's to make safe, as a document's fence hook's is. There is no
+  default: `Md.plain_code` colors nothing.
 - **A bounded cost.** Rendering is linear in the message, and every step is
   charged to a work budget sized by its length. A message built to blow it up
   (thousands of nested brackets, a table thousands of columns wide) is
@@ -120,11 +126,12 @@ app [main!] {
 import md.Md
 ```
 
-Every render takes the host's options, `{ uploads }`: a rule saying which
-same-origin paths are its uploads.
+Every chat render takes the host's options, `{ uploads, code }`: a rule
+saying which same-origin paths are its uploads, and a hook for its code
+blocks' bodies.
 
 ```roc
-options = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")) }
+options = { uploads: Md.uploads_under(Str.to_utf8("/user_uploads/")), code: Md.plain_code }
 html = Md.render(message, options)
 ```
 

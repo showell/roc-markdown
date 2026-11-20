@@ -143,7 +143,7 @@ columns_of_row : {
 	dialect : MdDialect.Dialect,
 } -> List(MdTable.Align)
 columns_of_row = |{ cells, aligns, dialect }| match dialect {
-	Chat => aligns
+	Chat(_) => aligns
 	Document(_) => {
 		extra_cells = U64.max(cells.len(), aligns.len()) - aligns.len()
 		List.concat(aligns, List.repeat(Plain, extra_cells))

@@ -12,7 +12,28 @@ MdSpec :: [].{}
 
 # The chat's own options, as roc-chat passes them.
 chat : Md.Options
-chat = { uploads: Md.uploads_under("/user_uploads/".to_utf8()) }
+chat = { uploads: Md.uploads_under("/user_uploads/".to_utf8()), code: Md.plain_code }
+
+# A host that colors its `roc` blocks, as roc-chat does: the body escaped,
+# each `<` set apart, the frame left to the renderer. Any other block is
+# plain.
+coloring : Md.Options
+coloring = {
+	uploads: Md.uploads_under("/user_uploads/".to_utf8()),
+	code: |{ language, body }|
+		if language == "roc".to_utf8() {
+			Colored(List.concat(List.concat("<i>".to_utf8(), Md.escape(body)), "</i>".to_utf8()))
+		} else {
+			Plain
+		},
+}
+
+colored : Str -> Str
+colored = |text| Str.from_utf8(Md.render(text.to_utf8(), coloring)) ?? crash "a test's text is UTF-8"
+
+# A host that colors every block it is offered, to show which it is.
+coloring_all : Md.Options
+coloring_all = { uploads: Md.no_uploads, code: |_| Colored("X".to_utf8()) }
 
 md : Str -> Str
 
@@ -35,6 +56,20 @@ expect Str.from_utf8(
 expect md("# about MSG_plans_3") == "<h1>about <a href=\"#msg-plans_3\" class=\"msg-ref\">MSG_plans_3</a></h1>\n"
 expect md("```zig\na<b\n```\nafter") == "<pre><code class=\"language-zig\">a&lt;b\n</code></pre>\n<p>after</p>\n"
 expect md("- a\n- b") == "<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n"
+# The code hook: its HTML inside the renderer's own frame, the language
+# escaped as ever; a block it passes on is the renderer's escape; a
+# quote-reply is never offered; a fence in a list and an unclosed fence are
+# offered their bodies less the fence's indent. The budget is the same
+# whatever the hook does.
+expect colored("```roc\na<b & c\n```\nafter") == "<pre><code class=\"language-roc\"><i>a&lt;b &amp; c\n</i></code></pre>\n<p>after</p>\n"
+expect colored("```zig\na<b\n```") == md("```zig\na<b\n```")
+expect colored("```\na<b\n```") == "<pre><code>a&lt;b\n</code></pre>\n"
+expect colored("- x\n\n  ```roc\n  a\n   b\n  ```") == "<ul>\n<li>\n<p>x</p>\n<pre><code class=\"language-roc\"><i>a\n b\n</i></code></pre>\n</li>\n</ul>\n"
+expect colored("```roc\na") == "<pre><code class=\"language-roc\"><i>a\n</i></code></pre>\n"
+expect Str.from_utf8(Md.render("```quote\n<hi>\n```".to_utf8(), coloring_all)) == Ok(md("```quote\n<hi>\n```"))
+expect Str.from_utf8(Md.render("```a\"b\nz\n```".to_utf8(), coloring_all)) == Ok("<pre><code class=\"language-a&quot;b\">X</code></pre>\n")
+expect Md.work_units("```roc\na<b\n```".to_utf8(), coloring) == Md.work_units("```roc\na<b\n```".to_utf8(), chat)
+expect Str.from_utf8(Md.render_trusted("```roc\na\n```".to_utf8(), coloring)) == Ok("<pre><code class=\"language-roc\"><i>a\n</i></code></pre>\n")
 # A blank line inside an item stays: two paragraphs, a fence's blank line.
 expect md("- one\n\n  two") == "<ul>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ul>\n"
 expect md("- ```\n  a\n\n  b") == "<ul>\n<li>\n<pre><code>a\n\nb\n</code></pre>\n</li>\n</ul>\n"

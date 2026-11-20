@@ -123,11 +123,18 @@ MdFence := [].{
 			MdHtml.code_block_close,
 		)
 		block = match dialect {
-			Chat if MdChat.is_quote_fence(fence.language) => List.concat(
+			Chat(_) if MdChat.is_quote_fence(fence.language) => List.concat(
 				MdText.escape_onto(MdHtml.chat_quote_open, body),
 				MdHtml.chat_quote_close,
 			)
-			Chat => code()
+			Chat(hook) =>
+				match hook({ language: fence.language, body }) {
+					Colored(inner) => List.concat(
+						List.concat(MdHtml.code_block_open(fence.language), inner),
+						MdHtml.code_block_close,
+					)
+					Plain => code()
+				}
 			Document(options) =>
 				match (options.fence)({
 					tag: fence.language,

@@ -16,7 +16,7 @@ import md.Md
 
 answers : List(U8), List(U8) -> List(List(U8))
 answers = |text, rule| {
-	options = { uploads: uploads_of(rule) }
+	options = { uploads: uploads_of(rule), code: Md.plain_code }
 	[
 		Md.render(text, options),
 		Md.work_units(text, options).to_str().to_utf8(),

@@ -24,7 +24,7 @@ answer = |text, mode| [
 ## **THE PLAYGROUND IS A HOST WHOSE UPLOADS ARE `/user_uploads/`**, where
 ## `zig build playground` puts its sample image, as roc-chat's are.
 options : Md.Options
-options = { uploads: Md.uploads_under("/user_uploads/".to_utf8()) }
+options = { uploads: Md.uploads_under("/user_uploads/".to_utf8()), code: Md.plain_code }
 
 ## **A MODE THE PAGE CANNOT NAME IS A CRASH**, never a render in some other
 ## mode.

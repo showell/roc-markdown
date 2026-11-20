@@ -9,6 +9,7 @@
 ## (judge/judge.zig) holds every corpus case to its frozen html and `work_units`.
 ## Pure.
 import MdBlocks
+import MdChat
 import MdDialect
 import MdDocument
 import MdHtml
@@ -23,7 +24,22 @@ Md := [].{
 	## keeps its files is the host's to say: the renderer judges a src as a
 	## URL, and asks this rule of one that passes. There is no default; a
 	## host with no uploads passes `no_uploads`.
-	Options : { uploads : MdSafety.Uploads }
+	##
+	## And how a code block's body is shown (`code`): the host's hook may
+	## color it, as HTML of the host's own that goes inside the renderer's
+	## `<pre><code>`, or pass it to the renderer's escape. A quote-reply is
+	## never offered. There is no default; a host that colors nothing passes
+	## `plain_code`. The hook's work is the host's: the budget charges a code
+	## block's body once, whatever the hook does with it.
+	Options : { uploads : MdSafety.Uploads, code : Md.CodeHook }
+
+	## See MdChat.CodeHook.
+	CodeHook : MdChat.CodeHook
+
+	## The code hook of a host that colors nothing: every code block's body is
+	## the renderer's escape of it.
+	plain_code : MdChat.CodeBlock -> [Colored(List(U8)), Plain]
+	plain_code = |_| Plain
 
 	## The rule of one uploads folder: every path under `prefix`.
 	uploads_under : List(U8) -> MdSafety.Uploads
@@ -38,13 +54,13 @@ Md := [].{
 	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
 	## book builder call by name.
 	render : List(U8), Md.Options -> List(U8)
-	render = |md, { uploads }| html_of(
+	render = |md, { uploads, code }| html_of(
 		md,
 		{
 			wrap: HardWrap,
 			budget: MdText.for_input(md),
 			uploads,
-			dialect: Chat,
+			dialect: Chat(code),
 		},
 	)
 
@@ -53,13 +69,13 @@ Md := [].{
 	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
 	## book builder call by name.
 	render_trusted : List(U8), Md.Options -> List(U8)
-	render_trusted = |md, { uploads }| html_of(
+	render_trusted = |md, { uploads, code }| html_of(
 		md,
 		{
 			wrap: HardWrap,
 			budget: MdText.unlimited,
 			uploads,
-			dialect: Chat,
+			dialect: Chat(code),
 		},
 	)
 
@@ -69,13 +85,13 @@ Md := [].{
 	## `render` names the package's API, which roc-chat, roc-webbox and roc-apps'
 	## book builder call by name.
 	render_trusted_reflow : List(U8), Md.Options -> List(U8)
-	render_trusted_reflow = |md, { uploads }| html_of(
+	render_trusted_reflow = |md, { uploads, code }| html_of(
 		md,
 		{
 			wrap: Reflow,
 			budget: MdText.unlimited,
 			uploads,
-			dialect: Chat,
+			dialect: Chat(code),
 		},
 	)
 
@@ -114,13 +130,13 @@ Md := [].{
 	## The work a render of `md` costs, unlimited, the
 	## measure the budget caps.
 	work_units : List(U8), Md.Options -> U64
-	work_units = |md, { uploads }| match run(
+	work_units = |md, { uploads, code }| match run(
 		md,
 		{
 			wrap: HardWrap,
 			budget: MdText.unlimited,
 			uploads,
-			dialect: Chat,
+			dialect: Chat(code),
 		},
 	) {
 		Ok(done) => done.budget.spent
@@ -130,13 +146,13 @@ Md := [].{
 	## Whether `md` would blow its budget, so a POST
 	## refuses it. One render in good faith with the real budget.
 	hostility : List(U8), Md.Options -> [Renderable, TooMuchFormatting]
-	hostility = |md, { uploads }| match run(
+	hostility = |md, { uploads, code }| match run(
 		md,
 		{
 			wrap: HardWrap,
 			budget: MdText.for_input(md),
 			uploads,
-			dialect: Chat,
+			dialect: Chat(code),
 		},
 	) {
 		Ok(_) => Renderable
