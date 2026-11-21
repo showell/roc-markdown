@@ -142,6 +142,10 @@ expect doc("  ```dot\n  a\n   b\n  ```") == "<svg>a\n b\n</svg>\n"
 expect doc("- x\n\n  ```dot\n  a\n  ```\n") == "<ul>\n<li>\n<p>x</p>\n<svg>a\n</svg>\n</li>\n</ul>\n"
 # A chat has no hook, so the same fences are code.
 expect md("```widget sky\n```\n") == "<pre><code class=\"language-widget\"></code></pre>\n"
+# A language is one class: a form feed or a CR after its first word ends it
+# as a space does, so a message can't add a class of the page's own.
+expect md("```x\u(000C)top-bar\n```\n") == "<pre><code class=\"language-x\"></code></pre>\n"
+expect md("```x\rtop-bar\n```\n") == "<pre><code class=\"language-x\"></code></pre>\n"
 expect md("```dot\na -> b\n```") == "<pre><code class=\"language-dot\">a -&gt; b\n</code></pre>\n"
 
 # The chat's syntax is off in a document, and on in a chat.

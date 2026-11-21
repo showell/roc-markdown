@@ -47,7 +47,7 @@ MdFence := [].{
 							info.take_first(
 								Bytes.count_while(
 									info,
-									{ keep: |byte| byte != ' ' and byte != '\t', at: 0 },
+									{ keep: |byte| !MdText.is_space(byte), at: 0 },
 								),
 							),
 						)
@@ -72,7 +72,7 @@ MdFence := [].{
 		info = Bytes.trim(line.drop_first(open_line.indent + open_line.count), info_space)
 		Bytes.trim(
 			info.drop_first(
-				Bytes.count_while(info, { keep: |byte| byte != ' ' and byte != '\t', at: 0 }),
+				Bytes.count_while(info, { keep: |byte| !MdText.is_space(byte), at: 0 }),
 			),
 			info_space,
 		)
@@ -260,6 +260,12 @@ expect MdFence.open("   ~~~ a b".to_utf8()) == Ok({
 })
 expect MdFence.open("    ~~~".to_utf8()) == Err(NotAFence)
 expect MdFence.open("``` foo\\+bar\\x".to_utf8()).map_ok(|fence| fence.language) == Ok("foo+bar\\x".to_utf8())
+# The language ends at any byte HTML splits a class list on (`MdText.is_space`),
+# so it is one class, `language-<word>`, never a class the page has.
+expect
+	["```x top-bar", "```x\ttop-bar", "```x\u(000C)top-bar", "```x\rtop-bar"].all(
+		|line| MdFence.open(line.to_utf8()).map_ok(|fence| fence.language) == Ok("x".to_utf8()),
+	)
 expect !MdFence.is_close("~~~".to_utf8(), { char: '~', count: 4 })
 expect MdFence.is_close("~~~~".to_utf8(), { char: '~', count: 4 })
 expect MdFence.is_close("~~~~~".to_utf8(), { char: '~', count: 4 })
