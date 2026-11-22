@@ -190,10 +190,17 @@ if exists(scratch_dir) then remove_tree(scratch_dir) end
 
 -- ── the formatters ──
 -- **THE PINNED ROC**: tools:roc-<pin>/roc, a tree's roc-version naming the
--- pin (pins live side by side; the PATH's may be another project's).
+-- pin (pins live side by side; the PATH's may be another project's). A
+-- missing binary, and one whose `roc version` isn't exactly the pin, each
+-- stop the run.
 function pinned_roc(pin_file)
-  local at = "tools:roc-" .. trim(read(pin_file)) .. "/roc"
+  local pin = trim(read(pin_file))
+  local at = "tools:roc-" .. pin .. "/roc"
   if not exists(at) then fail("verify: no " .. at .. " (the toolchain release carries it)") end
+  local said = run({real(at), "version"}, {timeout_ms = 30000, whole = 4000})
+  if trim(said.out) ~= "Roc compiler version " .. pin then
+    fail("verify: " .. at .. " says `" .. trim(said.out) .. "`, not Roc compiler version " .. pin)
+  end
   return real(at)
 end
 local zf = run({"zig", "fmt", "--check", "build.zig", "judge", "playground"}, {cwd = ".", timeout_ms = 60000, tail = 20})
