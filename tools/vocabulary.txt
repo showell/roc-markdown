@@ -1,4 +1,4 @@
-# Words this repository has decided on, read by Shale's cookbook/roc/check_vocabulary.shale.
+# Words this repository has decided on, read by Shale's cookbook/roc/find_retired_words.shale.
 # Each line is `kept: retired, retired`.
 line: pos
 column: col

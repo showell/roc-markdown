@@ -1,4 +1,4 @@
--- roc-markdown's own short terms, which Shale's find_unclear_names passes
+-- roc-markdown's own short terms, which Shale's find_names_and_docs_that_say_too_little passes
 -- beside its cookbook/words/accepted_terms.txt: one a line, each with its
 -- reason after `--`. tools/lints.shale hands it over as `accepted=`.
 args    -- a fence's info string after its language, as MdDocument.Fence names it for a hook (roc-apps' book builder reads the field)
